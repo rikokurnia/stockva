@@ -190,7 +190,10 @@ export const defFor = (kind: BuildingKind) =>
   catalogue.find((d) => d.kind === kind)!;
 export const assetFor = (ticker: string) =>
   assets.find((a) => a.ticker === ticker)!;
-export const sprite = (path: string) => `/assets/sprites/${path}.png`;
+export const sprite = (path: string) =>
+  path.startsWith("vehicles/")
+    ? `/assets/sprites/${path}.webp`
+    : `/assets/sprites/${path}.png`;
 export const money = (n: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
