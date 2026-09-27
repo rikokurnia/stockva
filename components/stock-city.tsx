@@ -599,42 +599,7 @@ export default function StockCity() {
           </span>
         </div>
       )}
-      <div className="camera-controls">
-        <button
-          onClick={() => setGrid(!grid)}
-          className={grid ? "chosen" : ""}
-          aria-label="Toggle grid"
-          title="Grid (G)"
-        >
-          <span aria-hidden="true">▦</span>
-        </button>
-        <span />
-        <button
-          onClick={() => changeZoom(0.1)}
-          disabled={zoom >= 2}
-          aria-label="Zoom in"
-        >
-          <span aria-hidden="true">+</span>
-        </button>
-        <output>{Math.round(zoom * 100)}%</output>
-        <button
-          onClick={() => changeZoom(-0.1)}
-          disabled={zoom <= 1}
-          aria-label="Zoom out"
-        >
-          <span aria-hidden="true">−</span>
-        </button>
-        <button
-          onClick={() => {
-            setZoom(1);
-            setCameraReset((n) => n + 1);
-          }}
-          aria-label="Reset camera"
-          title="Reset camera (Home)"
-        >
-          <span aria-hidden="true">⌂</span>
-        </button>
-      </div>
+
       <aside className="minimap" aria-label="City overview">
         <div className="minimap-heading">
           <Layers size={11} />
@@ -1499,31 +1464,7 @@ export default function StockCity() {
             <kbd>X</kbd>
           </button>
         </nav>
-        <div className="history-controls">
-          <button
-            disabled={!history.current.length}
-            onClick={undo}
-            aria-label="Undo"
-            title="Undo (Ctrl Z)"
-          >
-            <span aria-hidden="true">↶</span>
-          </button>
-          <button
-            disabled={!future.current.length}
-            onClick={redo}
-            aria-label="Redo"
-            title="Redo (Ctrl Shift Z)"
-          >
-            <span aria-hidden="true">↷</span>
-          </button>
-          <span />
-          <button onClick={() => openPanel("help")} aria-label="Help">
-            <span aria-hidden="true">?</span>
-          </button>
-          <button onClick={() => openPanel("settings")} aria-label="Settings">
-            <img src={sprite("buttons/settings")} alt="" />
-          </button>
-        </div>
+
       </footer>
       <div className="status-line">
         <span

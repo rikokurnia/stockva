@@ -102,6 +102,12 @@ input {
   cursor: grab;
   background: #128bb3 url("/assets/ocean-tile.png") repeat;
   background-size: 192px 96px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+.game-world * {
+  -webkit-user-drag: none;
 }
 .game-world:active {
   cursor: grabbing;
@@ -122,6 +128,9 @@ input {
   left: 50%;
   transform-origin: center;
   will-change: transform;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 .island-media {
   position: absolute;

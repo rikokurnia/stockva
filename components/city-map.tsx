@@ -100,7 +100,9 @@ export default function CityMap(props: Props) {
     cell: Cell;
     pan: boolean;
     distance: number;
+    startedOnBuilding?: boolean;
   } | null>(null);
+  const lastDragDistance = useRef(0);
   const space = useRef(false);
   const camera = cameraBounds(size.w, size.h, zoom, pan);
   const { scale } = camera;
@@ -222,7 +224,26 @@ export default function CityMap(props: Props) {
         e.preventDefault();
         onCancel();
       }}
-      onWheel={(e) => onZoom(e.deltaY < 0 ? 0.1 : -0.1)}
+      onDragStart={(e) => e.preventDefault()}
+      onWheel={(e) => {
+        e.preventDefault();
+        if (e.ctrlKey) {
+          onZoom(e.deltaY < 0 ? 0.05 : -0.05);
+        } else if (
+          Math.abs(e.deltaX) > 0 ||
+          !Number.isInteger(e.deltaY) ||
+          Math.abs(e.deltaY) < 40
+        ) {
+          setPan((p) =>
+            clampPan({
+              x: p.x - e.deltaX,
+              y: p.y - e.deltaY,
+            }),
+          );
+        } else {
+          onZoom(e.deltaY < 0 ? 0.1 : -0.1);
+        }
+      }}
       onKeyDown={(e) => {
         const directions: Record<string, [number, number]> = {
           ArrowUp: [0, 40],
@@ -237,8 +258,10 @@ export default function CityMap(props: Props) {
         }
       }}
       onPointerDown={(e) => {
-        if ((e.target as Element).closest(".city-building")) return;
         if (e.button === 2) return;
+        const onBuilding = Boolean(
+          (e.target as Element).closest(".city-building"),
+        );
         const cell = updateHover(e);
         drag.current = {
           x: e.clientX,
@@ -248,8 +271,11 @@ export default function CityMap(props: Props) {
           cell,
           pan: tool === "inspect" || e.button === 1 || space.current,
           distance: 0,
+          startedOnBuilding: onBuilding,
         };
-        e.currentTarget.setPointerCapture(e.pointerId);
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {}
         if (tool === "road" && !drag.current.pan) setPreview([cell]);
       }}
       onPointerMove={(e) => {
@@ -271,9 +297,11 @@ export default function CityMap(props: Props) {
       onPointerUp={(e) => {
         const d = drag.current;
         if (!d) return;
+        lastDragDistance.current = d.distance;
         const cell = cellFromEvent(e);
         if (d.pan) {
-          if (d.distance < 4 && tool === "inspect") onSelect(null);
+          if (d.distance < 4 && tool === "inspect" && !d.startedOnBuilding)
+            onSelect(null);
         } else if (tool === "road") onRoad(roadLine(d.cell, cell));
         else if (d.distance < 8) commit(cell);
         drag.current = null;
@@ -292,6 +320,7 @@ export default function CityMap(props: Props) {
     >
       <div
         className="island-world"
+        onDragStart={(e) => e.preventDefault()}
         style={{
           transform: `translate(calc(-50% + ${camera.x}px),calc(-50% + ${camera.y}px)) scale(${scale})`,
         }}
@@ -358,13 +387,14 @@ export default function CityMap(props: Props) {
                   top: p.y + 36,
                   zIndex: Math.round(p.y + 36),
                 }}
-                onPointerDown={(e) => {
-                  if (tool === "inspect") e.stopPropagation();
-                }}
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
                 onClick={(e) => {
                   if (tool === "inspect") {
                     e.stopPropagation();
-                    onSelect(b.id);
+                    if (lastDragDistance.current < 5) {
+                      onSelect(b.id);
+                    }
                   }
                 }}
                 aria-label={`${def.name} building`}
