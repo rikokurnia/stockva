@@ -1,0 +1,558 @@
+{
+  "sprites": [
+    {
+      "name": "nvidia/minus.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "nvidia/level_1.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "nvidia/level_2.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "nvidia/level_3.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "tesla/minus.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "tesla/level_1.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "tesla/level_2.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "tesla/level_3.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "amazon/minus.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "amazon/level_1.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "amazon/level_2.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "amazon/level_3.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "blackrock/minus.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "blackrock/level_1.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "blackrock/level_2.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "blackrock/level_3.png",
+      "size": [
+        768,
+        960
+      ],
+      "anchor": [
+        384,
+        928
+      ]
+    },
+    {
+      "name": "functional/portfolio_city_hall.png",
+      "size": [
+        716,
+        689
+      ],
+      "anchor": [
+        358,
+        665
+      ]
+    },
+    {
+      "name": "functional/stock_exchange.png",
+      "size": [
+        772,
+        756
+      ],
+      "anchor": [
+        386,
+        732
+      ]
+    },
+    {
+      "name": "functional/oracle_data_center.png",
+      "size": [
+        707,
+        652
+      ],
+      "anchor": [
+        353,
+        628
+      ]
+    },
+    {
+      "name": "vehicles/electric_bus/upper_left.png",
+      "size": [
+        731,
+        634
+      ],
+      "anchor": [
+        365,
+        610
+      ]
+    },
+    {
+      "name": "vehicles/electric_bus/upper_right.png",
+      "size": [
+        727,
+        628
+      ],
+      "anchor": [
+        363,
+        604
+      ]
+    },
+    {
+      "name": "vehicles/construction_truck/upper_left.png",
+      "size": [
+        739,
+        582
+      ],
+      "anchor": [
+        369,
+        558
+      ]
+    },
+    {
+      "name": "vehicles/construction_truck/upper_right.png",
+      "size": [
+        743,
+        583
+      ],
+      "anchor": [
+        371,
+        559
+      ]
+    },
+    {
+      "name": "vehicles/maintenance_van/upper_left.png",
+      "size": [
+        716,
+        618
+      ],
+      "anchor": [
+        358,
+        594
+      ]
+    },
+    {
+      "name": "vehicles/maintenance_van/upper_right.png",
+      "size": [
+        717,
+        618
+      ],
+      "anchor": [
+        358,
+        594
+      ]
+    },
+    {
+      "name": "effects/construction.png",
+      "size": [
+        686,
+        435
+      ],
+      "anchor": [
+        343,
+        411
+      ]
+    },
+    {
+      "name": "effects/upgrade.png",
+      "size": [
+        640,
+        551
+      ],
+      "anchor": [
+        320,
+        527
+      ]
+    },
+    {
+      "name": "effects/negative_performance.png",
+      "size": [
+        729,
+        506
+      ],
+      "anchor": [
+        364,
+        482
+      ]
+    },
+    {
+      "name": "effects/selection.png",
+      "size": [
+        765,
+        547
+      ],
+      "anchor": [
+        382,
+        523
+      ]
+    },
+    {
+      "name": "buttons/buy.png",
+      "size": [
+        472,
+        497
+      ],
+      "anchor": [
+        236,
+        473
+      ]
+    },
+    {
+      "name": "buttons/sell.png",
+      "size": [
+        483,
+        500
+      ],
+      "anchor": [
+        241,
+        476
+      ]
+    },
+    {
+      "name": "buttons/swap.png",
+      "size": [
+        482,
+        501
+      ],
+      "anchor": [
+        241,
+        477
+      ]
+    },
+    {
+      "name": "buttons/portfolio.png",
+      "size": [
+        483,
+        504
+      ],
+      "anchor": [
+        241,
+        480
+      ]
+    },
+    {
+      "name": "buttons/settings.png",
+      "size": [
+        475,
+        503
+      ],
+      "anchor": [
+        237,
+        479
+      ]
+    },
+    {
+      "name": "roads/straight_ul_lr.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "UL",
+        "LR"
+      ]
+    },
+    {
+      "name": "roads/straight_ur_ll.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "UR",
+        "LL"
+      ]
+    },
+    {
+      "name": "roads/corner_ul_ur.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "UL",
+        "UR"
+      ]
+    },
+    {
+      "name": "roads/corner_ur_lr.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "UR",
+        "LR"
+      ]
+    },
+    {
+      "name": "roads/corner_lr_ll.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "LR",
+        "LL"
+      ]
+    },
+    {
+      "name": "roads/corner_ll_ul.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "LL",
+        "UL"
+      ]
+    },
+    {
+      "name": "roads/t_ul_ur_ll.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "UL",
+        "UR",
+        "LL"
+      ]
+    },
+    {
+      "name": "roads/t_ul_ur_lr.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "UL",
+        "UR",
+        "LR"
+      ]
+    },
+    {
+      "name": "roads/t_ul_ll_lr.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "UL",
+        "LL",
+        "LR"
+      ]
+    },
+    {
+      "name": "roads/t_ur_ll_lr.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "UR",
+        "LL",
+        "LR"
+      ]
+    },
+    {
+      "name": "roads/intersection.png",
+      "size": [
+        512,
+        296
+      ],
+      "anchor": [
+        256,
+        148
+      ],
+      "connections": [
+        "UL",
+        "UR",
+        "LL",
+        "LR"
+      ]
+    }
+  ],
+  "road_tile_size": [
+    512,
+    296
+  ],
+  "notes": [
+    "Road edge centers and asphalt/sidewalk widths are generated from shared (u,v) geometry. Turns use a continuous quarter-circle centerline. No grass, trees or benches are baked into road tiles.",
+    "Company states use shared 768 x 960 transparent canvases and bottom-center anchors; image-generated architecture may vary in its apparent base shape and exact floor count.",
+    "Vehicle upper-axis sprites are drawn as rear three-quarter views. Mirror in engine for opposite directions per revised specification."
+  ]
+}

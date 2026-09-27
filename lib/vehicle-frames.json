@@ -1,0 +1,152 @@
+{
+  "electric_bus": {
+    "upper_left": {
+      "src": "/assets/sprites/vehicles/electric_bus/upper_left.webp",
+      "viewBox": "32 32 667 570",
+      "width": 731,
+      "height": 634
+    },
+    "upper_right": {
+      "src": "/assets/sprites/vehicles/electric_bus/upper_right.webp",
+      "viewBox": "32 32 663 564",
+      "width": 727,
+      "height": 628
+    },
+    "lower_left": {
+      "src": "/assets/sprites/vehicles/electric_bus/lower_left.webp",
+      "viewBox": "62 112 1143 1030",
+      "width": 1254,
+      "height": 1254
+    },
+    "lower_right": {
+      "src": "/assets/sprites/vehicles/electric_bus/lower_right.webp",
+      "viewBox": "61 88 1134 1063",
+      "width": 1254,
+      "height": 1254
+    },
+    "right": {
+      "src": "/assets/sprites/vehicles/electric_bus/turns.webp",
+      "viewBox": "39 173 784 369",
+      "width": 1254,
+      "height": 1254
+    },
+    "down": {
+      "src": "/assets/sprites/vehicles/electric_bus/turns.webp",
+      "viewBox": "891 59 321 515",
+      "width": 1254,
+      "height": 1254
+    },
+    "left": {
+      "src": "/assets/sprites/vehicles/electric_bus/turns.webp",
+      "viewBox": "40 771 794 367",
+      "width": 1254,
+      "height": 1254
+    },
+    "up": {
+      "src": "/assets/sprites/vehicles/electric_bus/turns.webp",
+      "viewBox": "910 662 280 502",
+      "width": 1254,
+      "height": 1254
+    }
+  },
+  "construction_truck": {
+    "upper_left": {
+      "src": "/assets/sprites/vehicles/construction_truck/upper_left.webp",
+      "viewBox": "32 32 675 517",
+      "width": 739,
+      "height": 582
+    },
+    "upper_right": {
+      "src": "/assets/sprites/vehicles/construction_truck/upper_right.webp",
+      "viewBox": "32 32 678 519",
+      "width": 743,
+      "height": 583
+    },
+    "lower_left": {
+      "src": "/assets/sprites/vehicles/construction_truck/lower_left.webp",
+      "viewBox": "48 117 1168 1031",
+      "width": 1254,
+      "height": 1254
+    },
+    "lower_right": {
+      "src": "/assets/sprites/vehicles/construction_truck/lower_right.webp",
+      "viewBox": "60 91 1140 1068",
+      "width": 1254,
+      "height": 1254
+    },
+    "right": {
+      "src": "/assets/sprites/vehicles/construction_truck/turns.webp",
+      "viewBox": "56 131 718 417",
+      "width": 1254,
+      "height": 1254
+    },
+    "down": {
+      "src": "/assets/sprites/vehicles/construction_truck/turns.webp",
+      "viewBox": "845 54 346 525",
+      "width": 1254,
+      "height": 1254
+    },
+    "left": {
+      "src": "/assets/sprites/vehicles/construction_truck/turns.webp",
+      "viewBox": "49 745 724 415",
+      "width": 1254,
+      "height": 1254
+    },
+    "up": {
+      "src": "/assets/sprites/vehicles/construction_truck/turns.webp",
+      "viewBox": "844 696 350 496",
+      "width": 1254,
+      "height": 1254
+    }
+  },
+  "maintenance_van": {
+    "upper_left": {
+      "src": "/assets/sprites/vehicles/maintenance_van/upper_left.webp",
+      "viewBox": "32 32 652 554",
+      "width": 716,
+      "height": 618
+    },
+    "upper_right": {
+      "src": "/assets/sprites/vehicles/maintenance_van/upper_right.webp",
+      "viewBox": "32 33 653 552",
+      "width": 717,
+      "height": 618
+    },
+    "lower_left": {
+      "src": "/assets/sprites/vehicles/maintenance_van/lower_left.webp",
+      "viewBox": "32 104 1196 1040",
+      "width": 1254,
+      "height": 1254
+    },
+    "lower_right": {
+      "src": "/assets/sprites/vehicles/maintenance_van/lower_right.webp",
+      "viewBox": "51 92 1165 1099",
+      "width": 1254,
+      "height": 1254
+    },
+    "right": {
+      "src": "/assets/sprites/vehicles/maintenance_van/turns.webp",
+      "viewBox": "54 132 710 412",
+      "width": 1254,
+      "height": 1254
+    },
+    "down": {
+      "src": "/assets/sprites/vehicles/maintenance_van/turns.webp",
+      "viewBox": "829 75 368 503",
+      "width": 1254,
+      "height": 1254
+    },
+    "left": {
+      "src": "/assets/sprites/vehicles/maintenance_van/turns.webp",
+      "viewBox": "52 734 728 411",
+      "width": 1254,
+      "height": 1254
+    },
+    "up": {
+      "src": "/assets/sprites/vehicles/maintenance_van/turns.webp",
+      "viewBox": "839 687 349 476",
+      "width": 1254,
+      "height": 1254
+    }
+  }
+}
