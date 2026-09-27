@@ -319,7 +319,7 @@ export default function CityMap(props: Props) {
               } else v.style.display = "none";
             }}
           >
-            <source src="/assets/our-main-bg.mp4" type="video/mp4" />
+            <source src="/assets/background-main.mp4" type="video/mp4" />
           </video>
         )}
         {(grid || tool !== "inspect") && (
