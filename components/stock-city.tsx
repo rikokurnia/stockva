@@ -1403,11 +1403,15 @@ export default function StockCity() {
             aria-pressed={portfolioView}
             title={portfolioView ? "Currently in Portfolio view. Click or press V for Select mode" : "Currently in Select mode. Click or press V for Portfolio view"}
           >
-            <img
-              src="/assets/portfolio-menu.png"
-              alt={portfolioView ? "Portfolio view" : "Select mode"}
-              className="menu-custom-icon"
-            />
+            {portfolioView ? (
+              <img
+                src="/assets/portfolio-menu.png"
+                alt="Portfolio view"
+                className="menu-custom-icon"
+              />
+            ) : (
+              <GameArt index={0} />
+            )}
             <span>{portfolioView ? "Portfolio" : "Select"}</span>
             <kbd>V</kbd>
           </button>

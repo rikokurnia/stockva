@@ -2562,6 +2562,20 @@ input {
     filter 0.15s,
     transform 0.15s;
 }
+.portfolio-select-button > .game-art,
+.portfolio-select-button > .menu-custom-icon {
+  animation: modeIconSwap 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modeIconSwap {
+  from {
+    opacity: 0.6;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 .tool-palette > button > span:not(.game-art),
 .build-main-button > span:not(.game-art) {
   font-size: 9.5px;
