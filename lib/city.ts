@@ -44,21 +44,70 @@ export const assets: Asset[] = [
     color: "#526d69",
     sprite: "blackrock",
   },
+  {
+    ticker: "MSFT",
+    name: "Microsoft",
+    sector: "Technology",
+    price: 428.76,
+    change: 0.83,
+    color: "#00a4ef",
+    sprite: "microsoft",
+  },
+  {
+    ticker: "JPM",
+    name: "JPMorgan Chase",
+    sector: "Finance",
+    price: 251.9,
+    change: 0.54,
+    color: "#1170cf",
+    sprite: "jpmorgan",
+  },
+  {
+    ticker: "WMT",
+    name: "Walmart",
+    sector: "Consumer",
+    price: 96.8,
+    change: 0.48,
+    color: "#0071ce",
+    sprite: "walmart",
+  },
+  {
+    ticker: "KO",
+    name: "Coca-Cola",
+    sector: "Consumer",
+    price: 62.74,
+    change: -0.21,
+    color: "#f40009",
+    sprite: "coca_cola",
+  },
+  {
+    ticker: "XOM",
+    name: "ExxonMobil",
+    sector: "Energy",
+    price: 109.42,
+    change: 1.18,
+    color: "#fe000c",
+    sprite: "exxonmobil",
+  },
+  {
+    ticker: "UNH",
+    name: "UnitedHealth Group",
+    sector: "Healthcare",
+    price: 598.24,
+    change: 0.65,
+    color: "#002677",
+    sprite: "unitedhealth",
+  },
   ...[
     ["AAPL", "Apple", "Technology", 237.49, 1.12],
-    ["MSFT", "Microsoft", "Technology", 428.76, 0.83],
     ["GOOGL", "Alphabet", "Technology", 192.04, 1.43],
     ["META", "Meta", "Technology", 612.77, -0.64],
     ["NFLX", "Netflix", "Consumer", 886.12, 2.1],
     ["AMD", "AMD", "Technology", 121.34, -1.08],
     ["AVGO", "Broadcom", "Technology", 228.4, 1.65],
     ["COIN", "Coinbase", "Finance", 274.3, -2.32],
-    ["JPM", "JPMorgan Chase", "Finance", 251.9, 0.54],
     ["BRK.B", "Berkshire Hathaway", "Finance", 478.2, 0.31],
     ["V", "Visa", "Finance", 338.14, 0.92],
-    ["WMT", "Walmart", "Consumer", 96.8, 0.48],
-    ["KO", "Coca-Cola", "Consumer", 62.74, -0.21],
-    ["XOM", "Exxon Mobil", "Energy", 109.42, 1.18],
     ["SPY", "S&P 500 ETF", "Index", 598.48, 0.73],
     ["QQQ", "Nasdaq 100 ETF", "Index", 523.16, 1.08],
   ].map(([ticker, name, sector, price, change]) => ({
@@ -75,7 +124,19 @@ export type Cell = { r: number; c: number };
 export type Category = "roads" | "companies" | "services";
 export type Tool = "inspect" | "road" | "build" | "bulldoze" | "move";
 export type BuildingKind =
-  "nvidia" | "tesla" | "amazon" | "blackrock" | "hall" | "exchange" | "oracle";
+  | "nvidia"
+  | "tesla"
+  | "amazon"
+  | "blackrock"
+  | "microsoft"
+  | "jpmorgan"
+  | "walmart"
+  | "coca_cola"
+  | "exxonmobil"
+  | "unitedhealth"
+  | "hall"
+  | "exchange"
+  | "oracle";
 export type BuildingDef = {
   kind: BuildingKind;
   name: string;
@@ -125,6 +186,66 @@ export const catalogue: BuildingDef[] = [
     cost: 500,
     description:
       "Asset management. Place a building to create a simulated BlackRock stock position.",
+  },
+  {
+    kind: "microsoft",
+    name: "Microsoft",
+    category: "companies",
+    ticker: "MSFT",
+    image: "microsoft/level_1",
+    cost: 500,
+    description:
+      "Software & cloud infrastructure. Place a building to create a simulated Microsoft stock position.",
+  },
+  {
+    kind: "jpmorgan",
+    name: "JPMorgan Chase",
+    category: "companies",
+    ticker: "JPM",
+    image: "jpmorgan/level_1",
+    cost: 500,
+    description:
+      "Global banking & financial services. Place a building to create a simulated JPMorgan stock position.",
+  },
+  {
+    kind: "walmart",
+    name: "Walmart",
+    category: "companies",
+    ticker: "WMT",
+    image: "walmart/level_1",
+    cost: 500,
+    description:
+      "Retail & supply chain networks. Place a building to create a simulated Walmart stock position.",
+  },
+  {
+    kind: "coca_cola",
+    name: "Coca-Cola",
+    category: "companies",
+    ticker: "KO",
+    image: "coca_cola/level_1",
+    cost: 500,
+    description:
+      "Global beverages & consumer goods. Place a building to create a simulated Coca-Cola stock position.",
+  },
+  {
+    kind: "exxonmobil",
+    name: "ExxonMobil",
+    category: "companies",
+    ticker: "XOM",
+    image: "exxonmobil/level_1",
+    cost: 500,
+    description:
+      "Energy & petrochemical infrastructure. Place a building to create a simulated ExxonMobil stock position.",
+  },
+  {
+    kind: "unitedhealth",
+    name: "UnitedHealth",
+    category: "companies",
+    ticker: "UNH",
+    image: "unitedhealth/level_1",
+    cost: 500,
+    description:
+      "Healthcare & medical services. Place a building to create a simulated UnitedHealth stock position.",
   },
   {
     kind: "hall",
