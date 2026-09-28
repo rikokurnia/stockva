@@ -1,0 +1,79 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { defFor, hasRoad, wholeMoney, valueOf } from "../lib/city";
+import type { CityState, PriceMap } from "../lib/city";
+import styles from "./city-advisor.module.css";
+
+type Message = { role: "guide" | "user"; text: string };
+
+export default function CityAdvisor({ city, prices }: { city: CityState; prices: PriceMap }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const log = useRef<HTMLDivElement>(null);
+  const holdings = city.buildings.filter((b) => defFor(b.kind).ticker);
+  const disconnected = city.buildings.filter((b) => !hasRoad(b, city.roads)).length;
+  const total = holdings.reduce((sum, b) => sum + valueOf(b, prices), 0);
+  const briefing = !city.roads.length
+    ? "A fresh start. Lay your first road."
+    : disconnected
+      ? `${disconnected} ${disconnected === 1 ? "building needs" : "buildings need"} road access.`
+      : !holdings.length
+        ? "Roads are ready. Bring your first company home."
+        : `${holdings.length} company ${holdings.length === 1 ? "building" : "buildings"} · ${wholeMoney(total)} in stock value.`;
+
+  useEffect(() => { if (open) input.current?.focus({ preventScroll: true }); }, [open]);
+  useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [messages, open]);
+
+  function reply(question: string) {
+    const q = question.toLowerCase();
+    if (/buy|sell|rotate|trade|rebalance|defensive|transaction/.test(q))
+      return "I can help you explore your city here. Trading commands aren’t connected in this preview. Select a company building to review its position and available actions; this chat won’t move your funds.";
+    if (/allocation|portfolio|stock|holding/.test(q)) {
+      if (!holdings.length) return `Your portfolio is still empty, with ${wholeMoney(city.cash)} in demo funds. Open Build to choose your first company, then place it beside a road. Portfolio will reveal each building’s return and level.`;
+      const groups = new Map<string, number>();
+      holdings.forEach((b) => { const name = defFor(b.kind).name; groups.set(name, (groups.get(name) ?? 0) + valueOf(b, prices)); });
+      return `${wholeMoney(total)} in simulated stock positions. ${Array.from(groups).sort((a, b) => b[1] - a[1]).map(([name, value]) => `${name}: ${total > 0 ? (value / total * 100).toFixed(1) : "0"}%`).join(" · ")}. Open Portfolio to see returns and building levels across your island.`;
+    }
+    if (/expand|next|build|road|review|city/.test(q))
+      return `${briefing} You have ${wholeMoney(city.cash)} in demo funds. ${!city.roads.length ? "Open Build and choose Roads, then draw a small connected route on the island." : disconnected ? "Extend a road to the disconnected buildings before adding a new block." : "Open Build to choose a company and place it alongside your road network. Select a finished building to explore its position."}`;
+    return "Try asking for a city review, your portfolio allocation, or what to build next. This preview guide uses your current city and simulated prices.";
+  }
+
+  function send(text: string) {
+    const question = text.trim();
+    if (!question) return;
+    setMessages((previous) => [...previous, { role: "user", text: question }, { role: "guide", text: reply(question) }]);
+    setDraft("");
+    input.current?.focus({ preventScroll: true });
+  }
+
+  return (
+    <aside className={styles.advisor} data-open={open} aria-label="City advisor" onKeyDown={(event) => {
+      event.stopPropagation();
+      if (event.key === "Escape" && open) { setOpen(false); toggle.current?.focus(); }
+    }}>
+      {open && <section id="city-advisor-content" className={styles.content} aria-label="Advisor conversation">
+        <header className={styles.heading}><div><span className={styles.eyebrow}>A LITTLE GUIDANCE</span><h2>What’s next, Mayor?</h2></div><span className={styles.demo}>Demo guide</span></header>
+        <div ref={log} className={styles.messages} role="log" aria-live="polite" aria-relevant="additions">
+          <p className={styles.welcome}>Let’s grow your island, one good decision at a time. Ask about your city or your portfolio.</p>
+          {messages.map((message, index) => <p key={index} className={message.role === "user" ? styles.user : styles.answer}><span>{message.role === "user" ? "You" : "City advisor"}</span>{message.text}</p>)}
+        </div>
+        <div className={styles.prompts} aria-label="Suggested questions">{["Review my city", "Portfolio allocation", "What to build next?"].map((prompt) => <button key={prompt} onClick={() => send(prompt)}>{prompt}</button>)}</div>
+        <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); send(draft); }}>
+          <input ref={input} value={draft} maxLength={500} onChange={(event) => setDraft(event.target.value)} aria-label="Ask your city advisor" placeholder="Ask about your island…" autoComplete="off" />
+          <button type="submit" disabled={!draft.trim()} aria-label="Send message">Send</button>
+        </form>
+        <p className={styles.note}>Local city insights · Simulated assets</p>
+      </section>}
+      <button ref={toggle} className={styles.capsule} aria-expanded={open} aria-controls="city-advisor-content" onClick={() => setOpen((value) => !value)}>
+        <img src="/assets/ai_logo.png" alt="" width="64" height="64" draggable={false} />
+        <span className={styles.brief}><span className={styles.title}><i />City Advisor<span>{open ? "Close" : "Ask me"}</span></span><span className={styles.summary}>{briefing}</span></span>
+        <span className={styles.chevron} aria-hidden="true" />
+      </button>
+    </aside>
+  );
+}

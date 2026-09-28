@@ -2550,6 +2550,18 @@ input {
     filter 0.15s,
     transform 0.15s;
 }
+.tool-palette > button > img.menu-custom-icon,
+.build-main-button > img.menu-custom-icon {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  margin-bottom: 3px;
+  border-radius: 8px;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
+  transition:
+    filter 0.15s,
+    transform 0.15s;
+}
 .tool-palette > button > span:not(.game-art),
 .build-main-button > span:not(.game-art) {
   font-size: 9.5px;
@@ -2573,12 +2585,19 @@ input {
   color: #fffbe2;
 }
 .tool-palette > button:hover > .game-art,
-.build-main-button:hover > .game-art {
+.build-main-button:hover > .game-art,
+.tool-palette > button:hover > img.menu-custom-icon,
+.build-main-button:hover > img.menu-custom-icon {
   transform: translateY(-2px) scale(1.05);
 }
 .tool-palette > button.active > .game-art,
 .build-main-button.active > .game-art {
   filter: drop-shadow(0 0 4px var(--ks-kinpaku)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+  transform: translateY(-2px) scale(1.05);
+}
+.tool-palette > button.active > img.menu-custom-icon,
+.build-main-button.active > img.menu-custom-icon {
+  filter: drop-shadow(0 0 6px var(--ks-kinpaku)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
   transform: translateY(-2px) scale(1.05);
 }
 .tool-palette > button.active > span:not(.game-art),
@@ -3094,6 +3113,11 @@ input {
     width: 46px;
     height: 58px;
   }
+  .tool-palette > button > img.menu-custom-icon,
+  .build-main-button > img.menu-custom-icon {
+    width: 40px;
+    height: 40px;
+  }
   .construction-tray {
     left: 62px;
     top: 50px;
@@ -3494,8 +3518,10 @@ input {
 }
 .tool-palette > button:focus-visible > .game-art,
 .build-main-button:focus-visible > .game-art,
-.sub-tool-button:focus-visible > .game-art {
-  filter: drop-shadow(0 0 4px #fff1a7);
+.sub-tool-button:focus-visible > .game-art,
+.tool-palette > button:focus-visible > img.menu-custom-icon,
+.build-main-button:focus-visible > img.menu-custom-icon {
+  filter: drop-shadow(0 0 6px #fff1a7);
 }
 @media (max-width: 760px) {
   .active-tool-chip {
@@ -3619,10 +3645,9 @@ input {
 @media (prefers-reduced-motion: reduce) {
   .tool-palette > button > .game-art,
   .build-main-button > .game-art,
-  .sub-tool-button > .game-art {
+  .sub-tool-button > .game-art,
+  .tool-palette > button > img.menu-custom-icon,
+  .build-main-button > img.menu-custom-icon {
     transition: none;
-  }
-  .build-submenu {
-    animation: none;
   }
 }

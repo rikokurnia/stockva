@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import CityMap from "./city-map";
+import CityAdvisor from "./city-advisor";
 import portfolioStyles from "./portfolio-view.module.css";
 import type {
   BuildingKind,
@@ -218,6 +219,16 @@ export default function StockCity() {
     cancel();
     setPortfolioView(true);
   };
+  const toggleSelectPortfolio = () => {
+    if (portfolioView) {
+      setPortfolioView(false);
+      setActiveTool("inspect");
+      notify("Select mode active. Click any building to inspect.");
+    } else {
+      showPortfolio();
+      notify("Portfolio view active. Showing all holdings.");
+    }
+  };
   const cancel = () => {
     setTool("inspect");
     setKind(null);
@@ -407,7 +418,7 @@ export default function StockCity() {
           setPanel(null);
           break;
         case "v":
-          cancel();
+          toggleSelectPortfolio();
           break;
         case "x":
           setTool("bulldoze");
@@ -1386,18 +1397,19 @@ export default function StockCity() {
       <footer className="command-bar">
         <nav className="tool-palette" aria-label="Construction tools">
           <button
-            className={tool === "inspect" && !category && !portfolioView ? "active" : ""}
-            onClick={cancel}
-            aria-label="Select tool"
-            aria-pressed={tool === "inspect" && !category && !portfolioView}
+            className={`portfolio-select-button ${portfolioView ? "active portfolio-active" : (tool === "inspect" && !category ? "active select-active" : "")}`}
+            onClick={toggleSelectPortfolio}
+            aria-label={portfolioView ? "Switch to Select mode" : "Switch to Portfolio view"}
+            aria-pressed={portfolioView}
+            title={portfolioView ? "Currently in Portfolio view. Click or press V for Select mode" : "Currently in Select mode. Click or press V for Portfolio view"}
           >
-            <GameArt index={0} />
-            <span>Select</span>
+            <img
+              src="/assets/portfolio-menu.png"
+              alt={portfolioView ? "Portfolio view" : "Select mode"}
+              className="menu-custom-icon"
+            />
+            <span>{portfolioView ? "Portfolio" : "Select"}</span>
             <kbd>V</kbd>
-          </button>
-          <button className={portfolioView ? "active" : ""} onClick={showPortfolio} aria-label="Portfolio view" aria-pressed={portfolioView} title="Show all holdings on the island">
-            <GameArt index={5} />
-            <span>Portfolio</span>
           </button>
           <span className="tool-divider" />
           <button
@@ -1413,7 +1425,11 @@ export default function StockCity() {
             aria-expanded={Boolean(category)}
             aria-pressed={Boolean(category || tool === "road" || (tool === "build" && kind))}
           >
-            <GameArt index={2} />
+            <img
+              src="/assets/buids-menu.png"
+              alt="Build menu"
+              className="menu-custom-icon"
+            />
             <span>Build</span>
             <kbd>B</kbd>
           </button>
@@ -1437,6 +1453,7 @@ export default function StockCity() {
         </nav>
 
       </footer>
+      <CityAdvisor city={city} prices={prices} />
       {confirmReset && (
         <div className="confirm-overlay">
           <div
