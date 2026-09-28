@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownUp,
+  ArrowUpRight,
   Building2,
   Check,
   ChevronDown,
@@ -83,7 +84,7 @@ export default function StockCity() {
     [tool, setActiveTool] = useState<Tool>("inspect"),
     [portfolioView, setPortfolioView] = useState(false),
     [category, setCategory] = useState<Category | null>(null),
-    [buildExpanded, setBuildExpanded] = useState(false),
+    [lastCategory, setLastCategory] = useState<Category>("companies"),
     [guideHidden, setGuideHidden] = useState(false),
     [kind, setKind] = useState<BuildingKind | null>(null),
     [amount, setAmount] = useState(500),
@@ -226,33 +227,35 @@ export default function StockCity() {
     setCategory(null);
   };
   const chooseCategory = (next: Category) => {
-    if (category === next) {
-      cancel();
-      return;
-    }
-    setBuildExpanded(true);
+    setPortfolioView(false);
     setPanel(null);
     setSelected(null);
     setMoving(null);
-    setCategory(category === next ? null : next);
-    setKind(null);
-    setTool(next === "roads" ? "road" : "inspect");
-    notify(
-      next === "roads"
-        ? "Click and drag across the island to draw a road."
-        : next === "companies"
-          ? "Choose a company, then place its building on the island."
-          : "Choose a service, then place it on the island.",
-    );
+    setCategory(next);
+    setLastCategory(next);
+    if (next === "roads") {
+      setTool("road");
+      setKind(null);
+    } else {
+      const firstInCat = catalogue.find((d) => d.category === next);
+      if (firstInCat && (!kind || defFor(kind).category !== next)) {
+        setKind(firstInCat.kind);
+        setTool("build");
+      }
+    }
   };
-  const chooseBuilding = (value: BuildingKind) => {
+  const chooseBuilding = (value: BuildingKind, autoClose = false) => {
     setKind(value);
     setTool("build");
     setSelected(null);
     setMoving(null);
     setPanel(null);
-    setCategory(defFor(value).category);
-    notify(`Place ${defFor(value).name}. Right-click or Esc to cancel.`);
+    if (autoClose) {
+      setCategory(null);
+      notify(`Placing ${defFor(value).name}. Click island plot to build, Esc to cancel.`);
+    } else {
+      setCategory(defFor(value).category);
+    }
   };
   const openPanel = (value: Panel) => {
     setPortfolioView(false);
@@ -385,7 +388,6 @@ export default function StockCity() {
       }
       switch (e.key.toLowerCase()) {
         case "r":
-          setBuildExpanded(true);
           setCategory("roads");
           setTool("road");
           setKind(null);
@@ -393,14 +395,12 @@ export default function StockCity() {
           setPanel(null);
           break;
         case "b":
-          setBuildExpanded(true);
           setCategory("companies");
           setTool("inspect");
           setKind(null);
           setPanel(null);
           break;
         case "s":
-          setBuildExpanded(true);
           setCategory("services");
           setTool("inspect");
           setKind(null);
@@ -569,7 +569,11 @@ export default function StockCity() {
                 ? "$10 / tile · drag a route"
                 : tool === "bulldoze"
                   ? "Select an object to remove"
-                  : "Choose a clear plot on the island"}
+                  : kind && defFor(kind).ticker
+                    ? `$${amount} investment · Click island plot to build`
+                    : kind
+                      ? `${wholeMoney(defFor(kind).cost)} · Click island plot to build`
+                      : "Choose a clear plot on the island"}
             </small>
           </span>
           <button onClick={cancel} aria-label="Finish building">
@@ -606,26 +610,49 @@ export default function StockCity() {
           className="construction-tray"
           aria-label="Construction catalogue"
         >
-          <header>
-            <span>
-              {category === "roads"
-                ? "TRANSPORT"
-                : category === "companies"
-                  ? "STOCK BUILDINGS"
-                  : "CITY SERVICES"}
-            </span>
-            <small>
-              {category === "roads"
-                ? "Click and drag to build"
-                : category === "companies"
-                  ? "Select a building, then place it on the island"
-                  : "Place services wherever you need them"}
-            </small>
+          <header className="build-tray-header">
+            <div className="build-tray-nav">
+              <span className="build-title-badge">BUILDS</span>
+              <div className="build-category-tabs" role="tablist" aria-label="Build categories">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={category === "roads"}
+                  className={`build-cat-tab ${category === "roads" ? "active" : ""}`}
+                  onClick={() => chooseCategory("roads")}
+                >
+                  <GameArt index={1} />
+                  <span>Roads</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={category === "companies"}
+                  className={`build-cat-tab ${category === "companies" ? "active" : ""}`}
+                  onClick={() => chooseCategory("companies")}
+                >
+                  <GameArt index={2} />
+                  <span>Companies</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={category === "services"}
+                  className={`build-cat-tab ${category === "services" ? "active" : ""}`}
+                  onClick={() => chooseCategory("services")}
+                >
+                  <GameArt index={3} />
+                  <span>Services</span>
+                </button>
+              </div>
+            </div>
             <button
+              className="build-tray-close"
               onClick={() => setCategory(null)}
-              aria-label="Hide construction catalogue"
+              aria-label="Close construction catalogue"
+              title="Close (Esc)"
             >
-              <ChevronDown size={16} />
+              <X size={15} />
             </button>
           </header>
           <div className="tray-content">
@@ -636,7 +663,10 @@ export default function StockCity() {
                   onClick={() => {
                     setTool("road");
                     setKind(null);
+                    setCategory(null);
+                    notify("Drawing roads ($10/tile). Drag a route on island, release to build. Esc to finish.");
                   }}
+                  title="Click to start drawing roads"
                 >
                   <div className="card-image">
                     <img
@@ -672,10 +702,18 @@ export default function StockCity() {
                       <br />
                       Corners and intersections connect automatically.
                     </p>
-                    <span>
-                      <span className="instruction-key">SPACE</span> Hold Space
-                      to pan while building
-                    </span>
+                    <button
+                      className="place-on-island road-start-btn"
+                      onClick={() => {
+                        setTool("road");
+                        setKind(null);
+                        setCategory(null);
+                        notify("Drawing roads ($10/tile). Drag a route on island, release to build. Esc to finish.");
+                      }}
+                    >
+                      <span>Start Drawing Roads ($10/tile)</span>
+                      <ArrowUpRight size={14} />
+                    </button>
                   </div>
                 </div>
               </>
@@ -688,6 +726,7 @@ export default function StockCity() {
                       key={d.kind}
                       className={`build-card ${kind === d.kind ? "chosen" : ""} ${d.category === "companies" ? "company-card" : "service-card"}`}
                       onClick={() => chooseBuilding(d.kind)}
+                      onDoubleClick={() => chooseBuilding(d.kind, true)}
                       disabled={!ready || city.cash < (d.ticker ? 1 : d.cost)}
                     >
                       <div className="card-image">
@@ -707,7 +746,21 @@ export default function StockCity() {
                       <span className="footprint-label">2 × 2 footprint</span>
                       {buildDef.ticker ? (
                         <>
-                          <label htmlFor="build-amount">Demo position</label>
+                          <div className="investment-header">
+                            <label htmlFor="build-amount">Investment</label>
+                            <div className="quick-amount-chips">
+                              {[50, 100, 200, 500].map((amt) => (
+                                <button
+                                  key={amt}
+                                  type="button"
+                                  className={`quick-amount-btn ${amount === amt ? "active" : ""}`}
+                                  onClick={() => setAmount(amt)}
+                                >
+                                  ${amt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                           <div className="investment-input">
                             <span>$</span>
                             <input
@@ -734,6 +787,21 @@ export default function StockCity() {
                             shares · {money(priceOf(buildDef.ticker, prices))} /
                             share · {PROVIDER_TAG}
                           </small>
+                          <button
+                            className="place-on-island"
+                            onClick={() => {
+                              setCategory(null);
+                              notify(`Placing ${buildDef.name} ($${amount}). Click island plot to build, Esc to cancel.`);
+                            }}
+                            disabled={
+                              !Number.isFinite(amount) ||
+                              amount < 1 ||
+                              amount > city.cash
+                            }
+                          >
+                            <span>Pay ${Number.isFinite(amount) ? amount : 0} & Place</span>
+                            <ArrowUpRight size={14} />
+                          </button>
                         </>
                       ) : (
                         <>
@@ -741,6 +809,17 @@ export default function StockCity() {
                             {wholeMoney(buildDef.cost)}
                           </span>
                           <small>{buildDef.description}</small>
+                          <button
+                            className="place-on-island"
+                            onClick={() => {
+                              setCategory(null);
+                              notify(`Placing ${buildDef.name} (${wholeMoney(buildDef.cost)}). Click island plot to build, Esc to cancel.`);
+                            }}
+                            disabled={city.cash < buildDef.cost}
+                          >
+                            <span>Pay {wholeMoney(buildDef.cost)} & Place</span>
+                            <ArrowUpRight size={14} />
+                          </button>
                         </>
                       )}
                     </>
@@ -750,24 +829,10 @@ export default function StockCity() {
                       <strong>Select a building</strong>
                       <small>
                         {category === "companies"
-                          ? "Each stock position becomes a building you place yourself."
-                          : "Services start unbuilt. Choose one and place it on a clear plot."}
+                          ? "Select a company above, then click Pay & Place."
+                          : "Choose a service, then click Pay & Place."}
                       </small>
                     </>
-                  )}
-                  {buildDef && (
-                    <button
-                      className="place-on-island"
-                      onClick={() => setCategory(null)}
-                      disabled={
-                        !!buildDef.ticker &&
-                        (!Number.isFinite(amount) ||
-                          amount < 1 ||
-                          amount > city.cash)
-                      }
-                    >
-                      Place on island <span aria-hidden="true">↗</span>
-                    </button>
                   )}
                 </div>
               </>
@@ -1335,92 +1400,23 @@ export default function StockCity() {
             <span>Portfolio</span>
           </button>
           <span className="tool-divider" />
-          <div className="build-menu-group">
-            <button
-              className={`build-main-button ${category || tool === "road" || (tool === "build" && kind) ? "active" : ""}`}
-              onClick={() => {
-                if (category || tool === "road") {
-                  setBuildExpanded((prev) => !prev);
-                } else {
-                  setBuildExpanded((prev) => {
-                    const next = !prev;
-                    if (next && !category) {
-                      chooseCategory("roads");
-                    }
-                    return next;
-                  });
-                }
-              }}
-              aria-label="Build menu"
-              aria-expanded={buildExpanded}
-              aria-pressed={Boolean(category || tool === "road" || (tool === "build" && kind))}
-            >
-              <GameArt index={2} />
-              <span>Build</span>
-              <ChevronDown
-                size={11}
-                className={`build-chevron ${buildExpanded ? "expanded" : ""}`}
-              />
-            </button>
-            {buildExpanded && (
-              <div className="build-submenu" role="region" aria-label="Build options">
-                <button
-                  className={`sub-tool-button ${category === "roads" || tool === "road" ? "active" : ""}`}
-                  onClick={() => chooseCategory("roads")}
-                  aria-label="Roads tool"
-                  aria-pressed={tool === "road"}
-                >
-                  <GameArt index={1} />
-                  <span>Roads</span>
-                  <kbd>R</kbd>
-                </button>
-                <button
-                  className={`sub-tool-button ${
-                    category === "companies" ||
-                    (tool === "build" &&
-                      !!kind &&
-                      defFor(kind).category === "companies")
-                      ? "active"
-                      : ""
-                  }`}
-                  onClick={() => chooseCategory("companies")}
-                  aria-label="Companies catalogue"
-                  aria-pressed={
-                    category === "companies" ||
-                    (tool === "build" &&
-                      !!kind &&
-                      defFor(kind).category === "companies")
-                  }
-                >
-                  <GameArt index={2} />
-                  <span>Companies</span>
-                  <kbd>B</kbd>
-                </button>
-                <button
-                  className={`sub-tool-button ${
-                    category === "services" ||
-                    (tool === "build" &&
-                      !!kind &&
-                      defFor(kind).category === "services")
-                      ? "active"
-                      : ""
-                  }`}
-                  onClick={() => chooseCategory("services")}
-                  aria-label="Services catalogue"
-                  aria-pressed={
-                    category === "services" ||
-                    (tool === "build" &&
-                      !!kind &&
-                      defFor(kind).category === "services")
-                  }
-                >
-                  <GameArt index={3} />
-                  <span>Services</span>
-                  <kbd>S</kbd>
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            className={`build-main-button ${category || tool === "road" || (tool === "build" && kind) ? "active" : ""}`}
+            onClick={() => {
+              if (category) {
+                setCategory(null);
+              } else {
+                chooseCategory(kind ? defFor(kind).category : lastCategory);
+              }
+            }}
+            aria-label="Builds menu"
+            aria-expanded={Boolean(category)}
+            aria-pressed={Boolean(category || tool === "road" || (tool === "build" && kind))}
+          >
+            <GameArt index={2} />
+            <span>Build</span>
+            <kbd>B</kbd>
+          </button>
           <span className="tool-divider" />
           <button
             className={`bulldozer ${tool === "bulldoze" ? "active" : ""}`}
