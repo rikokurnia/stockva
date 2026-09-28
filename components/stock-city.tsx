@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Grid2X2,
   HelpCircle,
   Landmark,
@@ -82,6 +83,8 @@ export default function StockCity() {
     [tool, setActiveTool] = useState<Tool>("inspect"),
     [portfolioView, setPortfolioView] = useState(false),
     [category, setCategory] = useState<Category | null>(null),
+    [buildExpanded, setBuildExpanded] = useState(false),
+    [guideHidden, setGuideHidden] = useState(false),
     [kind, setKind] = useState<BuildingKind | null>(null),
     [amount, setAmount] = useState(500),
     [selected, setSelected] = useState<string | null>(null),
@@ -227,6 +230,7 @@ export default function StockCity() {
       cancel();
       return;
     }
+    setBuildExpanded(true);
     setPanel(null);
     setSelected(null);
     setMoving(null);
@@ -381,6 +385,7 @@ export default function StockCity() {
       }
       switch (e.key.toLowerCase()) {
         case "r":
+          setBuildExpanded(true);
           setCategory("roads");
           setTool("road");
           setKind(null);
@@ -388,12 +393,14 @@ export default function StockCity() {
           setPanel(null);
           break;
         case "b":
+          setBuildExpanded(true);
           setCategory("companies");
           setTool("inspect");
           setKind(null);
           setPanel(null);
           break;
         case "s":
+          setBuildExpanded(true);
           setCategory("services");
           setTool("inspect");
           setKind(null);
@@ -571,17 +578,27 @@ export default function StockCity() {
         </div>
       )}
       {(!city.buildings.length || !city.roads.length) && !panel && booted && !category && (
-        <div className="start-note" role="status">
+        <div className={`start-note ${guideHidden ? "minimized" : ""}`} role="status">
           <span className="step-number">
             {steps.filter(Boolean).length + 1}/3
           </span>
-          <span>
-            <b>Empty island — build it yourself</b>
-            <small>
-              {steps[0] ? "✓" : "1."} Drag Roads (R) · {steps[1] ? "✓" : "2."}{" "}
-              Place a company (B) · {steps[2] ? "✓" : "3."} Place a service (S)
-            </small>
-          </span>
+          {!guideHidden && (
+            <span>
+              <b>Empty island — build it yourself</b>
+              <small>
+                {steps[0] ? "✓" : "1."} Drag Roads (R) · {steps[1] ? "✓" : "2."}{" "}
+                Place a company (B) · {steps[2] ? "✓" : "3."} Place a service (S)
+              </small>
+            </span>
+          )}
+          <button
+            className="start-note-toggle"
+            onClick={() => setGuideHidden((v) => !v)}
+            aria-label={guideHidden ? "Expand guideline" : "Hide guideline"}
+            title={guideHidden ? "Expand guideline" : "Hide guideline"}
+          >
+            {guideHidden ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
         </div>
       )}
       {category && (
@@ -1318,60 +1335,92 @@ export default function StockCity() {
             <span>Portfolio</span>
           </button>
           <span className="tool-divider" />
-          <button
-            className={category === "roads" || tool === "road" ? "active" : ""}
-            onClick={() => chooseCategory("roads")}
-            aria-label="Roads tool"
-            aria-pressed={tool === "road"}
-          >
-            <GameArt index={1} />
-            <span>Roads</span>
-            <kbd>R</kbd>
-          </button>
-          <button
-            className={
-              category === "companies" ||
-              (tool === "build" &&
-                !!kind &&
-                defFor(kind).category === "companies")
-                ? "active"
-                : ""
-            }
-            onClick={() => chooseCategory("companies")}
-            aria-label="Companies catalogue"
-            aria-pressed={
-              category === "companies" ||
-              (tool === "build" &&
-                !!kind &&
-                defFor(kind).category === "companies")
-            }
-          >
-            <GameArt index={2} />
-            <span>Companies</span>
-            <kbd>B</kbd>
-          </button>
-          <button
-            className={
-              category === "services" ||
-              (tool === "build" &&
-                !!kind &&
-                defFor(kind).category === "services")
-                ? "active"
-                : ""
-            }
-            onClick={() => chooseCategory("services")}
-            aria-label="Services catalogue"
-            aria-pressed={
-              category === "services" ||
-              (tool === "build" &&
-                !!kind &&
-                defFor(kind).category === "services")
-            }
-          >
-            <GameArt index={3} />
-            <span>Services</span>
-            <kbd>S</kbd>
-          </button>
+          <div className="build-menu-group">
+            <button
+              className={`build-main-button ${category || tool === "road" || (tool === "build" && kind) ? "active" : ""}`}
+              onClick={() => {
+                if (category || tool === "road") {
+                  setBuildExpanded((prev) => !prev);
+                } else {
+                  setBuildExpanded((prev) => {
+                    const next = !prev;
+                    if (next && !category) {
+                      chooseCategory("roads");
+                    }
+                    return next;
+                  });
+                }
+              }}
+              aria-label="Build menu"
+              aria-expanded={buildExpanded}
+              aria-pressed={Boolean(category || tool === "road" || (tool === "build" && kind))}
+            >
+              <GameArt index={2} />
+              <span>Build</span>
+              <ChevronDown
+                size={11}
+                className={`build-chevron ${buildExpanded ? "expanded" : ""}`}
+              />
+            </button>
+            {buildExpanded && (
+              <div className="build-submenu" role="region" aria-label="Build options">
+                <button
+                  className={`sub-tool-button ${category === "roads" || tool === "road" ? "active" : ""}`}
+                  onClick={() => chooseCategory("roads")}
+                  aria-label="Roads tool"
+                  aria-pressed={tool === "road"}
+                >
+                  <GameArt index={1} />
+                  <span>Roads</span>
+                  <kbd>R</kbd>
+                </button>
+                <button
+                  className={`sub-tool-button ${
+                    category === "companies" ||
+                    (tool === "build" &&
+                      !!kind &&
+                      defFor(kind).category === "companies")
+                      ? "active"
+                      : ""
+                  }`}
+                  onClick={() => chooseCategory("companies")}
+                  aria-label="Companies catalogue"
+                  aria-pressed={
+                    category === "companies" ||
+                    (tool === "build" &&
+                      !!kind &&
+                      defFor(kind).category === "companies")
+                  }
+                >
+                  <GameArt index={2} />
+                  <span>Companies</span>
+                  <kbd>B</kbd>
+                </button>
+                <button
+                  className={`sub-tool-button ${
+                    category === "services" ||
+                    (tool === "build" &&
+                      !!kind &&
+                      defFor(kind).category === "services")
+                      ? "active"
+                      : ""
+                  }`}
+                  onClick={() => chooseCategory("services")}
+                  aria-label="Services catalogue"
+                  aria-pressed={
+                    category === "services" ||
+                    (tool === "build" &&
+                      !!kind &&
+                      defFor(kind).category === "services")
+                  }
+                >
+                  <GameArt index={3} />
+                  <span>Services</span>
+                  <kbd>S</kbd>
+                </button>
+              </div>
+            )}
+          </div>
           <span className="tool-divider" />
           <button
             className={`bulldozer ${tool === "bulldoze" ? "active" : ""}`}
