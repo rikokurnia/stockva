@@ -2314,6 +2314,7 @@ input {
   border: 0;
   box-shadow: none;
   pointer-events: none;
+  justify-content: space-between;
 }
 .game-header > * {
   pointer-events: auto;
@@ -2384,6 +2385,7 @@ input {
   background: #f1e2b3;
 }
 .header-resources {
+  margin-left: auto;
   gap: 8px;
 }
 .header-resources > button {
@@ -2432,55 +2434,68 @@ input {
   border-radius: 8px;
 }
 .command-bar {
-  height: 110px;
-  bottom: 24px;
-  padding: 0 22px;
+  position: absolute;
+  top: 56px;
+  left: 5px;
+  bottom: auto;
+  right: auto;
+  width: 60px;
+  height: auto;
+  padding: 0;
   background: none;
   border: 0;
   box-shadow: none;
   pointer-events: none;
+  justify-content: flex-start;
+  z-index: 1120;
 }
 .command-bar > * {
   pointer-events: auto;
 }
 .city-stage {
-  visibility: hidden;
-  min-width: 160px;
+  display: none;
 }
 .tool-palette {
-  gap: 12px;
-  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  margin: 0;
 }
 .tool-palette > button {
-  width: 82px;
-  height: 108px;
-  padding: 0;
+  width: 60px;
+  height: 76px;
+  padding: 0 0 2px;
   gap: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: 8px;
   color: #fffce8;
   background: none;
   box-shadow: none;
   justify-content: flex-end;
   transition: transform 0.15s;
+  cursor: pointer;
 }
 .tool-palette > button > .game-art {
-  width: 78px;
-  height: 94px;
-  filter: drop-shadow(0 4px 2px #27473270);
+  width: 54px;
+  height: 68px;
+  filter: drop-shadow(0 3px 2px #27473270);
   transition:
     filter 0.15s,
     transform 0.15s;
 }
 .tool-palette > button > span:not(.game-art) {
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.2px;
   text-shadow:
     0 1px 3px #173b32,
     0 1px 6px #173b32;
-  padding: 3px 8px;
-  border-radius: 10px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 .tool-palette > button:hover,
 .tool-palette > button.active,
@@ -2491,12 +2506,12 @@ input {
   color: #fffbe2;
 }
 .tool-palette > button:hover > .game-art {
-  transform: translateY(-5px);
+  transform: translateY(-2px) scale(1.05);
 }
 .tool-palette > button.active > .game-art {
   filter: drop-shadow(0 0 2px #fff0a6) drop-shadow(0 0 5px #ffe185)
     drop-shadow(0 3px 3px #294c36);
-  transform: translateY(-5px);
+  transform: translateY(-2px) scale(1.05);
 }
 .tool-palette > button.active > span:not(.game-art) {
   background: #fff0c7;
@@ -2505,14 +2520,14 @@ input {
   box-shadow: 0 2px 5px #34523b40;
 }
 .tool-palette > button > kbd {
-  top: 9px;
-  right: 0;
+  top: 2px;
+  right: 1px;
   color: #49644e;
   background: #fff4d8;
-  border-radius: 4px;
-  padding: 2px 4px;
-  font-size: 8px;
-  box-shadow: 0 1px 3px #264d3b30;
+  border-radius: 3px;
+  padding: 1px 3px;
+  font-size: 7.5px;
+  box-shadow: 0 1px 2px #264d3b30;
 }
 .tool-divider {
   display: none;
@@ -2584,13 +2599,7 @@ input {
   height: 83px;
 }
 .status-line {
-  background: none;
-  border: 0;
-  color: #f1f3de;
-  text-shadow: 0 1px 3px #1d4945;
-  padding: 0 23px;
-  height: 22px;
-  font-size: 10px;
+  display: none;
 }
 .status-line > span:last-child {
   color: #e7f0df;
@@ -2599,8 +2608,8 @@ input {
   color: #ffdfb4;
 }
 .start-note {
-  left: 22px;
-  bottom: 158px;
+  left: 20px;
+  bottom: 24px;
   background: #fff5dde8;
   border: 1px solid #f9efd0;
   color: #3e6150;
@@ -2615,16 +2624,18 @@ input {
   color: #4c583c;
 }
 .construction-tray {
-  left: 50%;
+  left: 72px;
   right: auto;
-  transform: translateX(-50%);
-  bottom: 153px;
-  width: min(700px, calc(100% - 100px));
+  top: 56px;
+  bottom: auto;
+  transform: none;
+  width: min(680px, calc(100vw - 84px));
   height: 185px;
   border: 1px solid #c4b68f;
   border-radius: 13px;
   background: #fff8e9f5;
   box-shadow: 0 8px 30px #1b453b30;
+  z-index: 1100;
 }
 .construction-tray > header {
   background: none;
@@ -2694,7 +2705,7 @@ input {
   }
   .tool-palette {
     flex: initial;
-    margin: auto;
+    margin: 0;
   }
   .history-controls {
     position: absolute;
@@ -2763,24 +2774,33 @@ input {
     display: none;
   }
   .command-bar {
-    bottom: 27px;
-    height: 95px;
-    left: 0;
-    right: 0;
-    padding: 0 6px;
+    top: 50px;
+    left: 4px;
+    bottom: auto;
+    right: auto;
+    width: 54px;
+    height: auto;
+    padding: 0;
   }
   .tool-palette {
+    display: flex;
+    flex-direction: column;
     gap: 3px;
-    width: 100%;
-    justify-content: center;
+    width: auto;
+    align-items: center;
   }
   .tool-palette > button {
-    width: 66px;
-    height: 91px;
+    width: 52px;
+    height: 66px;
   }
   .tool-palette > button > .game-art {
-    width: 62px;
-    height: 76px;
+    width: 46px;
+    height: 58px;
+  }
+  .construction-tray {
+    left: 62px;
+    top: 50px;
+    width: calc(100vw - 68px);
   }
   .tool-palette > button > span:not(.game-art) {
     font-size: 10px;

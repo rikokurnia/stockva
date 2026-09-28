@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Clock3,
   Grid2X2,
   HelpCircle,
   Landmark,
@@ -15,8 +14,6 @@ import {
   Menu,
   Minus,
   MousePointer2,
-  Pause,
-  Play,
   Plus,
   Redo2,
   Route,
@@ -57,7 +54,6 @@ import {
   newCity,
   pct,
   placementError,
-  point,
   priceOf,
   quoteDiff,
   returnOf,
@@ -430,7 +426,6 @@ export default function StockCity() {
         resetRef.current?.querySelector<HTMLButtonElement>("button")?.focus(),
       );
   }, [confirmReset]);
-  const elapsed = `${String(8 + (Math.floor(seconds / 60) % 16)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const steps = [
     city.roads.length > 0,
     city.buildings.some((b) => defFor(b.kind).ticker),
@@ -493,33 +488,6 @@ export default function StockCity() {
         >
           <img src={sprite("buttons/settings")} alt="" />
         </button>
-        <div className="time-control">
-          <Clock3 size={13} />
-          <span>
-            Day {String(1 + Math.floor(seconds / 960)).padStart(2, "0")}{" "}
-            <b>{elapsed}</b>
-          </span>
-          <button
-            onClick={() => setPaused(!paused)}
-            aria-label={paused ? "Resume simulation" : "Pause simulation"}
-            className={paused ? "chosen" : ""}
-          >
-            {paused ? <Play size={13} /> : <Pause size={13} />}
-          </button>
-          {[1, 2, 3].map((s) => (
-            <button
-              key={s}
-              onClick={() => {
-                setSpeed(s);
-                setPaused(false);
-              }}
-              className={speed === s && !paused ? "chosen" : ""}
-              aria-label={`Simulation speed ${s}x`}
-            >
-              {s}×
-            </button>
-          ))}
-        </div>
         <div className="header-resources">
           <button
             className="cash-resource"
@@ -585,7 +553,7 @@ export default function StockCity() {
           </button>
         </div>
       )}
-      {(!city.buildings.length || !city.roads.length) && !panel && booted && (
+      {(!city.buildings.length || !city.roads.length) && !panel && booted && !category && (
         <div className="start-note" role="status">
           <span className="step-number">
             {steps.filter(Boolean).length + 1}/3
@@ -599,58 +567,6 @@ export default function StockCity() {
           </span>
         </div>
       )}
-
-      <aside className="minimap" aria-label="City overview">
-        <div className="minimap-heading">
-          <Layers size={11} />
-          <span>ISLAND OVERVIEW</span>
-          <button
-            aria-label="Center map"
-            onClick={() => {
-              setZoom(1);
-              setCameraReset((n) => n + 1);
-            }}
-          >
-            <Maximize2 size={11} />
-          </button>
-        </div>
-        <div className="minimap-map">
-          <img src="/assets/background.png" alt="Island minimap" />
-          <svg viewBox="0 0 1280 720" aria-hidden="true">
-            {city.roads.map((r, i) => {
-              const p = point(r.r, r.c);
-              return (
-                <rect
-                  key={i}
-                  x={p.x - 15}
-                  y={p.y - 9}
-                  width="30"
-                  height="18"
-                  fill="#f8e9a8"
-                />
-              );
-            })}
-            {city.buildings.map((b) => {
-              const p = point(b.r + 0.5, b.c + 0.5);
-              return (
-                <rect
-                  key={b.id}
-                  x={p.x - 23}
-                  y={p.y - 16}
-                  width="46"
-                  height="32"
-                  fill={defFor(b.kind).ticker ? "#ffd15b" : "#91dbed"}
-                />
-              );
-            })}
-          </svg>
-          <span className="compass-n">N</span>
-        </div>
-        <div className="minimap-caption">
-          <span>{city.buildings.length} buildings</span>
-          <span>{city.roads.length} roads</span>
-        </div>
-      </aside>
       {category && (
         <section
           className="construction-tray"
@@ -1369,17 +1285,6 @@ export default function StockCity() {
         </aside>
       )}
       <footer className="command-bar">
-        <div className="city-stage">
-          <Building2 size={23} />
-          <span>
-            <b>
-              {city.buildings.length ? "DEVELOPING CITY" : "UNDEVELOPED ISLAND"}
-            </b>
-            <small>
-              {city.buildings.length} buildings · {city.roads.length} road tiles
-            </small>
-          </span>
-        </div>
         <nav className="tool-palette" aria-label="Construction tools">
           <button
             className={tool === "inspect" && !category ? "active" : ""}
@@ -1466,30 +1371,6 @@ export default function StockCity() {
         </nav>
 
       </footer>
-      <div className="status-line">
-        <span
-          className={noticeError ? "error" : ""}
-          role={noticeError ? "alert" : "status"}
-        >
-          {noticeError ? "! " : ""}
-          {notice}
-        </span>
-        <span>
-          {hover ? `${hover.r}, ${hover.c}` : "—, —"}
-          <i />
-          {tool === "road"
-            ? "ROAD TOOL"
-            : tool === "build"
-              ? "BUILD MODE"
-              : tool === "move"
-                ? "MOVE BUILDING"
-                : tool === "bulldoze"
-                  ? "BULLDOZE"
-                  : "SELECT"}
-          <i />
-          DEMO
-        </span>
-      </div>
       {confirmReset && (
         <div className="confirm-overlay">
           <div
