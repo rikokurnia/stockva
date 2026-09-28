@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import CityMap from "./city-map";
+import portfolioStyles from "./portfolio-view.module.css";
 import type {
   BuildingKind,
   Category,
@@ -78,7 +79,8 @@ export default function StockCity() {
   const [city, setCity] = useState<CityState>(newCity),
     [ready, setReady] = useState(false),
     [booted, setBooted] = useState(false),
-    [tool, setTool] = useState<Tool>("inspect"),
+    [tool, setActiveTool] = useState<Tool>("inspect"),
+    [portfolioView, setPortfolioView] = useState(false),
     [category, setCategory] = useState<Category | null>(null),
     [kind, setKind] = useState<BuildingKind | null>(null),
     [amount, setAmount] = useState(500),
@@ -204,6 +206,14 @@ export default function StockCity() {
     setCity(next);
     notify("Construction action restored.");
   };
+  const setTool = (next: Tool) => {
+    setPortfolioView(false);
+    setActiveTool(next);
+  };
+  const showPortfolio = () => {
+    cancel();
+    setPortfolioView(true);
+  };
   const cancel = () => {
     setTool("inspect");
     setKind(null);
@@ -241,6 +251,7 @@ export default function StockCity() {
     notify(`Place ${defFor(value).name}. Right-click or Esc to cancel.`);
   };
   const openPanel = (value: Panel) => {
+    setPortfolioView(false);
     setPanel(panel === value ? null : value);
     setSelected(null);
   };
@@ -398,7 +409,7 @@ export default function StockCity() {
           setSelected(null);
           break;
         case "g":
-          setGrid((v) => !v);
+          if (!portfolioView) setGrid((v) => !v);
           break;
         case "p":
           setPaused((v) => !v);
@@ -462,7 +473,8 @@ export default function StockCity() {
         moving={moving}
         zoom={zoom}
         cameraReset={cameraReset}
-        grid={grid}
+        grid={grid || portfolioView}
+        portfolioView={portfolioView}
         motion={motion}
         paused={paused}
         speed={speed}
@@ -480,6 +492,11 @@ export default function StockCity() {
         onCancel={cancel}
         onHover={setHover}
       />
+      {portfolioView && <div className={portfolioStyles.heading} role="status">
+        <h2>Portfolio view</h2>
+        <p>{city.buildings.some(b => !!defFor(b.kind).ticker) ? "All holdings · Unrealized return" : "No holdings yet · Place a company to begin"}</p>
+        <p>Select returns to your city</p>
+      </div>}
       <header className="game-header">
         <button
           className={`menu-button ${panel === "settings" ? "active" : ""}`}
@@ -1287,14 +1304,18 @@ export default function StockCity() {
       <footer className="command-bar">
         <nav className="tool-palette" aria-label="Construction tools">
           <button
-            className={tool === "inspect" && !category ? "active" : ""}
+            className={tool === "inspect" && !category && !portfolioView ? "active" : ""}
             onClick={cancel}
             aria-label="Select tool"
-            aria-pressed={tool === "inspect" && !category}
+            aria-pressed={tool === "inspect" && !category && !portfolioView}
           >
             <GameArt index={0} />
             <span>Select</span>
             <kbd>V</kbd>
+          </button>
+          <button className={portfolioView ? "active" : ""} onClick={showPortfolio} aria-label="Portfolio view" aria-pressed={portfolioView} title="Show all holdings on the island">
+            <GameArt index={5} />
+            <span>Portfolio</span>
           </button>
           <span className="tool-divider" />
           <button

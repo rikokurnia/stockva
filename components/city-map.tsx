@@ -29,6 +29,8 @@ import {
 import type { PriceMap } from "../lib/city";
 
 import Traffic from "./traffic";
+import PortfolioOverlay from "./portfolio-overlay";
+import portfolioStyles from "./portfolio-view.module.css";
 import RoadNetwork from "./road-network";
 import { cameraBounds } from "../lib/map-geometry";
 
@@ -42,6 +44,7 @@ type Props = {
   zoom: number;
   cameraReset: number;
   grid: boolean;
+  portfolioView: boolean;
   motion: boolean;
   paused: boolean;
   speed: number;
@@ -71,6 +74,7 @@ export default function CityMap(props: Props) {
     zoom,
     cameraReset,
     grid,
+    portfolioView,
     motion,
     paused,
     speed,
@@ -216,7 +220,7 @@ export default function CityMap(props: Props) {
   return (
     <div
       ref={root}
-      className={`game-world tool-${tool}`}
+      className={`game-world tool-${tool}${portfolioView ? ` portfolio-map-view ${portfolioStyles.mapView}` : ""}`}
       tabIndex={0}
       role="region"
       aria-label="Island canvas. Drag to pan. Select a construction tool to build."
@@ -370,7 +374,8 @@ export default function CityMap(props: Props) {
           }
         />
         {motion && <Traffic roads={city.roads} paused={paused} speed={speed} />}
-        {[...city.buildings]
+        {portfolioView && <PortfolioOverlay buildings={city.buildings} prices={prices} />}
+        {!portfolioView && [...city.buildings]
           .sort((a, b) => a.r + a.c - b.r - b.c)
           .map((b) => {
             const p = point(b.r + 0.5, b.c + 0.5),
