@@ -43,6 +43,10 @@ type Props = {
   moving: string | null;
   zoom: number;
   cameraReset: number;
+  focusTarget?: { r: number; c: number; nonce: number } | null;
+  scanMode?: boolean;
+  scanTarget?: string | null;
+  onScanTarget?: (id: string | null) => void;
   grid: boolean;
   portfolioView: boolean;
   motion: boolean;
@@ -105,11 +109,21 @@ export default function CityMap(props: Props) {
     pan: boolean;
     distance: number;
     startedOnBuilding?: boolean;
+    buildingId?: string;
   } | null>(null);
   const lastDragDistance = useRef(0);
   const space = useRef(false);
   const camera = cameraBounds(size.w, size.h, zoom, pan);
   const { scale } = camera;
+  useEffect(() => {
+    if (!props.focusTarget) return;
+    const p = point(props.focusTarget.r + 0.5, props.focusTarget.c + 0.5);
+    const bounded = cameraBounds(size.w, size.h, zoom, {
+      x: (640 - p.x) * scale,
+      y: (390 - p.y) * scale,
+    });
+    setPan({ x: bounded.x, y: bounded.y });
+  }, [props.focusTarget]);
   const clampPan = (p: { x: number; y: number }) => {
     const bounded = cameraBounds(size.w, size.h, zoom, p);
     return { x: bounded.x, y: bounded.y };
@@ -276,6 +290,9 @@ export default function CityMap(props: Props) {
           pan: tool === "inspect" || e.button === 1 || space.current,
           distance: 0,
           startedOnBuilding: onBuilding,
+          buildingId: (e.target as Element).closest<HTMLElement>(
+            ".city-building",
+          )?.dataset.buildingId,
         };
         try {
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -304,8 +321,8 @@ export default function CityMap(props: Props) {
         lastDragDistance.current = d.distance;
         const cell = cellFromEvent(e);
         if (d.pan) {
-          if (d.distance < 4 && tool === "inspect" && !d.startedOnBuilding)
-            onSelect(null);
+          if (d.distance < 4 && tool === "inspect")
+            onSelect(d.buildingId ?? null);
         } else if (tool === "road") onRoad(roadLine(d.cell, cell));
         else if (d.distance < 8) commit(cell);
         drag.current = null;
@@ -374,88 +391,109 @@ export default function CityMap(props: Props) {
           }
         />
         {motion && <Traffic roads={city.roads} paused={paused} speed={speed} />}
-        {portfolioView && <PortfolioOverlay buildings={city.buildings} prices={prices} />}
-        {!portfolioView && [...city.buildings]
-          .sort((a, b) => a.r + a.c - b.r - b.c)
-          .map((b) => {
-            const p = point(b.r + 0.5, b.c + 0.5),
-              def = defFor(b.kind);
-            const ret = def.ticker ? returnOf(b, prices) : 0;
-            const fresh = now - b.builtAt < 2200;
-            const upgraded = upgrades[b.id] && now - upgrades[b.id] < 2200;
-            return (
-              <button
-                key={b.id}
-                className={`city-building ${def.category === "companies" ? "company" : "service"} ${selected === b.id ? "selected" : ""} ${moving === b.id ? "being-moved" : ""} ${tool === "bulldoze" && hoveredBuilding?.id === b.id ? "demolish" : ""}`}
-                style={{
-                  left: p.x,
-                  top: p.y + 36,
-                  zIndex: Math.round(p.y + 36),
-                }}
-                draggable={false}
-                onDragStart={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  if (tool === "inspect") {
-                    e.stopPropagation();
-                    if (lastDragDistance.current < 5) {
-                      onSelect(b.id);
-                    }
-                  }
-                }}
-                aria-label={`${def.name} building`}
-                tabIndex={tool === "inspect" ? 0 : -1}
-              >
-                {selected === b.id && (
-                  <img
-                    className="selected-effect"
-                    src={sprite("effects/selection")}
-                    alt=""
-                  />
-                )}
-                {fresh && (
-                  <img
-                    className="fx-layer fx-construction"
-                    src={sprite("effects/construction")}
-                    alt=""
-                  />
-                )}
-                {upgraded && !fresh && (
-                  <img
-                    className="fx-layer fx-upgrade"
-                    src={sprite("effects/upgrade")}
-                    alt=""
-                  />
-                )}
-                {def.ticker && ret < 0 && !fresh && (
-                  <img
-                    className="fx-layer fx-negative"
-                    src={sprite("effects/negative_performance")}
-                    alt="Negative performance"
-                  />
-                )}
-                <img
-                  className="building-sprite"
-                  src={sprite(buildingImage(b, prices))}
-                  alt=""
+        {portfolioView && (
+          <PortfolioOverlay buildings={city.buildings} prices={prices} />
+        )}
+        {!portfolioView &&
+          [...city.buildings]
+            .sort((a, b) => a.r + a.c - b.r - b.c)
+            .map((b) => {
+              const p = point(b.r + 0.5, b.c + 0.5),
+                def = defFor(b.kind);
+              const ret = def.ticker ? returnOf(b, prices) : 0;
+              const fresh = now - b.builtAt < 2200;
+              const upgraded = upgrades[b.id] && now - upgrades[b.id] < 2200;
+              return (
+                <button
+                  key={b.id}
+                  data-building-id={b.id}
+                  className={`city-building ${props.scanMode && hoveredBuilding?.id === b.id ? "scan-active" : ""} ${def.category === "companies" ? "company" : "service"} ${selected === b.id ? "selected" : ""} ${moving === b.id ? "being-moved" : ""} ${tool === "bulldoze" && hoveredBuilding?.id === b.id ? "demolish" : ""}`}
+                  style={{
+                    left: p.x,
+                    top: p.y + 36,
+                    zIndex: Math.round(p.y + 36),
+                  }}
+                  onPointerEnter={() => {
+                    if (props.scanMode) props.onScanTarget?.(b.id);
+                  }}
+                  onFocus={() => {
+                    if (props.scanMode) props.onScanTarget?.(b.id);
+                  }}
                   draggable={false}
-                />
-                <span className="building-name">
-                  {def.ticker
-                    ? `${def.ticker} ${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%`
-                    : def.name}
-                </span>
-                {!hasRoad(b, city.roads) && (
-                  <span
-                    className="no-road"
-                    title="No road access"
-                    aria-label="No road access"
-                  >
-                    !
+                  onDragStart={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    if (tool === "inspect") {
+                      e.stopPropagation();
+                      if (e.detail === 0) {
+                        onSelect(b.id);
+                      }
+                    }
+                  }}
+                  aria-label={`${def.name} building`}
+                  tabIndex={tool === "inspect" ? 0 : -1}
+                >
+                  {props.scanMode &&
+                    props.scanTarget === b.id &&
+                    def.ticker && (
+                      <span className="scan-beam" aria-hidden="true" />
+                    )}
+                  {selected === b.id && (
+                    <img
+                      className="selected-effect"
+                      src={sprite("effects/selection")}
+                      alt=""
+                    />
+                  )}
+                  {fresh && (
+                    <img
+                      className="fx-layer fx-construction"
+                      src={sprite("effects/construction")}
+                      alt=""
+                    />
+                  )}
+                  {upgraded && !fresh && (
+                    <img
+                      className="fx-layer fx-upgrade"
+                      src={sprite("effects/upgrade")}
+                      alt=""
+                    />
+                  )}
+                  {def.ticker && ret < 0 && !fresh && (
+                    <img
+                      className="fx-layer fx-negative"
+                      src={sprite("effects/negative_performance")}
+                      alt="Negative performance"
+                    />
+                  )}
+                  <img
+                    className="building-sprite"
+                    src={sprite(buildingImage(b, prices))}
+                    alt=""
+                    onPointerEnter={() => {
+                      if (props.scanMode) props.onScanTarget?.(b.id);
+                    }}
+                    onFocus={() => {
+                      if (props.scanMode) props.onScanTarget?.(b.id);
+                    }}
+                    draggable={false}
+                  />
+                  <span className="building-name">
+                    {def.ticker
+                      ? `${def.ticker} ${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%`
+                      : def.name}
                   </span>
-                )}
-              </button>
-            );
-          })}
+                  {!hasRoad(b, city.roads) && (
+                    <span
+                      className="no-road"
+                      title="No road access"
+                      aria-label="No road access"
+                    >
+                      !
+                    </span>
+                  )}
+                </button>
+              );
+            })}
         {tool !== "inspect" && (
           <svg
             className="build-grid"

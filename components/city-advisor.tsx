@@ -40,7 +40,7 @@ export default function CityAdvisor({ city, prices }: { city: CityState; prices:
     }
     if (/expand|next|build|road|review|city/.test(q))
       return `${briefing} You have ${wholeMoney(city.cash)} in demo funds. ${!city.roads.length ? "Open Build and choose Roads, then draw a small connected route on the island." : disconnected ? "Extend a road to the disconnected buildings before adding a new block." : "Open Build to choose a company and place it alongside your road network. Select a finished building to explore its position."}`;
-    return "Try asking for a city review, your portfolio allocation, or what to build next. This preview guide uses your current city and simulated prices.";
+    return "Try asking for a city review, your portfolio allocation, or what to build next. This preview guide uses your current city and available market prices (including labeled fallbacks).";
   }
 
   function send(text: string) {

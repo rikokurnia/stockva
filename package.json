@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types tests/city.test.mjs",
+    "test": "node --experimental-strip-types tests/city.test.mjs && node --experimental-strip-types tests/logos.test.mjs",
     "format": "prettier --write app components lib tests"
   },
   "dependencies": {

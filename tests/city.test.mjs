@@ -15,6 +15,10 @@ import {
   valueOf,
   ALL_CELLS,
   validCell,
+  sellPosition,
+  catalogue,
+  buildingImage,
+  marketClock,
 } from "../lib/city.ts";
 
 test("a new game has no buildings, roads, holdings, or traffic", () => {
@@ -40,28 +44,36 @@ test("the first road can start on bare ground and is one atomic purchase", () =>
   assert.equal(repeat.state.cash, 9930);
   assert.equal(repeat.state.roads.length, 7);
 });
+const tradingCity = () =>
+  constructBuilding("exchange", { r: -6, c: 0 }, 400, newCity()).state;
+
 test("every building is manually purchased and reserves all four footprint tiles", () => {
   const city = constructRoad(
     roadLine({ r: 0, c: -3 }, { r: 0, c: 3 }),
-    newCity(),
+    tradingCity(),
   ).state;
   const placed = constructBuilding("nvidia", { r: 1, c: 1 }, 500, city);
   assert.equal(placed.error, "");
-  assert.equal(placed.state.buildings.length, 1);
-  assert.equal(placed.state.cash, 9430);
-  assert.equal(valueOf(placed.state.buildings[0]), 500);
-  assert.equal(hasRoad(placed.state.buildings[0], city.roads), true);
+  assert.equal(placed.state.buildings.length, 2);
+  assert.equal(placed.state.cash, 9030);
+  assert.equal(valueOf(placed.state.buildings[1]), 500);
+  assert.equal(hasRoad(placed.state.buildings[1], city.roads), true);
   assert.equal(
     placementError({ r: 2, c: 2 }, placed.state),
     "Building in the way",
   );
   const civic = constructBuilding("hall", { r: -4, c: -3 }, 999, placed.state);
   assert.equal(civic.error, "");
-  assert.equal(civic.state.buildings.length, 2);
-  assert.equal(civic.state.cash, 9180);
+  assert.equal(civic.state.buildings.length, 3);
+  assert.equal(civic.state.cash, 8780);
 });
 test("invalid road routes are rejected in full without spending or partial placement", () => {
-  const city = constructBuilding("tesla", { r: 1, c: 1 }, 500, newCity()).state;
+  const city = constructBuilding(
+    "tesla",
+    { r: 1, c: 1 },
+    500,
+    tradingCity(),
+  ).state;
   const blocked = constructRoad(roadLine({ r: 0, c: 1 }, { r: 4, c: 1 }), city);
   assert.equal(blocked.error, "A building blocks this route");
   assert.equal(blocked.state, city);
@@ -70,7 +82,7 @@ test("invalid road routes are rejected in full without spending or partial place
   assert.equal(ocean.state, city);
 });
 test("overlap, ocean placement, invalid amounts and insufficient funds are rejected", () => {
-  const city = constructRoad([{ r: 0, c: 0 }], newCity()).state;
+  const city = constructRoad([{ r: 0, c: 0 }], tradingCity()).state;
   for (const [cell, amount] of [
     [{ r: 0, c: 0 }, 500],
     [{ r: 100, c: 100 }, 500],
@@ -90,11 +102,11 @@ test("bulldozing a stock building releases its position and frees all its tiles"
     "blackrock",
     { r: 1, c: 1 },
     500,
-    newCity(),
+    tradingCity(),
   ).state;
   const result = bulldoze({ r: 2, c: 2 }, city);
-  assert.equal(result.state.buildings.length, 0);
-  assert.equal(result.state.cash, 10000);
+  assert.equal(result.state.buildings.length, 1);
+  assert.equal(result.state.cash, 9600);
   assert.equal(placementError({ r: 1, c: 1 }, result.state), "");
 });
 test("traffic only follows neighboring tiles in a connected component", () => {
@@ -204,35 +216,131 @@ test("vehicle paths have continuous positions and headings through corners and d
   }
 });
 
-const {vehicleView,vehicleSize,VEHICLES,DIRECTIONS,screenHeading}=await import('../lib/vehicle-view.ts');
-test('vehicle art follows all eight road headings without mirroring',()=>{
-  for(let i=0;i<8;i++) {
-    const view=vehicleView(i*Math.PI/4);
-    assert.equal(view.direction,DIRECTIONS[i]);
-    assert.ok(Math.abs(view.rotation)<1e-8);
+const { vehicleView, vehicleSize, VEHICLES, DIRECTIONS, screenHeading } =
+  await import("../lib/vehicle-view.ts");
+test("vehicle art follows all eight road headings without mirroring", () => {
+  for (let i = 0; i < 8; i++) {
+    const view = vehicleView((i * Math.PI) / 4);
+    assert.equal(view.direction, DIRECTIONS[i]);
+    assert.ok(Math.abs(view.rotation) < 1e-8);
   }
-  assert.equal(vehicleView(0).direction,'lower_right');
-  assert.equal(vehicleView(Math.PI/2).direction,'lower_left');
-  assert.equal(vehicleView(Math.PI).direction,'upper_left');
-  assert.equal(vehicleView(-Math.PI/2).direction,'upper_right');
+  assert.equal(vehicleView(0).direction, "lower_right");
+  assert.equal(vehicleView(Math.PI / 2).direction, "lower_left");
+  assert.equal(vehicleView(Math.PI).direction, "upper_left");
+  assert.equal(vehicleView(-Math.PI / 2).direction, "upper_right");
 });
-test('intermediate vehicle headings project onto the travel tangent',()=>{
-  for(let angle=-Math.PI*2;angle<=Math.PI*2;angle+=.01){
-    const view=vehicleView(angle),index=DIRECTIONS.indexOf(view.direction);
-    const rendered=screenHeading(index*Math.PI/4)+view.rotation*Math.PI/180;
-    assert.ok(Math.abs(Math.sin(rendered-screenHeading(angle)))<1e-8);
-    assert.ok(Math.abs(view.rotation)<36);
-    for(const v of VEHICLES){const size=vehicleSize(v,angle);assert.ok(size.width>0&&size.height>0&&size.width<32&&size.height<24);}
+test("intermediate vehicle headings project onto the travel tangent", () => {
+  for (let angle = -Math.PI * 2; angle <= Math.PI * 2; angle += 0.01) {
+    const view = vehicleView(angle),
+      index = DIRECTIONS.indexOf(view.direction);
+    const rendered =
+      screenHeading((index * Math.PI) / 4) + (view.rotation * Math.PI) / 180;
+    assert.ok(Math.abs(Math.sin(rendered - screenHeading(angle))) < 1e-8);
+    assert.ok(Math.abs(view.rotation) < 36);
+    for (const v of VEHICLES) {
+      const size = vehicleSize(v, angle);
+      assert.ok(
+        size.width > 0 &&
+          size.height > 0 &&
+          size.width < 32 &&
+          size.height < 24,
+      );
+    }
   }
 });
-test('each original vehicle has all eight local image frames with valid crop bounds',async()=>{
-  const {readFile}=await import('node:fs/promises');
-  const frames=JSON.parse(await readFile(new URL('../lib/vehicle-frames.json',import.meta.url),'utf8'));
-  for(const v of VEHICLES)for(const direction of DIRECTIONS){
-    const f=frames[v][direction];
-    assert.ok(existsSync(new URL(`../public${f.src}`,import.meta.url)));
-    const [x,y,w,h]=f.viewBox.split(' ').map(Number);
-    assert.ok(x>=0&&y>=0&&w>0&&h>0&&x+w<=f.width&&y+h<=f.height);
-    if(direction.startsWith('upper'))assert.ok(f.src.endsWith(`${direction}.webp`));
+test("each original vehicle has all eight local image frames with valid crop bounds", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const frames = JSON.parse(
+    await readFile(
+      new URL("../lib/vehicle-frames.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  for (const v of VEHICLES)
+    for (const direction of DIRECTIONS) {
+      const f = frames[v][direction];
+      assert.ok(existsSync(new URL(`../public${f.src}`, import.meta.url)));
+      const [x, y, w, h] = f.viewBox.split(" ").map(Number);
+      assert.ok(
+        x >= 0 &&
+          y >= 0 &&
+          w > 0 &&
+          h > 0 &&
+          x + w <= f.width &&
+          y + h <= f.height,
+      );
+      if (direction.startsWith("upper"))
+        assert.ok(f.src.endsWith(`${direction}.webp`));
+    }
+});
+
+test("progression rejects company construction without an Exchange, including after demolition", () => {
+  const empty = newCity();
+  const rejected = constructBuilding("nvidia", { r: 1, c: 1 }, 500, empty);
+  assert.match(rejected.error, /Stock Exchange/);
+  assert.equal(rejected.state, empty);
+  assert.equal(constructBuilding("hall", { r: 1, c: 1 }, 0, empty).error, "");
+  const city = tradingCity();
+  const removed = bulldoze({ r: -6, c: 0 }, city).state;
+  assert.match(
+    constructBuilding("nvidia", { r: 1, c: 1 }, 500, removed).error,
+    /Stock Exchange/,
+  );
+});
+test("partial and complete liquidation conserve cash, units and remaining cost basis", () => {
+  let city = constructBuilding("nvidia", { r: 1, c: 1 }, 500, tradingCity(), {
+    NVDA: 100,
+  }).state;
+  city = constructBuilding("nvidia", { r: 1, c: 4 }, 300, city, {
+    NVDA: 150,
+  }).state;
+  const cash = city.cash;
+  const partial = sellPosition(city, "NVDA", 0.25, { NVDA: 200 });
+  assert.equal(partial.error, "");
+  assert.equal(partial.state.cash, cash + 350);
+  assert.equal(partial.state.realizedPnl, 150);
+  const stocks = partial.state.buildings.filter((b) => b.kind === "nvidia");
+  assert.equal(
+    stocks.reduce((s, b) => s + b.quantity, 0),
+    5.25,
+  );
+  assert.equal(
+    stocks.reduce((s, b) => s + b.quantity * b.entry, 0),
+    600,
+  );
+  const full = sellPosition(partial.state, "NVDA", 1, { NVDA: 200 });
+  assert.equal(full.state.realizedPnl, 600);
+  assert.equal(full.state.cash, cash + 1400);
+  assert.equal(full.state.buildings.length, 1);
+  for (const fraction of [0, -1, 1.1, NaN, Infinity])
+    assert.equal(sellPosition(city, "NVDA", fraction).state, city);
+  assert.match(sellPosition(city, "TSLA", 1).error, /do not own/);
+});
+test("all 30+ catalogue assets have buildable valid art and persisted kinds", () => {
+  const defs = catalogue.filter((d) => d.ticker);
+  assert.ok(defs.length >= 30);
+  for (const def of defs) {
+    const built = constructBuilding(
+      def.kind,
+      { r: 1, c: 1 },
+      100,
+      tradingCity(),
+    );
+    assert.equal(built.error, "");
+    assert.ok(isSavedCity(built.state));
+    const path = buildingImage(built.state.buildings.at(-1));
+    assert.ok(
+      existsSync(
+        new URL(`../public/assets/sprites/${path}.png`, import.meta.url),
+      ),
+      path,
+    );
   }
+});
+test("regular-session estimate handles DST, weekends and closing boundary", () => {
+  assert.equal(marketClock(new Date("2026-01-05T14:00:00Z")).open, false);
+  assert.equal(marketClock(new Date("2026-01-05T15:00:00Z")).open, true);
+  assert.equal(marketClock(new Date("2026-07-07T13:30:00Z")).open, true);
+  assert.equal(marketClock(new Date("2026-07-07T20:00:00Z")).open, false);
+  assert.equal(marketClock(new Date("2026-07-05T15:00:00Z")).open, false);
 });

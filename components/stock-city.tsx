@@ -26,7 +26,10 @@ import {
   X,
 } from "lucide-react";
 import CityMap from "./city-map";
+import CivicPanel from "./civic-panel";
+import { fallbackFeed, type MarketFeed } from "../lib/market";
 import CityAdvisor from "./city-advisor";
+import StockLogo from "./stock-logo";
 import portfolioStyles from "./portfolio-view.module.css";
 import type {
   BuildingKind,
@@ -37,7 +40,6 @@ import type {
   Tool,
 } from "../lib/city";
 import {
-  MARKET_SOURCE,
   PROVIDER_TAG,
   ROAD_COST,
   STORAGE,
@@ -46,23 +48,20 @@ import {
   assets,
   buildingImage,
   bulldoze,
+  sellPosition,
   catalogue,
   constructBuilding,
   constructRoad,
   defFor,
   hasRoad,
-  healthOf,
   isSavedCity,
-  marketClock,
   money,
   newCity,
   pct,
   placementError,
   priceOf,
-  quoteDiff,
   returnOf,
   sprite,
-  tickMarket,
   basePrices,
   tier,
   valueOf,
@@ -103,12 +102,28 @@ export default function StockCity() {
     [notice, setNotice] = useState("Empty island ready. Draw roads to begin."),
     [noticeError, setNoticeError] = useState(false),
     [confirmReset, setConfirmReset] = useState(false),
-    [search, setSearch] = useState(""),
     [libraryTab, setLibraryTab] = useState("Buildings"),
     [prices, setPrices] = useState<PriceMap>(basePrices),
-    [lastRefresh, setLastRefresh] = useState(Date.now()),
     [now, setNow] = useState(Date.now()),
     [upgrades, setUpgrades] = useState<Record<string, number>>({});
+  const [feed, setFeed] = useState<MarketFeed>(fallbackFeed);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [assetTicker, setAssetTicker] = useState<string | null>(null);
+  const [scanMode, setScanMode] = useState(false);
+  const [scanTarget, setScanTarget] = useState<string | null>(null);
+  const [focusTarget, setFocusTarget] = useState<{
+    r: number;
+    c: number;
+    nonce: number;
+  } | null>(null);
+  const hasHall = city.buildings.some((b) => b.kind === "hall");
+  const hasExchange = city.buildings.some((b) => b.kind === "exchange");
+  const hasData = city.buildings.some((b) => b.kind === "oracle");
+  const scanBuilding = city.buildings.find((b) => b.id === scanTarget);
+  const scanTicker = scanBuilding
+    ? defFor(scanBuilding.kind).ticker
+    : undefined;
   const tiers = useRef<Record<string, string>>({});
   const history = useRef<CityState[]>([]),
     future = useRef<CityState[]>([]),
@@ -155,16 +170,66 @@ export default function StockCity() {
     return () => clearTimeout(t);
   }, []);
   useEffect(() => {
-    if (!ready || paused) return;
-    const interval = setInterval(
-      () => {
-        setPrices((p) => tickMarket(p));
-        setLastRefresh(Date.now());
-      },
-      Math.max(2500, 4500 / speed),
-    );
-    return () => clearInterval(interval);
-  }, [ready, paused, speed]);
+    const controller = new AbortController();
+    const refresh = async () => {
+      setFeedLoading(true);
+      try {
+        const response = await fetch("/api/market", {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw Error();
+        const next: MarketFeed = await response.json();
+        if (
+          !next.quotes ||
+          !assets.every(
+            (a) =>
+              Number.isFinite(next.quotes[a.ticker]?.price) &&
+              next.quotes[a.ticker].price > 0,
+          )
+        )
+          throw Error();
+        if (controller.signal.aborted) return;
+        setFeed(next);
+        setPrices(
+          Object.fromEntries(
+            Object.entries(next.quotes).map(([ticker, q]) => [ticker, q.price]),
+          ),
+        );
+      } catch {
+        if (!controller.signal.aborted)
+          setFeed((old) => ({
+            ...old,
+            error:
+              "Connection unavailable. Displaying last available or illustrative prices.",
+            quotes: Object.fromEntries(
+              Object.entries(old.quotes).map(([ticker, q]) => [
+                ticker,
+                { ...q, status: q.status === "live" ? "stale" : q.status },
+              ]),
+            ),
+          }));
+      } finally {
+        if (!controller.signal.aborted) setFeedLoading(false);
+      }
+    };
+    refresh();
+    const timer = setInterval(refresh, 60000);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [refreshKey]);
+  useEffect(() => {
+    if (!hasHall) {
+      setPortfolioView(false);
+      if (panel === "portfolio") setPanel(null);
+    }
+    if (!hasExchange && panel === "market") setPanel(null);
+    if (!hasData) {
+      setScanMode(false);
+      if (panel === "data") setPanel(null);
+    }
+  }, [hasHall, hasExchange, hasData, panel]);
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 800);
     return () => clearInterval(interval);
@@ -216,6 +281,10 @@ export default function StockCity() {
     setActiveTool(next);
   };
   const showPortfolio = () => {
+    if (!hasHall) {
+      notify("Build City Hall to unlock portfolio status.", true);
+      return;
+    }
     cancel();
     setPortfolioView(true);
   };
@@ -226,10 +295,10 @@ export default function StockCity() {
       notify("Select mode active. Click any building to inspect.");
     } else {
       showPortfolio();
-      notify("Portfolio view active. Showing all holdings.");
     }
   };
   const cancel = () => {
+    setScanMode(false);
     setTool("inspect");
     setKind(null);
     setMoving(null);
@@ -238,6 +307,14 @@ export default function StockCity() {
     setCategory(null);
   };
   const chooseCategory = (next: Category) => {
+    if (next === "companies" && !hasExchange) {
+      setCategory("companies");
+      setTool("inspect");
+      setKind(null);
+      setPanel(null);
+      notify("Build the Stock Exchange first to unlock Companies.", true);
+      return;
+    }
     setPortfolioView(false);
     setPanel(null);
     setSelected(null);
@@ -256,6 +333,11 @@ export default function StockCity() {
     }
   };
   const chooseBuilding = (value: BuildingKind, autoClose = false) => {
+    if (defFor(value).ticker && !hasExchange) {
+      notify("Build the Stock Exchange first.", true);
+      return;
+    }
+    setScanMode(false);
     setKind(value);
     setTool("build");
     setSelected(null);
@@ -263,12 +345,29 @@ export default function StockCity() {
     setPanel(null);
     if (autoClose) {
       setCategory(null);
-      notify(`Placing ${defFor(value).name}. Click island plot to build, Esc to cancel.`);
+      notify(
+        `Placing ${defFor(value).name}. Click island plot to build, Esc to cancel.`,
+      );
     } else {
       setCategory(defFor(value).category);
     }
   };
   const openPanel = (value: Panel) => {
+    if (
+      (value === "portfolio" && !hasHall) ||
+      (value === "market" && !hasExchange) ||
+      (value === "data" && !hasData)
+    ) {
+      notify(
+        `Build ${value === "portfolio" ? "City Hall" : value === "market" ? "the Stock Exchange" : "the Data Center"} first.`,
+        true,
+      );
+      return;
+    }
+    setAssetTicker(null);
+    setCategory(null);
+    setActiveTool("inspect");
+    setScanMode(false);
     setPortfolioView(false);
     setPanel(panel === value ? null : value);
     setSelected(null);
@@ -300,8 +399,12 @@ export default function StockCity() {
       return;
     }
     commit(result.state);
+    if (defFor(kind).ticker) {
+      setTool("inspect");
+      setKind(null);
+    }
     notify(
-      `${defFor(kind).name} placed${defFor(kind).ticker ? ` at ${money(priceOf(defFor(kind).ticker!, prices))} per simulated share` : ""}. Place another, or Esc.`,
+      `${defFor(kind).name} placed${defFor(kind).ticker ? ` at ${money(priceOf(defFor(kind).ticker!, prices))} per simulated share` : ""}${defFor(kind).ticker ? ". Investment placed." : ". Place another, or Esc."}`,
     );
   };
   const onRoad = (cells: Cell[]) => {
@@ -336,25 +439,13 @@ export default function StockCity() {
     definition = current ? defFor(current.kind) : null,
     buildDef = kind ? defFor(kind) : null;
   const portfolio = city.buildings.reduce(
-      (sum, b) => sum + valueOf(b, prices),
-      0,
-    ),
-    costBasis = city.buildings
-      .filter((b) => defFor(b.kind).ticker)
-      .reduce((s, b) => s + b.quantity * b.entry, 0),
-    profits = portfolio - costBasis;
-  const dayBase = costBasis || portfolio || 1;
-  const dayChange = portfolio
-    ? ((portfolio - dayBase * 0.995) / (dayBase * 0.995)) * 100
-    : 0;
-  const connected = city.buildings.filter((b) => hasRoad(b, city.roads)).length;
-  const health = healthOf(city.buildings, prices);
+    (sum, b) => sum + valueOf(b, prices),
+    0,
+  );
   const alloc = allocationOf(
     city.buildings.filter((b) => defFor(b.kind).ticker),
     prices,
   );
-  const clock = marketClock(new Date(lastRefresh));
-  const freshSecs = Math.max(0, Math.round((now - lastRefresh) / 1000));
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (confirmReset) {
@@ -457,8 +548,8 @@ export default function StockCity() {
   }, [confirmReset]);
   const steps = [
     city.roads.length > 0,
+    hasExchange,
     city.buildings.some((b) => defFor(b.kind).ticker),
-    city.buildings.some((b) => !defFor(b.kind).ticker),
   ];
   return (
     <main className={`simcity ${category ? "tray-open" : ""}`}>
@@ -491,6 +582,10 @@ export default function StockCity() {
         moving={moving}
         zoom={zoom}
         cameraReset={cameraReset}
+        focusTarget={focusTarget}
+        scanMode={scanMode}
+        scanTarget={scanTarget}
+        onScanTarget={setScanTarget}
         grid={grid || portfolioView}
         portfolioView={portfolioView}
         motion={motion}
@@ -502,7 +597,18 @@ export default function StockCity() {
         onZoom={changeZoom}
         onSelect={(id) => {
           setSelected(id);
-          setPanel(null);
+          const b = city.buildings.find((b) => b.id === id);
+          if (b && !defFor(b.kind).ticker) {
+            openPanel(
+              b.kind === "hall"
+                ? "portfolio"
+                : b.kind === "exchange"
+                  ? "market"
+                  : "data",
+            );
+          } else if (b && scanMode) {
+            setScanTarget(id);
+          } else setPanel(null);
         }}
         onPlace={onPlace}
         onRoad={onRoad}
@@ -510,11 +616,17 @@ export default function StockCity() {
         onCancel={cancel}
         onHover={setHover}
       />
-      {portfolioView && <div className={portfolioStyles.heading} role="status">
-        <h2>Portfolio view</h2>
-        <p>{city.buildings.some(b => !!defFor(b.kind).ticker) ? "All holdings · Unrealized return" : "No holdings yet · Place a company to begin"}</p>
-        <p>Select returns to your city</p>
-      </div>}
+      {portfolioView && (
+        <div className={portfolioStyles.heading} role="status">
+          <h2>Portfolio view</h2>
+          <p>
+            {city.buildings.some((b) => !!defFor(b.kind).ticker)
+              ? "All holdings · Unrealized return"
+              : "No holdings yet · Place a company to begin"}
+          </p>
+          <p>Select returns to your city</p>
+        </div>
+      )}
       <header className="game-header">
         <button
           className={`menu-button ${panel === "settings" ? "active" : ""}`}
@@ -541,7 +653,7 @@ export default function StockCity() {
             <img src={sprite("buttons/buy")} alt="" aria-hidden="true" />
             <span>
               <small>STOCK VALUE</small>
-              <b>{wholeMoney(portfolio)}</b>
+              <b>{hasHall ? wholeMoney(portfolio) : "Build City Hall"}</b>
             </span>
           </button>
           <button
@@ -592,30 +704,41 @@ export default function StockCity() {
           </button>
         </div>
       )}
-      {(!city.buildings.length || !city.roads.length) && !panel && booted && !category && (
-        <div className={`start-note ${guideHidden ? "minimized" : ""}`} role="status">
-          <span className="step-number">
-            {steps.filter(Boolean).length + 1}/3
-          </span>
-          {!guideHidden && (
-            <span>
-              <b>Empty island — build it yourself</b>
-              <small>
-                {steps[0] ? "✓" : "1."} Drag Roads (R) · {steps[1] ? "✓" : "2."}{" "}
-                Place a company (B) · {steps[2] ? "✓" : "3."} Place a service (S)
-              </small>
-            </span>
-          )}
-          <button
-            className="start-note-toggle"
-            onClick={() => setGuideHidden((v) => !v)}
-            aria-label={guideHidden ? "Expand guideline" : "Hide guideline"}
-            title={guideHidden ? "Expand guideline" : "Hide guideline"}
+      {(!city.buildings.length || !city.roads.length) &&
+        !panel &&
+        booted &&
+        !category && (
+          <div
+            className={`start-note ${guideHidden ? "minimized" : ""}`}
+            role="status"
           >
-            {guideHidden ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-        </div>
-      )}
+            <span className="step-number">
+              {steps.filter(Boolean).length + 1}/3
+            </span>
+            {!guideHidden && (
+              <span>
+                <b>Empty island — build it yourself</b>
+                <small>
+                  {steps[0] ? "✓" : "1."} Drag Roads (R) ·{" "}
+                  {steps[1] ? "✓" : "2."} Build Exchange (S) ·{" "}
+                  {steps[2] ? "✓" : "3."} Buy a company
+                </small>
+              </span>
+            )}
+            <button
+              className="start-note-toggle"
+              onClick={() => setGuideHidden((v) => !v)}
+              aria-label={guideHidden ? "Expand guideline" : "Hide guideline"}
+              title={guideHidden ? "Expand guideline" : "Hide guideline"}
+            >
+              {guideHidden ? (
+                <ChevronUp size={14} />
+              ) : (
+                <ChevronDown size={14} />
+              )}
+            </button>
+          </div>
+        )}
       {category && (
         <section
           className="construction-tray"
@@ -624,7 +747,11 @@ export default function StockCity() {
           <header className="build-tray-header">
             <div className="build-tray-nav">
               <span className="build-title-badge">BUILDS</span>
-              <div className="build-category-tabs" role="tablist" aria-label="Build categories">
+              <div
+                className="build-category-tabs"
+                role="tablist"
+                aria-label="Build categories"
+              >
                 <button
                   type="button"
                   role="tab"
@@ -643,7 +770,7 @@ export default function StockCity() {
                   onClick={() => chooseCategory("companies")}
                 >
                   <GameArt index={2} />
-                  <span>Companies</span>
+                  <span>Companies{!hasExchange ? " · Locked" : ""}</span>
                 </button>
                 <button
                   type="button"
@@ -667,7 +794,18 @@ export default function StockCity() {
             </button>
           </header>
           <div className="tray-content">
-            {category === "roads" ? (
+            {category === "companies" && !hasExchange ? (
+              <div className="companies-locked">
+                <Landmark size={26} />
+                <div>
+                  <strong>Open the market first</strong>
+                  <p>Build the Stock Exchange to unlock company buildings.</p>
+                </div>
+                <button onClick={() => chooseCategory("services")}>
+                  Build services <ChevronRight size={15} />
+                </button>
+              </div>
+            ) : category === "roads" ? (
               <>
                 <button
                   className={`build-card road-card ${tool === "road" ? "chosen" : ""}`}
@@ -675,7 +813,9 @@ export default function StockCity() {
                     setTool("road");
                     setKind(null);
                     setCategory(null);
-                    notify("Drawing roads ($10/tile). Drag a route on island, release to build. Esc to finish.");
+                    notify(
+                      "Drawing roads ($10/tile). Drag a route on island, release to build. Esc to finish.",
+                    );
                   }}
                   title="Click to start drawing roads"
                 >
@@ -719,7 +859,9 @@ export default function StockCity() {
                         setTool("road");
                         setKind(null);
                         setCategory(null);
-                        notify("Drawing roads ($10/tile). Drag a route on island, release to build. Esc to finish.");
+                        notify(
+                          "Drawing roads ($10/tile). Drag a route on island, release to build. Esc to finish.",
+                        );
                       }}
                     >
                       <span>Start Drawing Roads ($10/tile)</span>
@@ -742,6 +884,14 @@ export default function StockCity() {
                     >
                       <div className="card-image">
                         <img src={sprite(d.image)} alt={d.name} />
+                        {d.ticker && (
+                          <StockLogo
+                            ticker={d.ticker}
+                            name={d.name}
+                            size={20}
+                            className="card-logo-chip"
+                          />
+                        )}
                       </div>
                       <strong>{d.name}</strong>
                       <span>{d.ticker ?? wholeMoney(d.cost)}</span>
@@ -753,7 +903,16 @@ export default function StockCity() {
                 <div className="build-options">
                   {buildDef && defFor(kind!).category === category ? (
                     <>
-                      <strong>{buildDef.name}</strong>
+                      <div className="build-def-header">
+                        {buildDef.ticker && (
+                          <StockLogo
+                            ticker={buildDef.ticker}
+                            name={buildDef.name}
+                            size={26}
+                          />
+                        )}
+                        <strong>{buildDef.name}</strong>
+                      </div>
                       <span className="footprint-label">2 × 2 footprint</span>
                       {buildDef.ticker ? (
                         <>
@@ -802,7 +961,9 @@ export default function StockCity() {
                             className="place-on-island"
                             onClick={() => {
                               setCategory(null);
-                              notify(`Placing ${buildDef.name} ($${amount}). Click island plot to build, Esc to cancel.`);
+                              notify(
+                                `Placing ${buildDef.name} ($${amount}). Click island plot to build, Esc to cancel.`,
+                              );
                             }}
                             disabled={
                               !Number.isFinite(amount) ||
@@ -810,7 +971,10 @@ export default function StockCity() {
                               amount > city.cash
                             }
                           >
-                            <span>Pay ${Number.isFinite(amount) ? amount : 0} & Place</span>
+                            <span>
+                              Pay ${Number.isFinite(amount) ? amount : 0} &
+                              Place
+                            </span>
                             <ArrowUpRight size={14} />
                           </button>
                         </>
@@ -824,7 +988,9 @@ export default function StockCity() {
                             className="place-on-island"
                             onClick={() => {
                               setCategory(null);
-                              notify(`Placing ${buildDef.name} (${wholeMoney(buildDef.cost)}). Click island plot to build, Esc to cancel.`);
+                              notify(
+                                `Placing ${buildDef.name} (${wholeMoney(buildDef.cost)}). Click island plot to build, Esc to cancel.`,
+                              );
                             }}
                             disabled={city.cash < buildDef.cost}
                           >
@@ -851,7 +1017,7 @@ export default function StockCity() {
           </div>
         </section>
       )}
-      {current && definition && tool === "inspect" && !panel && (
+      {current && definition && tool === "inspect" && !panel && !scanMode && (
         <aside className="inspection-panel" aria-label="Selected building">
           <header>
             <div>
@@ -860,12 +1026,21 @@ export default function StockCity() {
                   ? "STOCK BUILDING · DEMO POSITION"
                   : "CITY SERVICE"}
               </small>
-              <h2>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
                 {definition.ticker && (
-                  <span className="ticker-badge">{definition.ticker}</span>
-                )}{" "}
-                {definition.name}
-              </h2>
+                  <StockLogo
+                    ticker={definition.ticker}
+                    name={definition.name}
+                    size={28}
+                  />
+                )}
+                <h2 style={{ margin: 0 }}>
+                  {definition.ticker && (
+                    <span className="ticker-badge">{definition.ticker}</span>
+                  )}{" "}
+                  {definition.name}
+                </h2>
+              </div>
             </div>
             <button
               aria-label="Close building inspector"
@@ -908,7 +1083,7 @@ export default function StockCity() {
                       Position value<strong>{money(val)}</strong>
                     </span>
                     <span>
-                      Simulated price
+                      Token price
                       <b>{money(live)}</b>
                     </span>
                     <span>
@@ -930,8 +1105,8 @@ export default function StockCity() {
                       Allocation<b>{myAlloc.toFixed(1)}% of stocks</b>
                     </span>
                     <small>
-                      {PROVIDER_TAG} · {MARKET_SOURCE} · updated {freshSecs}s
-                      ago
+                      {PROVIDER_TAG} · {feed.quotes[definition.ticker!]?.source}{" "}
+                      · {feed.quotes[definition.ticker!]?.status}
                     </small>
                   </div>
                   <span className="chain-link">
@@ -965,6 +1140,38 @@ export default function StockCity() {
               <ChevronRight size={14} />
             </button>
           )}
+          {definition.ticker && (
+            <div className="inspection-actions">
+              <button
+                disabled={!hasExchange}
+                title={
+                  hasExchange
+                    ? "Open Stock Exchange"
+                    : "Build the Stock Exchange first"
+                }
+                onClick={() => {
+                  openPanel("market");
+                  setAssetTicker(definition.ticker!);
+                }}
+              >
+                Trade position
+              </button>
+              <button
+                disabled={!hasData}
+                title={
+                  hasData
+                    ? "Inspect issuer and token evidence"
+                    : "Build the Data Center first"
+                }
+                onClick={() => {
+                  openPanel("data");
+                  setAssetTicker(definition.ticker!);
+                }}
+              >
+                RWA passport
+              </button>
+            </div>
+          )}
           <div className="inspection-actions">
             <button
               onClick={() => {
@@ -991,7 +1198,89 @@ export default function StockCity() {
           </div>
         </aside>
       )}
-      {panel && (
+      {scanMode && (
+        <div className="scan-toolbar">
+          <span>SCAN MODE · Hover or tap a building</span>
+          <button
+            onClick={() => {
+              setScanMode(false);
+              setScanTarget(null);
+            }}
+          >
+            Exit scan <X size={14} />
+          </button>
+        </div>
+      )}
+      {scanMode && scanTicker && (
+        <aside className="scan-card">
+          <small>RWA SIGNAL</small>
+          <h3>{feed.quotes[scanTicker]?.tokenName ?? scanTicker}</h3>
+          <p>
+            {feed.quotes[scanTicker]?.tokenName
+              ? "xStocks / Backed"
+              : "Issuer unconfirmed"}
+          </p>
+          <dl>
+            <dt>Price source</dt>
+            <dd>{feed.quotes[scanTicker]?.source}</dd>
+            <dt>Last fetched</dt>
+            <dd>
+              {feed.quotes[scanTicker]?.fetchedAt
+                ? new Date(
+                    feed.quotes[scanTicker].fetchedAt!,
+                  ).toLocaleTimeString()
+                : "Illustrative · no live timestamp"}
+            </dd>
+          </dl>
+          <button
+            onClick={() => {
+              setAssetTicker(scanTicker);
+              setPanel("data");
+              setScanMode(false);
+            }}
+          >
+            View Passport <ChevronRight size={14} />
+          </button>
+        </aside>
+      )}
+      {(panel === "portfolio" || panel === "market" || panel === "data") && (
+        <CivicPanel
+          mode={panel}
+          city={city}
+          prices={prices}
+          feed={feed}
+          loading={feedLoading}
+          initialTicker={assetTicker}
+          onClose={() => setPanel(null)}
+          onRetry={() => setRefreshKey((n) => n + 1)}
+          onBuy={(kind, investment) => {
+            setAmount(investment);
+            chooseBuilding(kind, true);
+          }}
+          onSell={(ticker, fraction) => {
+            const result = sellPosition(city, ticker, fraction, prices);
+            if (result.error) return result.error;
+            commit(result.state);
+            return `${fraction === 1 ? "Entire holding" : `${fraction * 100}% of holding`} sold. Demo funds updated.`;
+          }}
+          onFocus={(b) => {
+            setPanel(null);
+            setSelected(b.id);
+            setTool("inspect");
+            setZoom(1.7);
+            setFocusTarget({ r: b.r, c: b.c, nonce: Date.now() });
+          }}
+          onScan={() => {
+            setPanel(null);
+            setSelected(null);
+            setTool("inspect");
+            setCategory(null);
+            setScanMode(true);
+            setScanTarget(null);
+          }}
+        />
+      )}
+      {panel && !["portfolio", "market", "data"].includes(panel) && (
         <aside
           ref={panelRef}
           className={`utility-panel ${panel === "assets" ? "asset-panel" : ""}`}
@@ -1005,183 +1294,6 @@ export default function StockCity() {
               <X size={18} />
             </button>
           </header>
-          {panel === "portfolio" && (
-            <div className="panel-body">
-              <div className="finance-total">
-                <span>Available demo funds</span>
-                <strong>{money(city.cash)}</strong>
-              </div>
-              <dl className="finance-list">
-                <div>
-                  <dt>Stock portfolio (live)</dt>
-                  <dd>{money(portfolio)}</dd>
-                </div>
-                <div>
-                  <dt>Day change (sim)</dt>
-                  <dd className={dayChange >= 0 ? "positive" : "negative"}>
-                    {pct(dayChange)}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Unrealized return</dt>
-                  <dd className={profits >= 0 ? "positive" : "negative"}>
-                    {money(profits)}
-                  </dd>
-                </div>
-                <div>
-                  <dt>City health</dt>
-                  <dd>{health.label}</dd>
-                </div>
-                <div>
-                  <dt>Buildings / road access</dt>
-                  <dd>
-                    {city.buildings.length} / {connected}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Road construction</dt>
-                  <dd>{city.roads.length} tiles</dd>
-                </div>
-                <div>
-                  <dt>Data freshness</dt>
-                  <dd>updated {freshSecs}s ago</dd>
-                </div>
-              </dl>
-              <p className="health-line">
-                {health.detail} Not financial advice.
-              </p>
-              <h3>Stock positions</h3>
-              {!city.buildings.some((b) => defFor(b.kind).ticker) ? (
-                <div className="empty-panel">
-                  <Building2 size={26} />
-                  <strong>No stock buildings</strong>
-                  <p>
-                    Choose Companies in the construction bar and place your
-                    first building.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setCategory("companies");
-                      setPanel(null);
-                    }}
-                  >
-                    Open companies <ChevronRight size={13} />
-                  </button>
-                </div>
-              ) : (
-                city.buildings
-                  .filter((b) => defFor(b.kind).ticker)
-                  .map((b) => {
-                    const a = alloc.find((x) => x.id === b.id)?.pct ?? 0;
-                    return (
-                      <button
-                        className="holding"
-                        key={b.id}
-                        onClick={() => {
-                          setSelected(b.id);
-                          setPanel(null);
-                          setTool("inspect");
-                        }}
-                      >
-                        <span>
-                          {defFor(b.kind).name}
-                          <small>
-                            {b.quantity.toFixed(3)} shares · {a.toFixed(1)}% ·{" "}
-                            {pct(returnOf(b, prices))}
-                          </small>
-                          <span className="alloc-bar" aria-hidden="true">
-                            <i style={{ width: `${Math.min(100, a)}%` }} />
-                          </span>
-                        </span>
-                        <b>{money(valueOf(b, prices))}</b>
-                        <ChevronRight size={13} />
-                      </button>
-                    );
-                  })
-              )}
-              <p className="panel-disclaimer">
-                DEMO / TESTNET mock positions. Live simulated prices drive
-                building levels. Not financial advice.
-              </p>
-            </div>
-          )}
-          {panel === "market" && (
-            <div className="panel-body">
-              <div className="data-label">
-                <span />
-                {MARKET_SOURCE.toUpperCase()} · {clock.label.toUpperCase()} ·{" "}
-                {freshSecs}S AGO
-              </div>
-              <label className="market-search">
-                <Search size={15} />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  aria-label="Search stocks"
-                  placeholder="Search 20 tracked stocks"
-                />
-              </label>
-              <div className="market-rows">
-                {assets
-                  .filter((a) =>
-                    `${a.name} ${a.ticker}`
-                      .toLowerCase()
-                      .includes(search.toLowerCase()),
-                  )
-                  .map((a) => {
-                    const live = priceOf(a.ticker, prices);
-                    const chg =
-                      a.price !== 0
-                        ? ((live - a.price) / a.price) * 100
-                        : a.change;
-                    return (
-                      <div className="market-row" key={a.ticker}>
-                        <span>
-                          <strong>{a.ticker}</strong>
-                          <small>
-                            {a.name} · {PROVIDER_TAG}
-                          </small>
-                        </span>
-                        <span>
-                          <b>{money(live)}</b>
-                          <small className={chg >= 0 ? "positive" : "negative"}>
-                            {pct(chg)}
-                          </small>
-                        </span>
-                        {a.sprite ? (
-                          <button
-                            aria-label={`Build ${a.name} (demo mock position)`}
-                            title="Demo mock position — not live equity"
-                            onClick={() =>
-                              chooseBuilding(a.sprite as BuildingKind)
-                            }
-                          >
-                            <Plus size={15} />
-                          </button>
-                        ) : (
-                          <span className="watch-only">
-                            Watch
-                            <br />
-                            only
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                {!assets.some((a) =>
-                  `${a.name} ${a.ticker}`
-                    .toLowerCase()
-                    .includes(search.toLowerCase()),
-                ) && (
-                  <div className="empty-panel">
-                    <Search size={22} />
-                    <strong>No matching stocks</strong>
-                    <button onClick={() => setSearch("")}>Clear search</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
           {panel === "settings" && (
             <div className="panel-body">
               <label className="setting-toggle">
@@ -1261,55 +1373,6 @@ export default function StockCity() {
               </p>
             </div>
           )}
-          {panel === "data" && (
-            <div className="panel-body">
-              <div className="data-label">
-                <span />
-                ORACLE DATA CENTER · {clock.label.toUpperCase()}
-              </div>
-              {[
-                ["Source", MARKET_SOURCE],
-                ["Market state", `${clock.label} · ${clock.next}`],
-                ["Last refresh", `${freshSecs}s ago · local sim`],
-                ["Wallet", "Not connected (demo)"],
-                ["Transactions", "None — local simulation"],
-                ["Storage", "This browser only"],
-              ].map(([label, value]) => (
-                <div className="shortcut-row" key={label}>
-                  <span>{label}</span>
-                  <b>{value}</b>
-                </div>
-              ))}
-              <h3>On-chain vs reference (sim)</h3>
-              {city.buildings.filter((b) => defFor(b.kind).ticker).length ===
-              0 ? (
-                <p className="health-line">
-                  Place a company building to compare its tokenized quote.
-                </p>
-              ) : (
-                city.buildings
-                  .filter((b) => defFor(b.kind).ticker)
-                  .slice(0, 4)
-                  .map((b) => {
-                    const t = defFor(b.kind).ticker!;
-                    const q = quoteDiff(t, prices);
-                    return (
-                      <div className="shortcut-row" key={b.id}>
-                        <span>{t}</span>
-                        <b>
-                          {money(q.onchain)} vs {money(q.ref)} ({q.bps} bps)
-                        </b>
-                      </div>
-                    );
-                  })
-              )}
-              <p className="panel-disclaimer">
-                Demo quotes only. Mainnet path uses RWA Data + Trading +
-                Transaction APIs with user-confirmed swaps — never demoed as
-                real equity.
-              </p>
-            </div>
-          )}
           {panel === "assets" && (
             <>
               <div className="library-tabs">
@@ -1331,7 +1394,7 @@ export default function StockCity() {
                       d.ticker
                         ? ["minus", "level_1", "level_2", "level_3"].map(
                             (t) => ({
-                              path: `${d.kind}/${t}`,
+                              path: `${d.image.split("/")[0]}/${t}`,
                               name: `${d.name} ${t.replaceAll("_", " ")}`,
                             }),
                           )
@@ -1397,11 +1460,19 @@ export default function StockCity() {
       <footer className="command-bar">
         <nav className="tool-palette" aria-label="Construction tools">
           <button
-            className={`portfolio-select-button ${portfolioView ? "active portfolio-active" : (tool === "inspect" && !category ? "active select-active" : "")}`}
+            className={`portfolio-select-button ${portfolioView ? "active portfolio-active" : tool === "inspect" && !category ? "active select-active" : ""}`}
             onClick={toggleSelectPortfolio}
-            aria-label={portfolioView ? "Switch to Select mode" : "Switch to Portfolio view"}
+            aria-label={
+              portfolioView
+                ? "Switch to Select mode"
+                : "Switch to Portfolio view"
+            }
             aria-pressed={portfolioView}
-            title={portfolioView ? "Currently in Portfolio view. Click or press V for Select mode" : "Currently in Select mode. Click or press V for Portfolio view"}
+            title={
+              portfolioView
+                ? "Currently in Portfolio view. Click or press V for Select mode"
+                : "Currently in Select mode. Click or press V for Portfolio view"
+            }
           >
             {portfolioView ? (
               <img
@@ -1427,7 +1498,9 @@ export default function StockCity() {
             }}
             aria-label="Builds menu"
             aria-expanded={Boolean(category)}
-            aria-pressed={Boolean(category || tool === "road" || (tool === "build" && kind))}
+            aria-pressed={Boolean(
+              category || tool === "road" || (tool === "build" && kind),
+            )}
           >
             <img
               src="/assets/buids-menu.png"
@@ -1455,9 +1528,10 @@ export default function StockCity() {
             <kbd>X</kbd>
           </button>
         </nav>
-
       </footer>
-      <CityAdvisor city={city} prices={prices} />
+      {hasHall && !panel && !scanMode && (
+        <CityAdvisor city={city} prices={prices} />
+      )}
       {confirmReset && (
         <div className="confirm-overlay">
           <div

@@ -1,0 +1,1146 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Building2,
+  ChevronRight,
+  Crosshair,
+  ExternalLink,
+  Landmark,
+  Radio,
+  Search,
+  ShieldCheck,
+  X,
+} from "lucide-react";
+import {
+  assets,
+  catalogue,
+  defFor,
+  healthOf,
+  marketClock,
+  money,
+  pct,
+  priceOf,
+  valueOf,
+  type Building,
+  type BuildingKind,
+  type CityState,
+  type PriceMap,
+} from "../lib/city";
+import {
+  sampleHistory,
+  type HistoryFeed,
+  type MarketFeed,
+  type PricePoint,
+  type Passport,
+} from "../lib/market";
+import StockLogo from "./stock-logo";
+import styles from "./civic-panel.module.css";
+export type CivicMode = "portfolio" | "market" | "data";
+type Props = {
+  mode: CivicMode;
+  city: CityState;
+  prices: PriceMap;
+  feed: MarketFeed;
+  loading: boolean;
+  initialTicker: string | null;
+  onClose: () => void;
+  onRetry: () => void;
+  onBuy: (kind: BuildingKind, amount: number) => void;
+  onSell: (ticker: string, fraction: number) => string;
+  onFocus: (building: Building) => void;
+  onScan: () => void;
+};
+const stamp = (value?: string | null) =>
+  value
+    ? new Date(value).toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZoneName: "short",
+      })
+    : "No observed timestamp";
+export default function CivicPanel({
+  mode,
+  city,
+  prices,
+  feed,
+  loading,
+  initialTicker,
+  onClose,
+  onRetry,
+  onBuy,
+  onSell,
+  onFocus,
+  onScan,
+}: Props) {
+  const [ticker, setTicker] = useState<string | null>(initialTicker);
+  const [search, setSearch] = useState("");
+  const [amount, setAmount] = useState("500");
+  const [sale, setSale] = useState(25);
+  const [message, setMessage] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [history, setHistory] = useState<HistoryFeed | null>(null);
+  const [passport, setPassport] = useState<Passport | null>(null);
+  const [network, setNetwork] = useState(0);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [chartRetry, setChartRetry] = useState(0);
+  const [clock, setClock] = useState(() => marketClock());
+  const ref = useRef<HTMLElement>(null);
+  const drag = useRef(0);
+  const swiped = useRef(false);
+  const passportTicker = useRef<string | null>(null);
+  const deployment = passport?.deployments[network];
+  const quote = ticker ? feed.quotes[ticker] : undefined;
+  useEffect(() => {
+    setTicker(initialTicker);
+    setMessage("");
+  }, [initialTicker, mode]);
+  useEffect(() => {
+    const trigger = document.activeElement as HTMLElement;
+    ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => {
+      if (trigger?.isConnected) trigger.focus();
+    };
+  }, []);
+  useEffect(() => {
+    const timer = setInterval(() => setClock(marketClock()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!ticker || mode === "portfolio") return;
+    const controller = new AbortController();
+    setChartLoading(true);
+    setHistory(null);
+    fetch(
+      `/api/history?ticker=${encodeURIComponent(ticker)}${quote?.pair ? `&pair=${encodeURIComponent(quote.pair)}` : ""}`,
+      { signal: controller.signal },
+    )
+      .then((r) => {
+        if (!r.ok) throw Error();
+        return r.json();
+      })
+      .then((data: HistoryFeed) => {
+        if (!Array.isArray(data.points)) throw Error();
+        setHistory(data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setHistory({
+            points: sampleHistory(priceOf(ticker, prices)),
+            simulated: true,
+            tokenSource: "Illustrative fallback",
+            benchmarkSource: "Unavailable",
+          });
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setChartLoading(false);
+      });
+    return () => controller.abort();
+    // Quotes refresh separately. Only reload history when the selected instrument changes.
+  }, [ticker, quote?.pair, mode, chartRetry]);
+  useEffect(() => {
+    if (!ticker || mode === "portfolio") return;
+    const controller = new AbortController();
+    if (passportTicker.current !== ticker) {
+      setPassport(null);
+      setNetwork(0);
+      passportTicker.current = ticker;
+    }
+    fetch(`/api/passport?ticker=${encodeURIComponent(ticker)}`, {
+      signal: controller.signal,
+    })
+      .then((r) => {
+        if (!r.ok) throw Error();
+        return r.json();
+      })
+      .then(setPassport)
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setPassport({
+            fetchedAt: new Date().toISOString(),
+            deployments: [],
+            error: "Issuer information unavailable. Retry to check again.",
+          });
+      });
+    return () => controller.abort();
+  }, [ticker, mode, chartRetry, feed.fetchedAt]);
+  const regularOpen = passport?.period
+    ? passport.period === "market"
+    : clock.open;
+  const marketLabel = passport?.period
+    ? regularOpen
+      ? "U.S. market open"
+      : "U.S. market closed"
+    : clock.label;
+  const selected = assets.find((a) => a.ticker === ticker);
+  const positions = city.buildings.filter((b) => defFor(b.kind).ticker);
+  const total = positions.reduce((sum, b) => sum + valueOf(b, prices), 0);
+  const realizedPnl = city.realizedPnl ?? 0;
+  const basis = positions.reduce((sum, b) => sum + b.entry * b.quantity, 0);
+  const totalPnl = total - basis + realizedPnl;
+  const companies = [...new Set(positions.map((b) => defFor(b.kind).ticker!))];
+  const held = positions.filter((b) => defFor(b.kind).ticker === ticker);
+  const heldValue = held.reduce((sum, b) => sum + valueOf(b, prices), 0);
+  const sectors = [
+    ...new Set(
+      positions.map(
+        (b) => assets.find((a) => a.ticker === defFor(b.kind).ticker)!.sector,
+      ),
+    ),
+  ];
+  const input = Number(amount);
+  const validAmount =
+    Number.isFinite(input) && input >= 1 && input <= city.cash;
+  const hasExchange = city.buildings.some((b) => b.kind === "exchange");
+  const liveCount = Object.values(feed.quotes).filter(
+    (q) => q.status === "live",
+  ).length;
+  const title =
+    mode === "portfolio"
+      ? "City Hall"
+      : mode === "market"
+        ? "Stock Exchange"
+        : "Data Center";
+  return (
+    <aside
+      ref={ref}
+      className={`${styles.panel} ${expanded ? styles.expanded : ""}`}
+      role="dialog"
+      aria-modal="false"
+      aria-label={title}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+    >
+      <button
+        className={styles.handle}
+        aria-label={expanded ? "Collapse panel" : "Expand panel"}
+        aria-expanded={expanded}
+        onClick={() => {
+          if (swiped.current) {
+            swiped.current = false;
+            return;
+          }
+          setExpanded((v) => !v);
+        }}
+        onPointerDown={(e) => {
+          swiped.current = false;
+          drag.current = e.clientY;
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerUp={(e) => {
+          if (Math.abs(e.clientY - drag.current) > 20) {
+            swiped.current = true;
+            setExpanded(e.clientY < drag.current);
+          }
+        }}
+      >
+        <span />
+      </button>
+      <header className={styles.header}>
+        <div className={styles.serviceIcon}>
+          {mode === "portfolio" ? (
+            <Landmark size={21} />
+          ) : mode === "market" ? (
+            <Building2 size={21} />
+          ) : (
+            <ShieldCheck size={21} />
+          )}
+        </div>
+        <div>
+          <span className={styles.eyebrow}>
+            {mode === "portfolio"
+              ? "YOUR CITY, ACCOUNTED FOR"
+              : mode === "market"
+                ? "THE ISLAND TRADING DESK"
+                : "RWA SCANNER & VERIFICATION"}
+          </span>
+          <h2>{title}</h2>
+        </div>
+        <button
+          className={styles.iconButton}
+          onClick={onClose}
+          aria-label="Close building panel"
+        >
+          <X size={20} />
+        </button>
+      </header>
+      <div className={styles.content}>
+        {mode === "portfolio" ? (
+          <>
+            <section className={styles.summary}>
+              <span className={styles.eyebrow}>INVESTED PORTFOLIO</span>
+              <h3>{money(total)}</h3>
+              <span className={totalPnl >= 0 ? styles.up : styles.down}>
+                {money(totalPnl)} total profit / loss
+              </span>
+              <div className={styles.stats}>
+                <div>
+                  Available funds<strong>{money(city.cash)}</strong>
+                </div>
+                <div>
+                  Cost basis<strong>{money(basis)}</strong>
+                </div>
+                <div>
+                  Unrealized P/L<strong>{money(total - basis)}</strong>
+                </div>
+                <div>
+                  Realized P/L<strong>{money(realizedPnl)}</strong>
+                </div>
+              </div>
+            </section>
+            <div className={styles.note}>
+              <Radio size={15} />
+              <span>
+                <strong>{healthOf(city.buildings, prices).label}</strong>
+                <br />
+                {healthOf(city.buildings, prices).detail}
+              </span>
+            </div>
+            <SectionTitle
+              title="Sector allocation"
+              detail={`${sectors.length} sectors`}
+            />
+            {!sectors.length && (
+              <p className={styles.empty}>
+                Your city has no investments yet. Build the Stock Exchange, then
+                choose your first company.
+              </p>
+            )}
+            {sectors.map((sector) => {
+              const value = positions
+                .filter(
+                  (b) =>
+                    assets.find((a) => a.ticker === defFor(b.kind).ticker)
+                      ?.sector === sector,
+                )
+                .reduce((s, b) => s + valueOf(b, prices), 0);
+              return (
+                <div className={styles.sector} key={sector}>
+                  <div>
+                    <span>{sector}</span>
+                    <b>{total ? ((value / total) * 100).toFixed(1) : 0}%</b>
+                  </div>
+                  <div className={styles.track}>
+                    <i
+                      style={{ width: `${total ? (value / total) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            {companies.length > 0 && (
+              <>
+                <SectionTitle
+                  title="Company allocation"
+                  detail={`${companies.length} companies`}
+                />
+                {companies.map((ticker) => {
+                  const buildings = positions.filter(
+                    (b) => defFor(b.kind).ticker === ticker,
+                  );
+                  const value = buildings.reduce(
+                    (sum, b) => sum + valueOf(b, prices),
+                    0,
+                  );
+                  return (
+                    <button
+                      key={ticker}
+                      className={styles.assetRow}
+                      onClick={() => onFocus(buildings[0])}
+                    >
+                      <StockLogo
+                        ticker={ticker}
+                        name={assets.find((a) => a.ticker === ticker)?.name}
+                        size={34}
+                        color={assets.find((a) => a.ticker === ticker)?.color}
+                      />
+                      <span>
+                        <strong>
+                          {assets.find((a) => a.ticker === ticker)?.name}
+                        </strong>
+                        <small>
+                          {buildings.length} building
+                          {buildings.length === 1 ? "" : "s"} ·{" "}
+                          {total ? ((value / total) * 100).toFixed(1) : 0}%
+                          allocation
+                        </small>
+                      </span>
+                      <span className={styles.rowPrice}>{money(value)}</span>
+                      <Crosshair size={14} />
+                    </button>
+                  );
+                })}
+              </>
+            )}
+            <SectionTitle
+              title="Owned buildings"
+              detail={`${city.buildings.length} on island`}
+            />
+            <p className={styles.caption}>
+              Select a name to find it on your island.
+            </p>
+            {city.buildings.map((b) => {
+              const def = defFor(b.kind);
+              return (
+                <button
+                  key={b.id}
+                  className={styles.assetRow}
+                  onClick={() => onFocus(b)}
+                >
+                  {def.ticker ? (
+                    <StockLogo
+                      ticker={def.ticker}
+                      name={def.name}
+                      size={34}
+                      color={assets.find((a) => a.ticker === def.ticker)?.color}
+                    />
+                  ) : (
+                    <span className={styles.monogram}>
+                      <Landmark size={15} />
+                    </span>
+                  )}
+                  <span>
+                    <strong>{def.name}</strong>
+                    <small>
+                      {def.ticker
+                        ? `${b.quantity.toFixed(4)} units · ${assets.find((a) => a.ticker === def.ticker)?.sector}`
+                        : "Public service"}
+                    </small>
+                  </span>
+                  <span className={styles.rowPrice}>
+                    <b>{def.ticker ? money(valueOf(b, prices)) : "Built"}</b>
+                    {def.ticker && (
+                      <small
+                        className={
+                          valueOf(b, prices) >= b.quantity * b.entry
+                            ? styles.up
+                            : styles.down
+                        }
+                      >
+                        {money(valueOf(b, prices) - b.quantity * b.entry)}
+                      </small>
+                    )}
+                  </span>
+                  <Crosshair size={14} />
+                </button>
+              );
+            })}
+            <p className={styles.caption}>
+              Valued with the latest available quotes; individual assets may use
+              illustrative fallback prices. {liveCount}/{assets.length} live
+              quotes.
+            </p>
+          </>
+        ) : (
+          <>
+            {mode === "data" && (
+              <button className={styles.scanButton} onClick={onScan}>
+                <Crosshair size={18} />
+                <span>
+                  Scan the island<small>Hover or tap a company building</small>
+                </span>
+                <ArrowUpRight size={18} />
+              </button>
+            )}
+            {!selected ? (
+              <>
+                <div className={styles.intro}>
+                  <h3>
+                    {mode === "market"
+                      ? "Build a position."
+                      : "Look behind the building."}
+                  </h3>
+                  <p>
+                    {mode === "market"
+                      ? "Choose a company. Invest demo funds. Give it a place on your island."
+                      : "Inspect the token, its price source, and the evidence available before you invest."}
+                  </p>
+                </div>
+                <div className={styles.feedStatus}>
+                  <span
+                    className={loading ? styles.loadingDot : styles.liveDot}
+                  />
+                  {loading
+                    ? "Connecting to public market data…"
+                    : `${liveCount} live · ${assets.length - liveCount} fallback or stale`}
+                  <button onClick={onRetry} disabled={loading}>
+                    Refresh
+                  </button>
+                </div>
+                {feed.error && <p className={styles.warning}>{feed.error}</p>}
+                <label className={styles.search}>
+                  <Search size={16} />
+                  <input
+                    aria-label="Search companies"
+                    placeholder={`Search ${assets.length} stocks and funds`}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </label>
+                <div className={styles.listHeader}>
+                  <span>COMPANY / TOKEN</span>
+                  <span>PRICE / TODAY</span>
+                </div>
+                {assets
+                  .filter((a) =>
+                    `${a.ticker} ${a.name} ${a.sector}`
+                      .toLowerCase()
+                      .includes(search.toLowerCase()),
+                  )
+                  .map((a) => {
+                    const q = feed.quotes[a.ticker];
+                    return (
+                      <button
+                        className={styles.assetRow}
+                        key={a.ticker}
+                        onClick={() => {
+                          setTicker(a.ticker);
+                          setMessage("");
+                        }}
+                      >
+                        <StockLogo
+                          ticker={a.ticker}
+                          name={a.name}
+                          size={34}
+                          color={a.color}
+                          type={mode === "data" ? "rwa" : "stock"}
+                          badge={mode === "data" ? "RWA" : undefined}
+                        />
+                        <span>
+                          <strong>{a.name}</strong>
+                          <small>
+                            {q?.tokenName ?? a.ticker}{" "}
+                            <span className={styles.tag}>
+                              {q?.status === "live"
+                                ? "xStocks"
+                                : (q?.status ?? "fallback")}
+                            </span>
+                          </small>
+                        </span>
+                        <span className={styles.rowPrice}>
+                          <b>{money(priceOf(a.ticker, prices))}</b>
+                          <small
+                            className={
+                              (q?.change ?? 0) >= 0 ? styles.up : styles.down
+                            }
+                          >
+                            {pct(q?.change ?? 0)}
+                          </small>
+                        </span>
+                        <ChevronRight size={14} />
+                      </button>
+                    );
+                  })}
+                {!assets.some((a) =>
+                  `${a.ticker} ${a.name} ${a.sector}`
+                    .toLowerCase()
+                    .includes(search.toLowerCase()),
+                ) && (
+                  <div className={styles.empty}>
+                    No companies match “{search}”.{" "}
+                    <button onClick={() => setSearch("")}>Clear search</button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <button className={styles.back} onClick={() => setTicker(null)}>
+                  <ArrowLeft size={14} />
+                  All assets<span>{assets.length}</span>
+                </button>
+                <div className={styles.instrument}>
+                  <div className={styles.instrumentHeader}>
+                    <StockLogo
+                      ticker={selected.ticker}
+                      name={selected.name}
+                      size={46}
+                      color={selected.color}
+                      type="stock"
+                    />
+                    <div>
+                      <span className={styles.eyebrow}>
+                        {selected.ticker} / USD · {selected.sector}
+                      </span>
+                      <h3>{selected.name}</h3>
+                    </div>
+                  </div>
+                  <div className={styles.quote}>
+                    {money(priceOf(selected.ticker, prices))}
+                    <span
+                      className={
+                        (quote?.change ?? 0) >= 0 ? styles.up : styles.down
+                      }
+                    >
+                      {pct(quote?.change ?? 0)}
+                    </span>
+                  </div>
+                  <div className={styles.marketState}>
+                    <span
+                      className={
+                        regularOpen ? styles.liveDot : styles.closedDot
+                      }
+                    />
+                    {marketLabel}
+                    <span>
+                      {quote?.status === "live"
+                        ? "Token last trade"
+                        : `${quote?.status ?? "fallback"} price`}
+                    </span>
+                  </div>
+                  <p className={styles.caption}>
+                    {passport?.period
+                      ? `Issuer session: ${passport.period}${passport.halted ? " · trading halted" : ""} · ${passport.nextChangeAt ? `next change ${stamp(passport.nextChangeAt)}` : ""}`
+                      : clock.next}
+                  </p>
+                </div>
+                <div className={styles.chartHeader}>
+                  <strong>
+                    {mode === "data"
+                      ? "Token vs. underlying"
+                      : "Price movement"}
+                  </strong>
+                  <span>HOURLY · USD</span>
+                </div>
+                {chartLoading ? (
+                  <div className={styles.chartSkeleton} role="status">
+                    Loading price history…
+                  </div>
+                ) : (
+                  <PriceChart
+                    points={history?.points ?? []}
+                    compare={mode === "data"}
+                    simulated={history?.simulated ?? true}
+                  />
+                )}
+                <div className={styles.chartLegend}>
+                  <span>
+                    <i />
+                    {history?.tokenSource ?? "Loading token history"}
+                  </span>
+                  {mode === "data" && (
+                    <span>
+                      <i className={styles.benchmarkKey} />
+                      {history?.benchmarkSource ?? "Loading reference"}
+                    </span>
+                  )}
+                </div>
+                {(history?.simulated ||
+                  (mode === "data" && !history?.benchmarkPrice)) && (
+                  <p className={styles.warning}>
+                    {history?.simulated
+                      ? "Observed token history unavailable. Any sample line is illustrative."
+                      : "Underlying price unavailable; a spread cannot be calculated."}{" "}
+                    <button onClick={() => setChartRetry((v) => v + 1)}>
+                      Retry
+                    </button>
+                  </p>
+                )}
+                {mode === "market" ? (
+                  <>
+                    <section className={styles.trade}>
+                      <SectionTitle
+                        title="Make it part of your city"
+                        detail="DEMO ORDER"
+                      />
+                      <label htmlFor="investment">Investment amount</label>
+                      <div className={styles.amount}>
+                        <span>USD</span>
+                        <input
+                          id="investment"
+                          type="number"
+                          min="1"
+                          step="0.01"
+                          inputMode="decimal"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          aria-invalid={!validAmount}
+                          aria-describedby="amount-hint"
+                        />
+                      </div>
+                      <div id="amount-hint" className={styles.caption}>
+                        {validAmount
+                          ? `≈ ${(input / priceOf(selected.ticker, prices)).toFixed(4)} units · ${money(city.cash)} available`
+                          : `Enter $1–${money(city.cash)} in available demo funds.`}
+                      </div>
+                      <button
+                        className={styles.primary}
+                        disabled={!validAmount || !hasExchange}
+                        onClick={() =>
+                          onBuy(
+                            catalogue.find((d) => d.ticker === selected.ticker)!
+                              .kind,
+                            input,
+                          )
+                        }
+                      >
+                        Buy & place building
+                        <ArrowUpRight size={17} />
+                      </button>
+                      <p className={styles.caption}>
+                        Funds are deducted when you place the building. Escape
+                        cancels.
+                      </p>
+                    </section>
+                    <section className={styles.trade}>
+                      <SectionTitle
+                        title="Your position"
+                        detail={money(heldValue)}
+                      />
+                      {held.length ? (
+                        <>
+                          <div className={styles.segment}>
+                            {[25, 50, 75, 100].map((n) => (
+                              <button
+                                key={n}
+                                aria-pressed={sale === n}
+                                className={sale === n ? styles.chosen : ""}
+                                onClick={() => setSale(n)}
+                              >
+                                {n === 100 ? "All" : `${n}%`}
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            className={styles.sell}
+                            disabled={!hasExchange}
+                            onClick={() =>
+                              setMessage(onSell(selected.ticker, sale / 100))
+                            }
+                          >
+                            {sale === 100
+                              ? "Liquidate holding"
+                              : `Sell ${sale}%`}{" "}
+                            · {money((heldValue * sale) / 100)}
+                          </button>
+                          <p className={styles.caption}>
+                            A full sale removes all {selected.ticker} buildings.
+                            Partial sales keep their remaining units.
+                          </p>
+                        </>
+                      ) : (
+                        <p className={styles.caption}>
+                          No position yet. Your first purchase starts here.
+                        </p>
+                      )}
+                      {message && (
+                        <p role="status" className={styles.notice}>
+                          {message}
+                        </p>
+                      )}
+                    </section>
+                  </>
+                ) : (
+                  <>
+                    <SectionTitle
+                      title="RWA passport"
+                      detail={quote?.tokenName ?? "NOT CONFIRMED"}
+                    />
+                    <div className={styles.passportHero}>
+                      <div className={styles.passportLogos}>
+                        <StockLogo
+                          ticker={selected.ticker}
+                          name={selected.name}
+                          size={44}
+                          color={selected.color}
+                          type="stock"
+                        />
+                        <span className={styles.rwaLinkArrow}>⇄</span>
+                        <StockLogo
+                          ticker={selected.ticker}
+                          name={passport?.name ?? `${selected.ticker}x`}
+                          size={44}
+                          color={selected.color}
+                          type="rwa"
+                          badge="RWA"
+                        />
+                      </div>
+                      <div className={styles.passportHeroMeta}>
+                        <h4>{passport?.name ?? `${selected.name} Tokenized Stock`}</h4>
+                        <span className={styles.passportIssuer}>
+                          Underlying: {selected.name} ({selected.ticker}) · Backed by Physical Equity
+                        </span>
+                      </div>
+                    </div>
+                    <dl className={styles.passport}>
+                      <Fact label="Underlying">
+                        {selected.name} · {selected.ticker}
+                      </Fact>
+                      <Fact label="Stock exchange">
+                        {passport?.exchange ??
+                          history?.exchange ??
+                          "Not supplied by the reference provider"}
+                      </Fact>
+                      <Fact label="Token">
+                        {passport?.name ??
+                          quote?.tokenName ??
+                          "No live token match returned"}
+                      </Fact>
+                      <Fact label="Issuer">
+                        {passport?.symbol
+                          ? "Backed Assets (JE) Limited"
+                          : "Unconfirmed — issuer metadata unavailable"}
+                      </Fact>
+                      <Fact label="ISIN">
+                        {passport?.isin ?? "Unavailable"}
+                      </Fact>
+                      <Fact label="Network">
+                        {passport?.deployments.length ? (
+                          <select
+                            aria-label="Token network"
+                            value={network}
+                            onChange={(e) => setNetwork(Number(e.target.value))}
+                          >
+                            {passport.deployments.map((d, i) => (
+                              <option value={i} key={d.network}>
+                                {d.network === "BinanceSmartChain"
+                                  ? "BNB Smart Chain"
+                                  : d.network}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          "No verified deployment returned"
+                        )}
+                      </Fact>
+                      <Fact label="Contract">
+                        {deployment ? (
+                          <>
+                            <code>{deployment.address}</code>
+                            {deployment.explorer && (
+                              <a
+                                className={styles.contractLink}
+                                href={deployment.explorer}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Verify contract & transactions{" "}
+                                <ExternalLink size={12} />
+                              </a>
+                            )}
+                          </>
+                        ) : (
+                          "Unavailable — no address inferred"
+                        )}
+                      </Fact>
+                    </dl>
+                    <SectionTitle
+                      title="Price comparison"
+                      detail="INDEPENDENT SOURCES"
+                    />
+                    <div className={styles.comparison}>
+                      <div>
+                        <small>Token · {quote?.status}</small>
+                        <strong>
+                          {money(priceOf(selected.ticker, prices))}
+                        </strong>
+                        <span>{stamp(quote?.fetchedAt)} · fetched</span>
+                      </div>
+                      <div>
+                        <small>Underlying benchmark</small>
+                        <strong>
+                          {history?.benchmarkPrice
+                            ? money(history.benchmarkPrice)
+                            : "Unavailable"}
+                        </strong>
+                        <span>{stamp(history?.benchmarkAt)} · traded</span>
+                      </div>
+                    </div>
+                    <p className={styles.caption}>
+                      {quote?.source} / {history?.benchmarkSource}. Token
+                      retrieval time is not its last-trade time.
+                    </p>
+                    <div className={styles.note}>
+                      <Radio size={15} />
+                      <span>
+                        {quote?.status === "live" && history?.benchmarkPrice
+                          ? `Indicative spread: ${pct((quote.price / history.benchmarkPrice - 1) * 100)}. Quotes are not synchronized.`
+                          : "Spread unavailable without two observed prices."}
+                        <br />
+                        {!regularOpen &&
+                          "U.S. session closed: the stock reference stays at its last reported trade; tokens can still trade."}
+                      </span>
+                    </div>
+                    <SectionTitle
+                      title="Evidence & limitations"
+                      detail="READ BEFORE BUYING"
+                    />
+                    <div className={styles.evidence}>
+                      <strong>
+                        {passport?.reserve
+                          ? `Issuer reserve report · ${Date.now() - Date.parse(passport.reserve.timestamp) > 86400000 ? "stale (>24h)" : "available"}`
+                          : "Reserve status: report unavailable"}
+                      </strong>
+                      {passport?.reserve ? (
+                        <>
+                          <dl className={styles.passport}>
+                            <Fact label="Reported shares">
+                              {passport.reserve.sharesHeld.toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 4 },
+                              )}
+                            </Fact>
+                            <Fact label="Circulating supply">
+                              {passport.reserve.circulatingSupply.toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 4 },
+                              )}
+                            </Fact>
+                            <Fact label="Custody providers">
+                              {passport.reserve.providers.join(", ") ||
+                                "Not supplied"}
+                            </Fact>
+                            <Fact label="Report timestamp">
+                              {stamp(passport.reserve.timestamp)}
+                            </Fact>
+                          </dl>
+                          <p>
+                            Issuer-reported holdings, not an independent audit.
+                            Share counts and token supply can differ due to
+                            multipliers, dividends, and pending issuance. No
+                            backing ratio is inferred.
+                          </p>
+                          <a
+                            href={`https://api.xstocks.fi/api/v2/public/proof-of-reserves/${encodeURIComponent(passport.symbol ?? `${selected.ticker}x`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View source reserve report{" "}
+                            <ExternalLink size={13} />
+                          </a>
+                        </>
+                      ) : (
+                        <p>
+                          {passport
+                            ? "No reserve report returned. A live token price is not proof of backing."
+                            : "Fetching the issuer’s current reserve report…"}
+                        </p>
+                      )}
+                    </div>
+                    <div className={styles.evidence}>
+                      <strong>Rights & limitations</strong>
+                      <p>
+                        {passport?.symbol
+                          ? "A tracker certificate gives economic exposure to the stock, without shareholder voting rights or direct equity ownership. Redemption eligibility, geographic restrictions and fees follow the prospectus. Issuer, custody, liquidity and price-deviation risks remain."
+                          : "Token rights are unconfirmed until issuer metadata is available. Review the official product documents before relying on an illustrative listing."}
+                      </p>
+                      <a
+                        href="https://assets.backed.fi/legal-documentation"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Official base prospectus & product terms{" "}
+                        <ExternalLink size={13} />
+                      </a>
+                      <br />
+                      <a
+                        href="https://docs.xstocks.fi/docs/product-legal-overview"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Issuer legal overview <ExternalLink size={13} />
+                      </a>
+                    </div>
+                    {passport?.error && (
+                      <p className={styles.warning}>
+                        {passport.error}{" "}
+                        <button onClick={() => setChartRetry((v) => v + 1)}>
+                          Retry issuer data
+                        </button>
+                      </p>
+                    )}
+                    <p className={styles.caption}>
+                      Issuer API checked {stamp(passport?.fetchedAt)}. Contract
+                      details describe the real token; your city position is a
+                      local simulation.
+                    </p>
+                  </>
+                )}
+                <p className={styles.caption}>
+                  {quote?.source} · {stamp(quote?.fetchedAt)}{" "}
+                  <button onClick={onRetry} disabled={loading}>
+                    {loading ? "Refreshing…" : "Refresh quote"}
+                  </button>
+                </p>
+              </>
+            )}
+          </>
+        )}
+      </div>
+      <footer className={styles.footer}>
+        <span>DEMO CITY</span>Simulated positions · no real securities are
+        purchased
+      </footer>
+    </aside>
+  );
+}
+function SectionTitle({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className={styles.sectionTitle}>
+      <h3>{title}</h3>
+      <span>{detail}</span>
+    </div>
+  );
+}
+function Fact({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+function PriceChart({
+  points,
+  compare,
+  simulated,
+}: {
+  points: PricePoint[];
+  compare: boolean;
+  simulated: boolean;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const token = points.filter((p) => p.token !== undefined);
+  const benchmark = points.filter((p) => p.benchmark !== undefined);
+  const values = points
+    .flatMap((p) => [p.token, compare ? p.benchmark : undefined])
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  if (!values.length)
+    return (
+      <div className={styles.chartSkeleton}>
+        No observed price history available.
+      </div>
+    );
+  const low = Math.min(...values),
+    high = Math.max(...values);
+  const padding = (high - low) * 0.15 || high * 0.01;
+  const min = low - padding,
+    max = high + padding;
+  const start = points[0].time,
+    end = points[points.length - 1].time;
+  const x = (t: number) => 8 + ((t - start) / (end - start || 1)) * 342;
+  const y = (n: number) => 170 - ((n - min) / (max - min)) * 150;
+  const path = (rows: PricePoint[], key: "token" | "benchmark") =>
+    rows
+      .map(
+        (p, i) =>
+          `${i ? "L" : "M"}${x(p.time).toFixed(2)},${y(p[key]!).toFixed(2)}`,
+      )
+      .join(" ");
+  const active = hover === null ? undefined : points[hover];
+  return (
+    <div className={styles.chart}>
+      <svg
+        viewBox="0 0 420 205"
+        role="img"
+        aria-label={`${simulated ? "Illustrative" : "Observed"} token price history${compare ? " compared with available underlying prices" : ""}`}
+        onPointerMove={(e) => {
+          const box = e.currentTarget.getBoundingClientRect();
+          const t =
+            start +
+            ((((e.clientX - box.left) / box.width) * 420 - 8) / 342) *
+              (end - start);
+          setHover(
+            points.reduce(
+              (best, p, i) =>
+                Math.abs(p.time - t) < Math.abs(points[best].time - t)
+                  ? i
+                  : best,
+              0,
+            ),
+          );
+        }}
+        onPointerLeave={() => setHover(null)}
+      >
+        {[0, 1, 2, 3].map((i) => {
+          const n = min + ((max - min) * i) / 3;
+          return (
+            <g key={i}>
+              <line
+                x1="8"
+                x2="350"
+                y1={y(n)}
+                y2={y(n)}
+                stroke="currentColor"
+                opacity=".12"
+              />
+              <text x="360" y={y(n) + 4} fill="currentColor" fontSize="10">
+                {n.toFixed(n >= 1000 ? 0 : 2)}
+              </text>
+            </g>
+          );
+        })}
+        {token.length > 0 && (
+          <path
+            d={path(token, "token")}
+            fill="none"
+            stroke="var(--civic-accent)"
+            strokeWidth="2"
+          />
+        )}
+        {compare && benchmark.length > 0 && (
+          <path
+            d={path(benchmark, "benchmark")}
+            fill="none"
+            stroke="var(--civic-blue)"
+            strokeWidth="2"
+            strokeDasharray="5 4"
+          />
+        )}
+        {active && (
+          <line
+            x1={x(active.time)}
+            x2={x(active.time)}
+            y1="10"
+            y2="176"
+            stroke="currentColor"
+            opacity=".4"
+          />
+        )}
+        <text x="8" y="199" fill="currentColor" fontSize="10">
+          {simulated && !benchmark.length
+            ? "SAMPLE"
+            : new Date(start).toLocaleDateString([], {
+                month: "short",
+                day: "numeric",
+              })}
+        </text>
+        <text
+          x="350"
+          y="199"
+          textAnchor="end"
+          fill="currentColor"
+          fontSize="10"
+        >
+          {simulated && !benchmark.length
+            ? "ILLUSTRATIVE"
+            : new Date(end).toLocaleDateString([], {
+                month: "short",
+                day: "numeric",
+              })}
+        </text>
+      </svg>
+      {active && (
+        <div className={styles.chartTooltip}>
+          {new Date(active.time).toLocaleString()} ·{" "}
+          {active.token ? `Token ${money(active.token)}` : ""}{" "}
+          {compare && active.benchmark
+            ? `Stock ${money(active.benchmark)}`
+            : ""}
+        </div>
+      )}
+    </div>
+  );
+}

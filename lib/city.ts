@@ -6,7 +6,31 @@ export type Asset = {
   change: number;
   color: string;
   sprite?: string;
+  logo?: string;
+  rwaLogo?: string;
 };
+
+export function stockLogoUrl(ticker: string): string {
+  const clean = ticker.toLowerCase().replace(/\./g, "_");
+  return `/logos/stocks/${clean}.svg`;
+}
+
+export function rwaLogoUrl(ticker: string): string {
+  const clean = ticker.toLowerCase().replace(/\./g, "_");
+  if (clean === "brk_b") return `/logos/stocks/brk_b.svg`;
+  return `/logos/rwa/${clean}.png`;
+}
+
+export function stockLogoApiUrl(ticker: string): string {
+  const clean = ticker.toUpperCase().replace(/\./g, "-");
+  return `https://assets.parqet.com/logos/symbol/${clean}`;
+}
+
+export function rwaLogoApiUrl(ticker: string): string {
+  const clean = ticker.replace(/\./g, "");
+  return `https://xstocks-metadata.backed.fi/logos/tokens/${clean}x.png`;
+}
+
 export const assets: Asset[] = [
   {
     ticker: "NVDA",
@@ -99,6 +123,22 @@ export const assets: Asset[] = [
     sprite: "unitedhealth",
   },
   ...[
+    ["ADBE", "Adobe", "Technology", 345.2, 0.4],
+    ["CRM", "Salesforce", "Technology", 260.1, -0.3],
+    ["ORCL", "Oracle", "Technology", 168.4, 0.8],
+    ["INTC", "Intel", "Technology", 23.8, -0.5],
+    ["PLTR", "Palantir", "Technology", 88.2, 1.3],
+    ["CSCO", "Cisco", "Technology", 61.3, 0.2],
+    ["PEP", "PepsiCo", "Consumer", 148.3, -0.2],
+    ["MCD", "McDonald’s", "Consumer", 307.2, 0.3],
+    ["COST", "Costco", "Consumer", 963.7, 0.5],
+    ["DIS", "Walt Disney", "Consumer", 110.8, 0.6],
+    ["ABT", "Abbott", "Healthcare", 132.7, 0.1],
+    ["MRK", "Merck", "Healthcare", 85.4, -0.3],
+    ["PFE", "Pfizer", "Healthcare", 25.1, 0.2],
+    ["CVX", "Chevron", "Energy", 156.8, 0.4],
+    ["GS", "Goldman Sachs", "Finance", 589.2, 0.6],
+    ["MA", "Mastercard", "Finance", 542.1, 0.4],
     ["AAPL", "Apple", "Technology", 237.49, 1.12],
     ["GOOGL", "Alphabet", "Technology", 192.04, 1.43],
     ["META", "Meta", "Technology", 612.77, -0.64],
@@ -119,11 +159,16 @@ export const assets: Asset[] = [
     color: "#6c8179",
   })),
 ];
+for (const a of assets) {
+  a.logo = stockLogoUrl(a.ticker);
+  a.rwaLogo = rwaLogoUrl(a.ticker);
+}
 
 export type Cell = { r: number; c: number };
 export type Category = "roads" | "companies" | "services";
 export type Tool = "inspect" | "road" | "build" | "bulldoze" | "move";
 export type BuildingKind =
+  | `stock_${string}`
   | "nvidia"
   | "tesla"
   | "amazon"
@@ -275,6 +320,30 @@ export const catalogue: BuildingDef[] = [
       "Your city’s information hub. Select it to inspect the status of the demo data.",
   },
 ];
+// Reuse sector artwork for catalogue assets without a dedicated sprite.
+for (const asset of assets.filter(
+  (a) => !catalogue.some((d) => d.ticker === a.ticker),
+)) {
+  const art =
+    (
+      {
+        Technology: "microsoft",
+        Finance: "blackrock",
+        Consumer: "walmart",
+        Healthcare: "unitedhealth",
+        Energy: "exxonmobil",
+      } as Record<string, string>
+    )[asset.sector] ?? "blackrock";
+  catalogue.push({
+    kind: `stock_${asset.ticker}`,
+    name: asset.name,
+    category: "companies",
+    ticker: asset.ticker,
+    image: `${art}/level_1`,
+    cost: 500,
+    description: `Simulated ${asset.name} position. Shared sector building artwork.`,
+  });
+}
 export type Building = Cell & {
   id: string;
   kind: BuildingKind;
@@ -286,6 +355,7 @@ export type Building = Cell & {
 export type CityState = {
   version: 2;
   cash: number;
+  realizedPnl?: number;
   buildings: Building[];
   roads: Cell[];
 };
@@ -294,6 +364,7 @@ export const ROAD_COST = 10;
 export const newCity = (): CityState => ({
   version: 2,
   cash: 10000,
+  realizedPnl: 0,
   buildings: [],
   roads: [],
 });
@@ -356,7 +427,7 @@ export const tier = (n: number) =>
   n < 0 ? "minus" : n < 5 ? "level_1" : n < 10 ? "level_2" : "level_3";
 export const buildingImage = (b: Building, prices?: PriceMap) =>
   defFor(b.kind).ticker
-    ? `${b.kind}/${tier(returnOf(b, prices))}`
+    ? `${defFor(b.kind).image.split("/")[0]}/${tier(returnOf(b, prices))}`
     : defFor(b.kind).image;
 export function allocationOf(buildings: Building[], prices?: PriceMap) {
   const total = buildings.reduce((s, b) => s + valueOf(b, prices), 0);
@@ -396,18 +467,24 @@ export function healthOf(buildings: Building[], prices?: PriceMap) {
   };
 }
 export function marketClock(now: Date = new Date()) {
-  // NYSE 09:30–16:00 ET, Mon–Fri. September = EDT (UTC-4).
-  const et = new Date(now.getTime() - 4 * 3600 * 1000);
-  const day = et.getUTCDay();
-  const mins = et.getUTCHours() * 60 + et.getUTCMinutes();
-  const open = day > 0 && day < 6 && mins >= 570 && mins < 960;
-  const next = open
-    ? "Closes 16:00 ET"
-    : day === 0 || day === 6 || mins >= 960
-      ? "Opens next weekday 09:30 ET"
-      : "Opens today 09:30 ET";
-  return { open, label: open ? "Market open" : "Market closed", next };
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const mins = Number(get("hour")) * 60 + Number(get("minute"));
+  const open =
+    !["Sat", "Sun"].includes(get("weekday")) && mins >= 570 && mins < 960;
+  return {
+    open,
+    label: open ? "Regular session*" : "Market closed",
+    next: "09:30–16:00 New York · holiday/early-close exceptions not supplied",
+  };
 }
+
 export function quoteDiff(ticker: string, prices?: PriceMap) {
   const ref = priceOf(ticker, prices);
   let h = 0;
@@ -587,6 +664,14 @@ export function constructBuilding(
   state: CityState,
   prices?: PriceMap,
 ) {
+  if (
+    defFor(kind).ticker &&
+    !state.buildings.some((b) => b.kind === "exchange")
+  )
+    return {
+      state,
+      error: "Build the Stock Exchange before buying companies.",
+    };
   const error = placementError(cell, state);
   if (error) return { state, error };
   const def = defFor(kind),
@@ -622,6 +707,11 @@ export function bulldoze(cell: Cell, state: CityState, prices?: PriceMap) {
       state: {
         ...state,
         cash: state.cash + valueOf(b, prices),
+        realizedPnl:
+          (state.realizedPnl ?? 0) +
+          (defFor(b.kind).ticker
+            ? valueOf(b, prices) - b.quantity * b.entry
+            : 0),
         buildings: state.buildings.filter((p) => p.id !== b.id),
       },
       message: defFor(b.kind).ticker
@@ -672,6 +762,7 @@ export function isSavedCity(input: unknown): input is CityState {
     s.version === 2 &&
     Number.isFinite(s.cash) &&
     s.cash >= 0 &&
+    (s.realizedPnl === undefined || Number.isFinite(s.realizedPnl)) &&
     Array.isArray(s.roads) &&
     Array.isArray(s.buildings) &&
     s.roads.every(validCell) &&
@@ -686,4 +777,49 @@ export function isSavedCity(input: unknown): input is CityState {
         b.quantity >= 0,
     )
   );
+}
+
+export function sellPosition(
+  state: CityState,
+  ticker: string,
+  fraction: number,
+  prices?: PriceMap,
+) {
+  if (!state.buildings.some((b) => b.kind === "exchange"))
+    return { state, error: "Build the Stock Exchange before selling." };
+  if (!Number.isFinite(fraction) || fraction <= 0 || fraction > 1)
+    return { state, error: "Choose a valid sell percentage." };
+  const holdings = state.buildings.filter(
+    (b) => defFor(b.kind).ticker === ticker,
+  );
+  if (!holdings.length) return { state, error: "You do not own this asset." };
+  const proceeds = holdings.reduce(
+    (sum, b) => sum + valueOf(b, prices) * fraction,
+    0,
+  );
+  const realized = holdings.reduce(
+    (sum, b) => sum + (valueOf(b, prices) - b.quantity * b.entry) * fraction,
+    0,
+  );
+  return {
+    state: {
+      ...state,
+      cash: state.cash + proceeds,
+      realizedPnl: (state.realizedPnl ?? 0) + realized,
+      buildings: state.buildings.flatMap((b) =>
+        defFor(b.kind).ticker !== ticker
+          ? [b]
+          : fraction === 1
+            ? []
+            : [
+                {
+                  ...b,
+                  quantity: b.quantity * (1 - fraction),
+                  cost: b.cost * (1 - fraction),
+                },
+              ],
+      ),
+    },
+    error: "",
+  };
 }
