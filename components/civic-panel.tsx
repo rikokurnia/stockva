@@ -622,6 +622,8 @@ export default function CivicPanel({
                     tokenName={quote?.tokenName ?? `${selected.ticker}x`}
                     benchmarkName={`${selected.name} (${selected.ticker})`}
                     defaultPrice={priceOf(selected.ticker, prices)}
+                    livePrice={quote?.price ?? priceOf(selected.ticker, prices)}
+                    liveChange={quote?.change ?? selected.change}
                   />
                 )}
                 <div className={styles.chartLegend}>

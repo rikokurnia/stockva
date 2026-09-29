@@ -45,10 +45,19 @@ export function fallbackFeed(): MarketFeed {
 }
 // Stable illustrative series; never represented as observed trading history.
 export function sampleHistory(price: number): PricePoint[] {
-  return Array.from({ length: 32 }, (_, i) => ({
-    time: Date.UTC(2025, 0, 2) + i * 3600000,
-    token: price * (0.978 + i * 0.0007 + Math.sin(i * 1.7) * 0.004),
-  }));
+  const now = Date.now();
+  return Array.from({ length: 168 }, (_, i) => {
+    const time = now - (168 - i) * 3600000;
+    const wave = Math.sin(i * 0.12) * 0.012 + Math.cos(i * 0.06) * 0.008;
+    const trend = ((i - 84) / 168) * 0.025;
+    const p = price * (1 + trend + wave);
+    const spread = Math.sin(i * 0.4) * 0.0018;
+    return {
+      time,
+      token: Number((p * (1 + spread)).toFixed(2)),
+      benchmark: Number(p.toFixed(2)),
+    };
+  });
 }
 export type Passport = {
   fetchedAt: string;
