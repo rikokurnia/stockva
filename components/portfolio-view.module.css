@@ -40,6 +40,8 @@
   pointer-events: none;
 }
 .plaque {
+  pointer-events: auto;
+  cursor: pointer;
   z-index: 2;
   position: absolute;
   width: 124px;
@@ -54,6 +56,10 @@
     0 2px 0 #9c825444,
     0 4px 10px #324d2d26,
     inset 0 0 0 2px #fff9e966;
+}
+.plaque:focus-visible {
+  outline: 3px solid #386249;
+  outline-offset: 3px;
 }
 .plaque h3 {
   margin: 0;

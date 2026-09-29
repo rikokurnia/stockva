@@ -6,6 +6,7 @@ import type {
   Cell,
   CityState,
   Tool,
+  TierThresholds,
 } from "../lib/city";
 import {
   ALL_CELLS,
@@ -25,6 +26,7 @@ import {
   sameCell,
   sprite,
   wholeMoney,
+  tier,
 } from "../lib/city";
 import type { PriceMap } from "../lib/city";
 
@@ -53,6 +55,8 @@ type Props = {
   paused: boolean;
   speed: number;
   prices: PriceMap;
+  thresholds: TierThresholds;
+  simulationReturns: Record<string, number> | null;
   now: number;
   upgrades: Record<string, number>;
   onZoom: (delta: number) => void;
@@ -392,7 +396,13 @@ export default function CityMap(props: Props) {
         />
         {motion && <Traffic roads={city.roads} paused={paused} speed={speed} />}
         {portfolioView && (
-          <PortfolioOverlay buildings={city.buildings} prices={prices} />
+          <PortfolioOverlay
+            buildings={city.buildings}
+            prices={prices}
+            thresholds={props.thresholds}
+            simulationReturns={props.simulationReturns}
+            onInspect={onSelect}
+          />
         )}
         {!portfolioView &&
           [...city.buildings]
@@ -400,7 +410,9 @@ export default function CityMap(props: Props) {
             .map((b) => {
               const p = point(b.r + 0.5, b.c + 0.5),
                 def = defFor(b.kind);
-              const ret = def.ticker ? returnOf(b, prices) : 0;
+              const ret = def.ticker
+                ? (props.simulationReturns?.[b.id] ?? returnOf(b, prices))
+                : 0;
               const fresh = now - b.builtAt < 2200;
               const upgraded = upgrades[b.id] && now - upgrades[b.id] < 2200;
               return (
@@ -458,16 +470,25 @@ export default function CityMap(props: Props) {
                       alt=""
                     />
                   )}
-                  {def.ticker && ret < 0 && !fresh && (
-                    <img
-                      className="fx-layer fx-negative"
-                      src={sprite("effects/negative_performance")}
-                      alt="Negative performance"
-                    />
-                  )}
+                  {def.ticker &&
+                    tier(ret, props.thresholds) === "minus" &&
+                    !fresh && (
+                      <img
+                        className="fx-layer fx-negative"
+                        src={sprite("effects/negative_performance")}
+                        alt="Negative performance"
+                      />
+                    )}
                   <img
                     className="building-sprite"
-                    src={sprite(buildingImage(b, prices))}
+                    src={sprite(
+                      buildingImage(
+                        b,
+                        prices,
+                        props.thresholds,
+                        props.simulationReturns?.[b.id],
+                      ),
+                    )}
                     alt=""
                     onPointerEnter={() => {
                       if (props.scanMode) props.onScanTarget?.(b.id);

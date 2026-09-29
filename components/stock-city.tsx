@@ -30,6 +30,8 @@ import CivicPanel from "./civic-panel";
 import { fallbackFeed, type MarketFeed } from "../lib/market";
 import CityAdvisor from "./city-advisor";
 import StockLogo from "./stock-logo";
+import BuildingSimulation from "./building-simulation";
+import CompanyIntel from "./company-intel";
 import portfolioStyles from "./portfolio-view.module.css";
 import type {
   BuildingKind,
@@ -66,6 +68,11 @@ import {
   tier,
   valueOf,
   wholeMoney,
+  DEFAULT_THRESHOLDS,
+  SIMULATION_INTERVALS,
+  simulationStep,
+  validThresholds,
+  type TierThresholds,
 } from "../lib/city";
 type Panel =
   "portfolio" | "market" | "settings" | "help" | "data" | "assets" | null;
@@ -112,6 +119,23 @@ export default function StockCity() {
   const [assetTicker, setAssetTicker] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState(false);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
+  const [intelId, setIntelId] = useState<string | null>(null);
+  const [thresholds, setThresholds] =
+    useState<TierThresholds>(DEFAULT_THRESHOLDS);
+  const [simulationInterval, setSimulationInterval] = useState(6);
+  const [simulationRunning, setSimulationRunning] = useState(false);
+  const [simulationReturns, setSimulationReturns] = useState<Record<
+    string,
+    number
+  > | null>(null);
+  const intelBuilding = city.buildings.find(
+    (b) => b.id === intelId && defFor(b.kind).ticker,
+  );
+  const simulationLatest = useRef({ city, prices });
+  simulationLatest.current = { city, prices };
+  const companyCount = city.buildings.filter(
+    (b) => defFor(b.kind).ticker,
+  ).length;
   const [focusTarget, setFocusTarget] = useState<{
     r: number;
     c: number;
@@ -130,6 +154,59 @@ export default function StockCity() {
     panelRef = useRef<HTMLElement>(null),
     resetRef = useRef<HTMLDivElement>(null);
   const oldFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("stockva.building-simulation.v1") ?? "null",
+      );
+      if (validThresholds(saved?.thresholds)) setThresholds(saved.thresholds);
+      if (SIMULATION_INTERVALS.includes(saved?.interval))
+        setSimulationInterval(saved.interval);
+    } catch {
+      /* Invalid optional preferences fall back to defaults. */
+    }
+  }, []);
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      localStorage.setItem(
+        "stockva.building-simulation.v1",
+        JSON.stringify({ thresholds, interval: simulationInterval }),
+      );
+    } catch {
+      /* Simulation remains usable without persistence. */
+    }
+  }, [thresholds, simulationInterval, ready]);
+  useEffect(() => {
+    if (!companyCount) setSimulationRunning(false);
+    setSimulationReturns((previous) =>
+      previous === null
+        ? null
+        : Object.fromEntries(
+            city.buildings
+              .filter((b) => defFor(b.kind).ticker)
+              .map((b) => [
+                b.id,
+                previous[b.id] ?? returnOf(b, simulationLatest.current.prices),
+              ]),
+          ),
+    );
+  }, [city.buildings, companyCount]);
+  useEffect(() => {
+    if (!simulationRunning) return;
+    const timer = setInterval(() => {
+      setSimulationReturns((previous) => {
+        const latest = simulationLatest.current;
+        const values = Object.fromEntries(
+          latest.city.buildings
+            .filter((b) => defFor(b.kind).ticker)
+            .map((b) => [b.id, previous?.[b.id] ?? returnOf(b, latest.prices)]),
+        );
+        return simulationStep(values, thresholds);
+      });
+    }, simulationInterval * 1000);
+    return () => clearInterval(timer);
+  }, [simulationRunning, simulationInterval, thresholds]);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE);
@@ -239,7 +316,10 @@ export default function StockCity() {
     let changed = false;
     for (const b of city.buildings) {
       if (!defFor(b.kind).ticker) continue;
-      const t = tier(returnOf(b, prices));
+      const t = tier(
+        simulationReturns?.[b.id] ?? returnOf(b, prices),
+        thresholds,
+      );
       if (tiers.current[b.id] && tiers.current[b.id] !== t) {
         next[b.id] = Date.now();
         changed = true;
@@ -248,9 +328,9 @@ export default function StockCity() {
     }
     if (changed) {
       setUpgrades((u) => ({ ...u, ...next }));
-      setNotice("A building upgraded to a new level.");
+      setNotice("Building tiers updated.");
     }
-  }, [prices, city.buildings]);
+  }, [prices, city.buildings, thresholds, simulationReturns]);
   const notify = (message: string, error = false) => {
     setNotice(message);
     setNoticeError(error);
@@ -298,6 +378,7 @@ export default function StockCity() {
     }
   };
   const cancel = () => {
+    setIntelId(null);
     setScanMode(false);
     setTool("inspect");
     setKind(null);
@@ -592,6 +673,8 @@ export default function StockCity() {
         paused={paused}
         speed={speed}
         prices={prices}
+        thresholds={thresholds}
+        simulationReturns={simulationReturns}
         now={now}
         upgrades={upgrades}
         onZoom={changeZoom}
@@ -608,7 +691,10 @@ export default function StockCity() {
             );
           } else if (b && scanMode) {
             setScanTarget(id);
-          } else setPanel(null);
+          } else {
+            setPanel(null);
+            if (b && defFor(b.kind).ticker) setIntelId(b.id);
+          }
         }}
         onPlace={onPlace}
         onRoad={onRoad}
@@ -616,12 +702,76 @@ export default function StockCity() {
         onCancel={cancel}
         onHover={setHover}
       />
+      {!panel && !intelBuilding && !category && !scanMode && (
+        <BuildingSimulation
+          thresholds={thresholds}
+          interval={simulationInterval}
+          running={simulationRunning}
+          active={simulationReturns !== null}
+          count={companyCount}
+          onThresholds={setThresholds}
+          onInterval={setSimulationInterval}
+          onToggle={() => {
+            if (!companyCount) return;
+            if (simulationReturns === null)
+              setSimulationReturns(
+                Object.fromEntries(
+                  city.buildings
+                    .filter((b) => defFor(b.kind).ticker)
+                    .map((b) => [b.id, returnOf(b, prices)]),
+                ),
+              );
+            setSimulationRunning((v) => !v);
+          }}
+          onReset={() => {
+            setSimulationRunning(false);
+            setSimulationReturns(null);
+          }}
+        />
+      )}
+      {intelBuilding && (
+        <CompanyIntel
+          key={intelBuilding.id}
+          building={intelBuilding}
+          prices={prices}
+          quote={feed.quotes[defFor(intelBuilding.kind).ticker!]}
+          thresholds={thresholds}
+          simulatedReturn={simulationReturns?.[intelBuilding.id]}
+          running={simulationRunning}
+          hasExchange={hasExchange}
+          hasData={hasData}
+          onClose={() => {
+            setIntelId(null);
+            setSelected(null);
+          }}
+          onTrade={() => {
+            setIntelId(null);
+            openPanel("market");
+            setAssetTicker(defFor(intelBuilding.kind).ticker!);
+          }}
+          onPassport={() => {
+            setIntelId(null);
+            openPanel("data");
+            setAssetTicker(defFor(intelBuilding.kind).ticker!);
+          }}
+          onMove={() => {
+            setIntelId(null);
+            setMoving(intelBuilding.id);
+            setKind(intelBuilding.kind);
+            setTool("move");
+            setCategory(null);
+            notify("Choose an empty plot for this building. Escape cancels.");
+          }}
+        />
+      )}
       {portfolioView && (
         <div className={portfolioStyles.heading} role="status">
           <h2>Portfolio view</h2>
           <p>
             {city.buildings.some((b) => !!defFor(b.kind).ticker)
-              ? "All holdings · Unrealized return"
+              ? simulationReturns !== null
+                ? `Simulated returns · ${simulationRunning ? "Running" : "Paused"}`
+                : "All holdings · Unrealized return"
               : "No holdings yet · Place a company to begin"}
           </p>
           <p>Select returns to your city</p>
@@ -1017,187 +1167,212 @@ export default function StockCity() {
           </div>
         </section>
       )}
-      {current && definition && tool === "inspect" && !panel && !scanMode && (
-        <aside className="inspection-panel" aria-label="Selected building">
-          <header>
-            <div>
-              <small>
-                {definition.category === "companies"
-                  ? "STOCK BUILDING · DEMO POSITION"
-                  : "CITY SERVICE"}
-              </small>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-                {definition.ticker && (
-                  <StockLogo
-                    ticker={definition.ticker}
-                    name={definition.name}
-                    size={28}
-                  />
-                )}
-                <h2 style={{ margin: 0 }}>
+      {current &&
+        definition &&
+        tool === "inspect" &&
+        !panel &&
+        !scanMode &&
+        !intelBuilding && (
+          <aside className="inspection-panel" aria-label="Selected building">
+            <header>
+              <div>
+                <small>
+                  {definition.category === "companies"
+                    ? "STOCK BUILDING · DEMO POSITION"
+                    : "CITY SERVICE"}
+                </small>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginTop: "4px",
+                  }}
+                >
                   {definition.ticker && (
-                    <span className="ticker-badge">{definition.ticker}</span>
-                  )}{" "}
-                  {definition.name}
-                </h2>
+                    <StockLogo
+                      ticker={definition.ticker}
+                      name={definition.name}
+                      size={28}
+                    />
+                  )}
+                  <h2 style={{ margin: 0 }}>
+                    {definition.ticker && (
+                      <span className="ticker-badge">{definition.ticker}</span>
+                    )}{" "}
+                    {definition.name}
+                  </h2>
+                </div>
               </div>
+              <button
+                aria-label="Close building inspector"
+                onClick={() => setSelected(null)}
+              >
+                <X size={17} />
+              </button>
+            </header>
+            <div className={`inspection-art ${definition.category}`}>
+              <img
+                src={sprite(
+                  buildingImage(
+                    current,
+                    prices,
+                    thresholds,
+                    simulationReturns?.[current.id],
+                  ),
+                )}
+                alt={definition.name}
+              />
+              <span>
+                {definition.ticker
+                  ? tier(
+                      simulationReturns?.[current.id] ??
+                        returnOf(current, prices),
+                      thresholds,
+                    )
+                      .replace("_", " ")
+                      .toUpperCase()
+                  : "SERVICE"}
+              </span>
             </div>
-            <button
-              aria-label="Close building inspector"
-              onClick={() => setSelected(null)}
+            <div
+              className={`road-connection ${hasRoad(current, city.roads) ? "connected" : ""}`}
             >
-              <X size={17} />
-            </button>
-          </header>
-          <div className={`inspection-art ${definition.category}`}>
-            <img
-              src={sprite(buildingImage(current, prices))}
-              alt={definition.name}
-            />
-            <span>
-              {definition.ticker
-                ? tier(returnOf(current, prices))
-                    .replace("_", " ")
-                    .toUpperCase()
-                : "SERVICE"}
-            </span>
-          </div>
-          <div
-            className={`road-connection ${hasRoad(current, city.roads) ? "connected" : ""}`}
-          >
-            <Route size={13} />
-            {hasRoad(current, city.roads)
-              ? "Road access connected"
-              : "No road access — connect a road"}
-          </div>
-          {definition.ticker ? (
-            (() => {
-              const ret = returnOf(current, prices);
-              const val = valueOf(current, prices);
-              const myAlloc = alloc.find((a) => a.id === current.id)?.pct ?? 0;
-              const live = priceOf(definition.ticker, prices);
-              return (
-                <>
-                  <div className="inspection-stats">
-                    <span>
-                      Position value<strong>{money(val)}</strong>
+              <Route size={13} />
+              {hasRoad(current, city.roads)
+                ? "Road access connected"
+                : "No road access — connect a road"}
+            </div>
+            {definition.ticker ? (
+              (() => {
+                const ret = returnOf(current, prices);
+                const val = valueOf(current, prices);
+                const myAlloc =
+                  alloc.find((a) => a.id === current.id)?.pct ?? 0;
+                const live = priceOf(definition.ticker, prices);
+                return (
+                  <>
+                    <div className="inspection-stats">
+                      <span>
+                        Position value<strong>{money(val)}</strong>
+                      </span>
+                      <span>
+                        Token price
+                        <b>{money(live)}</b>
+                      </span>
+                      <span>
+                        Shares
+                        <b>
+                          {current.quantity.toFixed(4)} {definition.ticker}
+                        </b>
+                      </span>
+                      <span>
+                        Average entry<b>{money(current.entry)}</b>
+                      </span>
+                      <span>
+                        Return
+                        <b className={ret >= 0 ? "positive" : "negative"}>
+                          {pct(ret)}
+                        </b>
+                      </span>
+                      <span>
+                        Allocation<b>{myAlloc.toFixed(1)}% of stocks</b>
+                      </span>
+                      <small>
+                        {PROVIDER_TAG} ·{" "}
+                        {feed.quotes[definition.ticker!]?.source} ·{" "}
+                        {feed.quotes[definition.ticker!]?.status}
+                      </small>
+                    </div>
+                    <span className="chain-link">
+                      Demo position · no on-chain transaction
                     </span>
-                    <span>
-                      Token price
-                      <b>{money(live)}</b>
-                    </span>
-                    <span>
-                      Shares
-                      <b>
-                        {current.quantity.toFixed(4)} {definition.ticker}
-                      </b>
-                    </span>
-                    <span>
-                      Average entry<b>{money(current.entry)}</b>
-                    </span>
-                    <span>
-                      Return
-                      <b className={ret >= 0 ? "positive" : "negative"}>
-                        {pct(ret)}
-                      </b>
-                    </span>
-                    <span>
-                      Allocation<b>{myAlloc.toFixed(1)}% of stocks</b>
-                    </span>
-                    <small>
-                      {PROVIDER_TAG} · {feed.quotes[definition.ticker!]?.source}{" "}
-                      · {feed.quotes[definition.ticker!]?.status}
-                    </small>
-                  </div>
-                  <span className="chain-link">
-                    Demo position · no on-chain transaction
-                  </span>
-                </>
-              );
-            })()
-          ) : (
-            <p className="service-description">{definition.description}</p>
-          )}
-          {!definition.ticker && (
-            <button
-              className="panel-action"
-              onClick={() =>
-                openPanel(
-                  current.kind === "hall"
-                    ? "portfolio"
-                    : current.kind === "exchange"
-                      ? "market"
-                      : "data",
-                )
-              }
-            >
-              Open{" "}
-              {current.kind === "hall"
-                ? "finances"
-                : current.kind === "exchange"
-                  ? "market"
-                  : "data status"}
-              <ChevronRight size={14} />
-            </button>
-          )}
-          {definition.ticker && (
+                  </>
+                );
+              })()
+            ) : (
+              <p className="service-description">{definition.description}</p>
+            )}
+            {!definition.ticker && (
+              <button
+                className="panel-action"
+                onClick={() =>
+                  openPanel(
+                    current.kind === "hall"
+                      ? "portfolio"
+                      : current.kind === "exchange"
+                        ? "market"
+                        : "data",
+                  )
+                }
+              >
+                Open{" "}
+                {current.kind === "hall"
+                  ? "finances"
+                  : current.kind === "exchange"
+                    ? "market"
+                    : "data status"}
+                <ChevronRight size={14} />
+              </button>
+            )}
+            {definition.ticker && (
+              <div className="inspection-actions">
+                <button
+                  disabled={!hasExchange}
+                  title={
+                    hasExchange
+                      ? "Open Stock Exchange"
+                      : "Build the Stock Exchange first"
+                  }
+                  onClick={() => {
+                    openPanel("market");
+                    setAssetTicker(definition.ticker!);
+                  }}
+                >
+                  Trade position
+                </button>
+                <button
+                  disabled={!hasData}
+                  title={
+                    hasData
+                      ? "Inspect issuer and token evidence"
+                      : "Build the Data Center first"
+                  }
+                  onClick={() => {
+                    openPanel("data");
+                    setAssetTicker(definition.ticker!);
+                  }}
+                >
+                  RWA passport
+                </button>
+              </div>
+            )}
             <div className="inspection-actions">
               <button
-                disabled={!hasExchange}
-                title={
-                  hasExchange
-                    ? "Open Stock Exchange"
-                    : "Build the Stock Exchange first"
-                }
                 onClick={() => {
-                  openPanel("market");
-                  setAssetTicker(definition.ticker!);
+                  setMoving(current.id);
+                  setKind(current.kind);
+                  setTool("move");
+                  setCategory(null);
+                  notify(
+                    "Click a free plot to move this building. Esc to cancel.",
+                  );
                 }}
               >
-                Trade position
+                Move
               </button>
-              <button
-                disabled={!hasData}
-                title={
-                  hasData
-                    ? "Inspect issuer and token evidence"
-                    : "Build the Data Center first"
-                }
-                onClick={() => {
-                  openPanel("data");
-                  setAssetTicker(definition.ticker!);
-                }}
-              >
-                RWA passport
+              <button onClick={() => onBulldoze(current)}>
+                <Trash2 size={14} />
+                {definition.ticker ? "Sell & remove" : "Bulldoze"}
               </button>
             </div>
-          )}
-          <div className="inspection-actions">
-            <button
-              onClick={() => {
-                setMoving(current.id);
-                setKind(current.kind);
-                setTool("move");
-                setCategory(null);
-                notify(
-                  "Click a free plot to move this building. Esc to cancel.",
-                );
-              }}
-            >
-              Move
-            </button>
-            <button onClick={() => onBulldoze(current)}>
-              <Trash2 size={14} />
-              {definition.ticker ? "Sell & remove" : "Bulldoze"}
-            </button>
-          </div>
-          <div className="inspection-note">
-            {definition.ticker
-              ? "DEMO / TESTNET mock position. Removing returns live value to demo funds."
-              : "Service construction costs are not refunded."}
-          </div>
-        </aside>
-      )}
+            <div className="inspection-note">
+              {definition.ticker
+                ? "DEMO / TESTNET mock position. Removing returns live value to demo funds."
+                : "Service construction costs are not refunded."}
+            </div>
+          </aside>
+        )}
       {scanMode && (
         <div className="scan-toolbar">
           <span>SCAN MODE · Hover or tap a building</span>
@@ -1529,7 +1704,7 @@ export default function StockCity() {
           </button>
         </nav>
       </footer>
-      {hasHall && !panel && !scanMode && (
+      {hasHall && !panel && !scanMode && !intelBuilding && (
         <CityAdvisor city={city} prices={prices} />
       )}
       {confirmReset && (
@@ -1554,6 +1729,8 @@ export default function StockCity() {
                 className="confirm-new"
                 onClick={() => {
                   setCity(newCity());
+                  setSimulationRunning(false);
+                  setSimulationReturns(null);
                   history.current = [];
                   future.current = [];
                   cancel();

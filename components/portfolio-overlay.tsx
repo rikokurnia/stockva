@@ -9,6 +9,8 @@ import {
   tier,
   type Building,
   type PriceMap,
+  type TierThresholds,
+  tierName,
 } from "../lib/city";
 import {
   layoutPortfolioLabels,
@@ -19,9 +21,15 @@ import styles from "./portfolio-view.module.css";
 export default function PortfolioOverlay({
   buildings,
   prices,
+  thresholds,
+  simulationReturns,
+  onInspect,
 }: {
   buildings: Building[];
   prices: PriceMap;
+  thresholds: TierThresholds;
+  simulationReturns: Record<string, number> | null;
+  onInspect: (id: string) => void;
 }) {
   const labels = useMemo(
     () =>
@@ -76,7 +84,9 @@ export default function PortfolioOverlay({
           >
             <img
               className="building-sprite"
-              src={sprite(buildingImage(b, prices))}
+              src={sprite(
+                buildingImage(b, prices, thresholds, simulationReturns?.[b.id]),
+              )}
               alt=""
               draggable={false}
             />
@@ -86,14 +96,21 @@ export default function PortfolioOverlay({
       {labels.map((p) => {
         const b = byId.get(p.id)!,
           def = defFor(b.kind),
-          gain = returnOf(b, prices),
-          level = portfolioLevel(tier(gain));
+          gain = simulationReturns?.[b.id] ?? returnOf(b, prices),
+          currentTier = tier(gain, thresholds),
+          level = currentTier === "minus" ? 0 : portfolioLevel(currentTier);
         return (
-          <article
+          <button
+            type="button"
             key={b.id}
             className={styles.plaque}
             style={{ left: p.left, top: p.top }}
-            aria-label={`${def.name}, ${portfolioPercent(gain)} unrealized return, Level ${level}`}
+            aria-label={`${def.name}, ${portfolioPercent(gain)} ${simulationReturns !== null ? "simulated" : "unrealized"} return, ${tierName(currentTier)}`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onInspect(b.id);
+            }}
             data-building-id={b.id}
           >
             <h3>{def.name}</h3>
@@ -109,14 +126,14 @@ export default function PortfolioOverlay({
               >
                 {portfolioPercent(gain)}
               </strong>
-              <span>Level {level}</span>
+              <span>{tierName(currentTier)}</span>
             </div>
             <div className={styles.level} aria-hidden="true">
               {[1, 2, 3].map((n) => (
                 <i key={n} className={n <= level ? styles.filled : ""} />
               ))}
             </div>
-          </article>
+          </button>
         );
       })}
     </div>

@@ -15,7 +15,8 @@ test("portfolio levels follow current artwork tiers, including negative performa
     [4.9, 1],
     [5, 2],
     [9.9, 2],
-    [10, 3],
+    [10, 2],
+    [15, 3],
     [200, 3],
   ])
     assert.equal(portfolioLevel(tier(gain)), level);

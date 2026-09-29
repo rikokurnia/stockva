@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Stockva — City Builder",
+  title: "Stockva — Build your portfolio. Shape your city.",
   description:
-    "An empty-island city builder. Draw roads and place every stock building yourself in a local frontend sandbox.",
+    "Turn your stock portfolio into a living city. Explore real-world stocks, build your island, and learn by playing in Stockva's city-building demo.",
 };
 export default function RootLayout({
   children,

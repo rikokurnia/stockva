@@ -423,11 +423,63 @@ export const returnOf = (b: Building, prices?: PriceMap) =>
   b.entry
     ? ((priceOf(defFor(b.kind).ticker!, prices) - b.entry) / b.entry) * 100
     : 0;
-export const tier = (n: number) =>
-  n < 0 ? "minus" : n < 5 ? "level_1" : n < 10 ? "level_2" : "level_3";
-export const buildingImage = (b: Building, prices?: PriceMap) =>
+export type TierThresholds = { minus: number; level2: number; level3: number };
+export const DEFAULT_THRESHOLDS: TierThresholds = {
+  minus: -5,
+  level2: 5,
+  level3: 15,
+};
+export const SIMULATION_INTERVALS = [4, 6, 8, 10] as const;
+export function validThresholds(value: unknown): value is TierThresholds {
+  if (!value || typeof value !== "object") return false;
+  const t = value as TierThresholds;
+  return (
+    [t.minus, t.level2, t.level3].every(Number.isFinite) &&
+    t.minus > -99 &&
+    t.minus < t.level2 &&
+    t.level2 < t.level3 &&
+    t.level3 <= 1000
+  );
+}
+export const tier = (
+  n: number,
+  thresholds: TierThresholds = DEFAULT_THRESHOLDS,
+) =>
+  n < thresholds.minus
+    ? "minus"
+    : n < thresholds.level2
+      ? "level_1"
+      : n < thresholds.level3
+        ? "level_2"
+        : "level_3";
+export const tierName = (value: ReturnType<typeof tier>) =>
+  value === "minus" ? "Minus tier" : value.replace("level_", "Level ");
+export function simulationStep(
+  previous: Record<string, number>,
+  thresholds: TierThresholds,
+  random: () => number = Math.random,
+) {
+  const span = Math.max(10, thresholds.level3 - thresholds.minus);
+  const low = Math.max(-98, thresholds.minus - span * 0.6),
+    high = thresholds.level3 + span * 0.6;
+  return Object.fromEntries(
+    Object.entries(previous).map(([id, value]) => [
+      id,
+      Math.round(
+        Math.max(low, Math.min(high, value + (random() - 0.5) * span * 1.3)) *
+          100,
+      ) / 100,
+    ]),
+  );
+}
+export const buildingImage = (
+  b: Building,
+  prices?: PriceMap,
+  thresholds: TierThresholds = DEFAULT_THRESHOLDS,
+  simulatedReturn?: number,
+) =>
   defFor(b.kind).ticker
-    ? `${defFor(b.kind).image.split("/")[0]}/${tier(returnOf(b, prices))}`
+    ? `${defFor(b.kind).image.split("/")[0]}/${tier(simulatedReturn ?? returnOf(b, prices), thresholds)}`
     : defFor(b.kind).image;
 export function allocationOf(buildings: Building[], prices?: PriceMap) {
   const total = buildings.reduce((s, b) => s + valueOf(b, prices), 0);

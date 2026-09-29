@@ -2,6 +2,13 @@
 
 An empty-island city builder for a simulated RWA stock portfolio. The player lays every road and places every company and service building. No starter city or starter holdings are loaded.
 
+## Building simulation and company intelligence
+
+- The parchment **Building simulation** control opens three editable thresholds: Minus below X, Level 1 from X to below Y, Level 2 from Y to below Z, and Level 3 at Z or above. Defaults are −5%, +5%, +15%. Values must be finite and ordered; preferences persist locally.
+- **Start / Pause** runs a bounded percentage simulation every 4, 6, 8 or 10 seconds. Pause freezes simulated returns; **Return to market percentages** restores market-based building returns. Threshold changes apply immediately to sprites and portfolio plaques. Simulation never changes quote data, cash, units or purchase basis, and never auto-starts after reload.
+- Clicking a company building or portfolio plaque opens a light Company Ledger with a matching tier sprite, company profile, operating drivers, risks, position facts and three recent attributed headlines where available. The ten requested companies have tailored profiles; other listed companies can also retrieve coverage. Trade, RWA passport and Move actions remain available.
+- `/api/company-news` retrieves a Google News RSS search, caches each ticker for ten minutes, filters common stock-picking clickbait and prefers reported corporate events. Dates and publishers come from the feed. Failed refreshes show cached reports as stale, or an explicit retry state; no fictional Bloomberg/Reuters headlines are supplied. The public RSS feed is intended for personal, non-commercial feed reading; production distribution needs an appropriately licensed news source.
+
 ## Run
 
 ```sh
@@ -10,6 +17,10 @@ npm run dev
 ```
 
 Open http://localhost:3000. Requires Node.js 22.6+ for the TypeScript model tests.
+
+The home route is Stockva's single-screen video landing page, adapted from the supplied `landing-page` template with Instrument Serif and Inter. **Start building** opens the existing sandbox at `/city`. The background uses the supplied `landing-page-video.mp4`, with a poster fallback, pause control, and reduced-motion support.
+
+The top-right wallet button uses Privy's React SDK. Set `PRIVY_APP_ID` in `.env` (or `NEXT_PUBLIC_PRIVY_APP_ID`); only the public app ID is passed to the client. `PRIVY_APP_SECRET` is not needed for this client login flow and is never exposed. Enable wallet login and allow your deployment's origin in the Privy dashboard. Wallet login does not change the browser-local simulated portfolio into real-money positions.
 
 ```sh
 npm run typecheck
@@ -66,7 +77,7 @@ Browser checks with gstack also verified: a fresh city renders no roads/building
 
 ## Public data and provenance
 
-No API key or new dependency is required.
+The public market-data routes do not require API keys. The landing page's wallet connection requires the Privy app ID described above.
 
 - `/api/market`: [Kraken AssetPairs and Ticker](https://docs.kraken.com/api-reference/market-data/get-ticker-information). Catalogue discovery uses `aclass_base=tokenized_asset`; quotes use `asset_class=tokenized_asset`. Positive finite prices only. One-minute caching, nine-second timeout, stale last-known prices before illustrative fallback. Quote timestamps indicate retrieval, not last-trade time. Daily change is from midnight UTC.
 - `/api/history`: Kraken hourly OHLC and Yahoo Finance's public chart endpoint for an independently timestamped underlying reference. Yahoo is a best-effort, unofficial public endpoint; availability and delay are not guaranteed. Missing series are labeled explicitly; sample lines are never presented as observed prices. Comparison quotes are not synchronized, so spread is indicative, not executable arbitrage.

@@ -19,7 +19,75 @@ import {
   catalogue,
   buildingImage,
   marketClock,
+  tier,
+  simulationStep,
+  validThresholds,
+  DEFAULT_THRESHOLDS,
+  SIMULATION_INTERVALS,
 } from "../lib/city.ts";
+
+test("custom tiers classify exact boundaries without gaps or overlaps", () => {
+  const thresholds = { minus: -5, level2: 5, level3: 15 };
+  for (const [gain, expected] of [
+    [-5.01, "minus"],
+    [-5, "level_1"],
+    [4.99, "level_1"],
+    [5, "level_2"],
+    [14.99, "level_2"],
+    [15, "level_3"],
+  ])
+    assert.equal(tier(gain, thresholds), expected);
+  assert.equal(tier(3, { minus: 4, level2: 6, level3: 9 }), "minus");
+  for (const invalid of [
+    null,
+    {},
+    { minus: 5, level2: 5, level3: 15 },
+    { minus: 8, level2: 5, level3: 15 },
+    { minus: -100, level2: 5, level3: 15 },
+    { minus: -5, level2: NaN, level3: 15 },
+    { minus: -5, level2: 5, level3: Infinity },
+  ])
+    assert.equal(validThresholds(invalid), false);
+  assert.equal(validThresholds(DEFAULT_THRESHOLDS), true);
+  assert.deepEqual(SIMULATION_INTERVALS, [4, 6, 8, 10]);
+});
+test("simulation traverses sprite tiers without changing market prices or positions", () => {
+  const city = constructBuilding(
+    "nvidia",
+    { r: 1, c: 1 },
+    500,
+    constructBuilding("exchange", { r: -6, c: 0 }, 400, newCity()).state,
+    { NVDA: 100 },
+  ).state;
+  const b = city.buildings.at(-1),
+    prices = { NVDA: 100 };
+  const before = JSON.stringify(city);
+  let returns = { [b.id]: 0 };
+  const visited = new Set();
+  for (const random of [0, 1, 1, 1, 0, 0, 0]) {
+    const previous = returns;
+    returns = simulationStep(returns, DEFAULT_THRESHOLDS, () => random);
+    assert.notEqual(returns, previous);
+    visited.add(tier(returns[b.id]));
+    assert.ok(
+      buildingImage(b, prices, DEFAULT_THRESHOLDS, returns[b.id]).endsWith(
+        tier(returns[b.id]),
+      ),
+    );
+  }
+  assert.ok(
+    visited.has("minus") &&
+      visited.has("level_1") &&
+      visited.has("level_2") &&
+      visited.has("level_3"),
+  );
+  for (let n = 0; n < 100; n++)
+    returns = simulationStep(returns, DEFAULT_THRESHOLDS, () => 1);
+  assert.equal(returns[b.id], 27);
+  assert.equal(JSON.stringify(city), before);
+  assert.deepEqual(prices, { NVDA: 100 });
+  assert.equal(buildingImage(b, prices, DEFAULT_THRESHOLDS), "nvidia/level_1");
+});
 
 test("a new game has no buildings, roads, holdings, or traffic", () => {
   const city = newCity();
