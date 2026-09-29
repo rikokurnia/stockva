@@ -36,6 +36,7 @@ import {
   type Passport,
 } from "../lib/market";
 import StockLogo from "./stock-logo";
+import TradingChart from "./trading-chart";
 import styles from "./civic-panel.module.css";
 export type CivicMode = "portfolio" | "market" | "data";
 type Props = {
@@ -613,10 +614,14 @@ export default function CivicPanel({
                     Loading price history…
                   </div>
                 ) : (
-                  <PriceChart
+                  <TradingChart
                     points={history?.points ?? []}
                     compare={mode === "data"}
                     simulated={history?.simulated ?? true}
+                    ticker={selected.ticker}
+                    tokenName={quote?.tokenName ?? `${selected.ticker}x`}
+                    benchmarkName={`${selected.name} (${selected.ticker})`}
+                    defaultPrice={priceOf(selected.ticker, prices)}
                   />
                 )}
                 <div className={styles.chartLegend}>
@@ -1002,145 +1007,4 @@ function Fact({
     </div>
   );
 }
-function PriceChart({
-  points,
-  compare,
-  simulated,
-}: {
-  points: PricePoint[];
-  compare: boolean;
-  simulated: boolean;
-}) {
-  const [hover, setHover] = useState<number | null>(null);
-  const token = points.filter((p) => p.token !== undefined);
-  const benchmark = points.filter((p) => p.benchmark !== undefined);
-  const values = points
-    .flatMap((p) => [p.token, compare ? p.benchmark : undefined])
-    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-  if (!values.length)
-    return (
-      <div className={styles.chartSkeleton}>
-        No observed price history available.
-      </div>
-    );
-  const low = Math.min(...values),
-    high = Math.max(...values);
-  const padding = (high - low) * 0.15 || high * 0.01;
-  const min = low - padding,
-    max = high + padding;
-  const start = points[0].time,
-    end = points[points.length - 1].time;
-  const x = (t: number) => 8 + ((t - start) / (end - start || 1)) * 342;
-  const y = (n: number) => 170 - ((n - min) / (max - min)) * 150;
-  const path = (rows: PricePoint[], key: "token" | "benchmark") =>
-    rows
-      .map(
-        (p, i) =>
-          `${i ? "L" : "M"}${x(p.time).toFixed(2)},${y(p[key]!).toFixed(2)}`,
-      )
-      .join(" ");
-  const active = hover === null ? undefined : points[hover];
-  return (
-    <div className={styles.chart}>
-      <svg
-        viewBox="0 0 420 205"
-        role="img"
-        aria-label={`${simulated ? "Illustrative" : "Observed"} token price history${compare ? " compared with available underlying prices" : ""}`}
-        onPointerMove={(e) => {
-          const box = e.currentTarget.getBoundingClientRect();
-          const t =
-            start +
-            ((((e.clientX - box.left) / box.width) * 420 - 8) / 342) *
-              (end - start);
-          setHover(
-            points.reduce(
-              (best, p, i) =>
-                Math.abs(p.time - t) < Math.abs(points[best].time - t)
-                  ? i
-                  : best,
-              0,
-            ),
-          );
-        }}
-        onPointerLeave={() => setHover(null)}
-      >
-        {[0, 1, 2, 3].map((i) => {
-          const n = min + ((max - min) * i) / 3;
-          return (
-            <g key={i}>
-              <line
-                x1="8"
-                x2="350"
-                y1={y(n)}
-                y2={y(n)}
-                stroke="currentColor"
-                opacity=".12"
-              />
-              <text x="360" y={y(n) + 4} fill="currentColor" fontSize="10">
-                {n.toFixed(n >= 1000 ? 0 : 2)}
-              </text>
-            </g>
-          );
-        })}
-        {token.length > 0 && (
-          <path
-            d={path(token, "token")}
-            fill="none"
-            stroke="var(--civic-accent)"
-            strokeWidth="2"
-          />
-        )}
-        {compare && benchmark.length > 0 && (
-          <path
-            d={path(benchmark, "benchmark")}
-            fill="none"
-            stroke="var(--civic-blue)"
-            strokeWidth="2"
-            strokeDasharray="5 4"
-          />
-        )}
-        {active && (
-          <line
-            x1={x(active.time)}
-            x2={x(active.time)}
-            y1="10"
-            y2="176"
-            stroke="currentColor"
-            opacity=".4"
-          />
-        )}
-        <text x="8" y="199" fill="currentColor" fontSize="10">
-          {simulated && !benchmark.length
-            ? "SAMPLE"
-            : new Date(start).toLocaleDateString([], {
-                month: "short",
-                day: "numeric",
-              })}
-        </text>
-        <text
-          x="350"
-          y="199"
-          textAnchor="end"
-          fill="currentColor"
-          fontSize="10"
-        >
-          {simulated && !benchmark.length
-            ? "ILLUSTRATIVE"
-            : new Date(end).toLocaleDateString([], {
-                month: "short",
-                day: "numeric",
-              })}
-        </text>
-      </svg>
-      {active && (
-        <div className={styles.chartTooltip}>
-          {new Date(active.time).toLocaleString()} ·{" "}
-          {active.token ? `Token ${money(active.token)}` : ""}{" "}
-          {compare && active.benchmark
-            ? `Stock ${money(active.benchmark)}`
-            : ""}
-        </div>
-      )}
-    </div>
-  );
-}
+

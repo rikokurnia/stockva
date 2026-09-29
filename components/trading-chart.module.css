@@ -1,0 +1,211 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  background: rgba(11, 19, 32, 0.7);
+  border: 1px solid var(--civic-line);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  margin: 10px 0 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.priceDisplay {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.currentPrice {
+  font-family: var(--mono, monospace);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+  color: #f8fafc;
+}
+
+.priceChange {
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.priceChange.up {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.priceChange.down {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.timeframeGroup {
+  display: flex;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.8);
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.timeframeBtn {
+  background: transparent;
+  border: 0;
+  color: var(--civic-muted);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.timeframeBtn:hover {
+  color: #ffffff;
+}
+
+.timeframeBtn.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--civic-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.chartViewport {
+  width: 100%;
+  height: 220px;
+  position: relative;
+}
+
+.chartCanvas {
+  width: 100%;
+  height: 100%;
+}
+
+.tooltipHUD {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  z-index: 5;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.tooltipTime {
+  color: var(--civic-muted);
+  font-size: 10px;
+}
+
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+}
+
+.tooltipDotToken {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.tooltipDotBenchmark {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #38bdf8;
+}
+
+.spreadTag {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 4px;
+  font-weight: 700;
+}
+
+.spreadTag.tight {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.spreadTag.wide {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.emptyOverlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 220px;
+  color: var(--civic-muted);
+  font-size: 12px;
+}
+
+.bottomLegend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 10px;
+  color: var(--civic-muted);
+}
+
+.legendItems {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legendDotToken {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #10b981;
+}
+
+.legendDotBenchmark {
+  width: 8px;
+  height: 2px;
+  background: #38bdf8;
+}
+
+.engineBadge {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+}
