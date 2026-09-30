@@ -33,7 +33,6 @@ import { fallbackFeed, type MarketFeed } from "../lib/market";
 import { VAULT_ADDRESS, bscAddressLink } from "../lib/contracts";
 import CityAdvisor from "./city-advisor";
 import StockLogo from "./stock-logo";
-import BuildingSimulation from "./building-simulation";
 import CompanyIntel from "./company-intel";
 import portfolioStyles from "./portfolio-view.module.css";
 import type {
@@ -125,6 +124,15 @@ export default function StockCity() {
   const [gameMode, setGameMode] = useState<"live" | "simulation">("live");
   const [thresholds, setThresholds] =
     useState<TierThresholds>(DEFAULT_THRESHOLDS);
+  const [thresholdDraft, setThresholdDraft] = useState<{
+    minus: string;
+    level2: string;
+    level3: string;
+  }>({
+    minus: String(DEFAULT_THRESHOLDS.minus),
+    level2: String(DEFAULT_THRESHOLDS.level2),
+    level3: String(DEFAULT_THRESHOLDS.level3),
+  });
   const [simulationInterval, setSimulationInterval] = useState(6);
   const [simulationRunning, setSimulationRunning] = useState(false);
   const [simulationReturns, setSimulationReturns] = useState<Record<
@@ -189,7 +197,14 @@ export default function StockCity() {
       const saved = JSON.parse(
         localStorage.getItem("stockva.building-simulation.v1") ?? "null",
       );
-      if (validThresholds(saved?.thresholds)) setThresholds(saved.thresholds);
+      if (validThresholds(saved?.thresholds)) {
+        setThresholds(saved.thresholds);
+        setThresholdDraft({
+          minus: String(saved.thresholds.minus),
+          level2: String(saved.thresholds.level2),
+          level3: String(saved.thresholds.level3),
+        });
+      }
       if (SIMULATION_INTERVALS.includes(saved?.interval))
         setSimulationInterval(saved.interval);
     } catch {
@@ -207,6 +222,49 @@ export default function StockCity() {
       /* Simulation remains usable without persistence. */
     }
   }, [thresholds, simulationInterval, ready]);
+
+  const handleThresholdChange = (
+    key: "minus" | "level2" | "level3",
+    val: string,
+  ) => {
+    setThresholdDraft((prev) => {
+      const updated = { ...prev, [key]: val };
+      const next = {
+        minus: Number(updated.minus),
+        level2: Number(updated.level2),
+        level3: Number(updated.level3),
+      };
+      if (
+        updated.minus.trim() !== "" &&
+        updated.level2.trim() !== "" &&
+        updated.level3.trim() !== "" &&
+        validThresholds(next)
+      ) {
+        setThresholds(next);
+      }
+      return updated;
+    });
+  };
+
+  const resetThresholds = () => {
+    setThresholds(DEFAULT_THRESHOLDS);
+    setThresholdDraft({
+      minus: String(DEFAULT_THRESHOLDS.minus),
+      level2: String(DEFAULT_THRESHOLDS.level2),
+      level3: String(DEFAULT_THRESHOLDS.level3),
+    });
+    notify("Thresholds reset to default (-5%, +5%, +15%)");
+  };
+
+  const isThresholdDraftValid =
+    thresholdDraft.minus.trim() !== "" &&
+    thresholdDraft.level2.trim() !== "" &&
+    thresholdDraft.level3.trim() !== "" &&
+    validThresholds({
+      minus: Number(thresholdDraft.minus),
+      level2: Number(thresholdDraft.level2),
+      level3: Number(thresholdDraft.level3),
+    });
   useEffect(() => {
     if (!companyCount) {
       setSimulationRunning(false);
@@ -757,29 +815,6 @@ export default function StockCity() {
         onCancel={cancel}
         onHover={setHover}
       />
-      {!panel && !intelBuilding && !category && !scanMode && (
-        <BuildingSimulation
-          mode={gameMode}
-          thresholds={thresholds}
-          interval={simulationInterval}
-          running={simulationRunning}
-          active={gameMode === "simulation" && simulationReturns !== null}
-          count={companyCount}
-          onThresholds={setThresholds}
-          onInterval={setSimulationInterval}
-          onToggle={() => {
-            if (!companyCount) return;
-            if (gameMode !== "simulation") {
-              switchToSimulationMode();
-              return;
-            }
-            setSimulationRunning((v) => !v);
-          }}
-          onReset={switchToLiveMode}
-          onSwitchToLive={switchToLiveMode}
-          onSwitchToSimulation={switchToSimulationMode}
-        />
-      )}
       {intelBuilding && (
         <CompanyIntel
           key={intelBuilding.id}
@@ -847,13 +882,10 @@ export default function StockCity() {
             <button
               className="cash-resource"
               onClick={() => openPanel("portfolio")}
-              title="City Hall · Finances & Balances"
+              title="City Hall · Treasury & Balances"
             >
               <img src={sprite("buttons/portfolio")} alt="" aria-hidden="true" />
-              <span>
-                <small>DEMO FUNDS</small>
-                <b>{wholeMoney(city.cash)}</b>
-              </span>
+              <b>{wholeMoney(city.cash)}</b>
             </button>
             <button
               type="button"
@@ -864,10 +896,10 @@ export default function StockCity() {
                   ...city,
                   cash: city.cash + 10_000,
                 });
-                notify("Added +$10,000 USD to Demo Funds!");
+                notify("Added +$10,000 USD to Treasury!");
               }}
-              title="Add +$10,000 USD demo funds"
-              aria-label="Add demo funds"
+              title="Add +$10,000 USD to Treasury"
+              aria-label="Add funds"
             >
               <Plus size={14} />
             </button>
@@ -1653,6 +1685,92 @@ export default function StockCity() {
                     >
                       {simulationRunning ? "Pause Simulation" : "Resume Simulation"}
                     </button>
+
+                    {/* Percentage Threshold Controls */}
+                    <div className="settings-thresholds-wrapper">
+                      <div className="settings-sim-row">
+                        <span className="settings-sim-sublabel">Tier Thresholds (%)</span>
+                        <button
+                          type="button"
+                          className="settings-threshold-reset-btn"
+                          onClick={resetThresholds}
+                          title="Reset to default: -5%, +5%, +15%"
+                        >
+                          Reset defaults
+                        </button>
+                      </div>
+
+                      <div className="settings-thresholds-grid">
+                        <div className="threshold-field">
+                          <label htmlFor="thresh-minus">Minus below</label>
+                          <div className="threshold-input-pill">
+                            <input
+                              id="thresh-minus"
+                              type="number"
+                              step="0.5"
+                              min="-98.5"
+                              max="1000"
+                              value={thresholdDraft.minus}
+                              onChange={(e) => handleThresholdChange("minus", e.target.value)}
+                            />
+                            <span className="threshold-unit">%</span>
+                          </div>
+                        </div>
+
+                        <div className="threshold-field">
+                          <label htmlFor="thresh-level2">Tier 2 at</label>
+                          <div className="threshold-input-pill">
+                            <input
+                              id="thresh-level2"
+                              type="number"
+                              step="0.5"
+                              min="-98.5"
+                              max="1000"
+                              value={thresholdDraft.level2}
+                              onChange={(e) => handleThresholdChange("level2", e.target.value)}
+                            />
+                            <span className="threshold-unit">%</span>
+                          </div>
+                        </div>
+
+                        <div className="threshold-field">
+                          <label htmlFor="thresh-level3">Tier 3 at</label>
+                          <div className="threshold-input-pill">
+                            <input
+                              id="thresh-level3"
+                              type="number"
+                              step="0.5"
+                              min="-98.5"
+                              max="1000"
+                              value={thresholdDraft.level3}
+                              onChange={(e) => handleThresholdChange("level3", e.target.value)}
+                            />
+                            <span className="threshold-unit">%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {!isThresholdDraftValid && (
+                        <p className="threshold-validation-error">
+                          Rule: −99 &lt; Minus &lt; Tier 2 &lt; Tier 3 ≤ 1000
+                        </p>
+                      )}
+
+                      <div className="settings-tier-preview">
+                        <span className="tier-tag minus">
+                          Minus: &lt; {thresholds.minus > 0 ? "+" : ""}{thresholds.minus}%
+                        </span>
+                        <span className="tier-tag level1">
+                          Tier 1: {thresholds.minus > 0 ? "+" : ""}{thresholds.minus}% to &lt; {thresholds.level2 > 0 ? "+" : ""}{thresholds.level2}%
+                        </span>
+                        <span className="tier-tag level2">
+                          Tier 2: {thresholds.level2 > 0 ? "+" : ""}{thresholds.level2}% to &lt; {thresholds.level3 > 0 ? "+" : ""}{thresholds.level3}%
+                        </span>
+                        <span className="tier-tag level3">
+                          Tier 3: ≥ {thresholds.level3 > 0 ? "+" : ""}{thresholds.level3}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

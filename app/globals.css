@@ -3888,6 +3888,137 @@ input {
   background: rgba(34, 197, 94, 0.25);
 }
 
+.settings-thresholds-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 2px;
+}
+
+.settings-threshold-reset-btn {
+  background: transparent;
+  border: none;
+  color: #8da4b3;
+  font-size: 10px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.settings-threshold-reset-btn:hover {
+  color: #facc15;
+}
+
+.settings-thresholds-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.threshold-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.threshold-field label {
+  font-size: 10px;
+  color: #8da4b3;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.threshold-input-pill {
+  display: flex;
+  align-items: center;
+  background: rgba(8, 18, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 4px 8px;
+  transition: border-color 0.15s ease;
+}
+
+.threshold-input-pill:focus-within {
+  border-color: #facc15;
+  box-shadow: 0 0 6px rgba(250, 204, 21, 0.3);
+}
+
+.threshold-input-pill input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #f8efd1;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+  outline: none;
+}
+
+.threshold-unit {
+  font-size: 11px;
+  color: #8da4b3;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.threshold-validation-error {
+  font-size: 10px;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 5px;
+  padding: 5px 8px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.settings-tier-preview {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tier-tag {
+  font-size: 10px;
+  font-family: var(--mono, monospace);
+  padding: 4px 6px;
+  border-radius: 4px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tier-tag.minus {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.tier-tag.level1 {
+  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #cbd5e1;
+}
+
+.tier-tag.level2 {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #86efac;
+}
+
+.tier-tag.level3 {
+  background: rgba(250, 204, 21, 0.15);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  color: #fef08a;
+}
+
 .cash-resource-container {
   display: flex;
   align-items: center;
@@ -3919,6 +4050,13 @@ input {
   gap: 10px;
   cursor: pointer;
   color: #f0f6fa;
+}
+
+.cash-resource-container .cash-resource b {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f8efd1;
+  letter-spacing: -0.4px;
 }
 
 .add-funds-btn {
