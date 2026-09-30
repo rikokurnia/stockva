@@ -233,6 +233,11 @@ export default function CivicPanel({
       setMessage(
         `${pendingBatch.length} buildings recorded on-chain in one tx. Receipts below.`,
       );
+      if (walletAddress) {
+        getOnchainPositions(walletAddress).then(setOnchainPositions).catch(() => {});
+        getPositionOpenTxns(walletAddress).then(setOpenTxns).catch(() => {});
+        getLiveVaultStats().then(setVaultStats).catch(() => {});
+      }
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Batch confirm failed";
