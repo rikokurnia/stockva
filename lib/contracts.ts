@@ -208,6 +208,18 @@ export async function recordBuildingOnchain(
   const amountWei = toWei(input.usdAmount);
   const entryWei = toWei(input.entryPrice);
 
+  const balance = (await publicClient.readContract({
+    address: MOCK_USD_ADDRESS,
+    abi: MOCK_USD_ABI,
+    functionName: "balanceOf",
+    args: [account],
+  })) as bigint;
+  if (balance < amountWei) {
+    throw new Error(
+      `Insufficient $mUSD balance. You have $${Number(formatUnits(balance, 18)).toLocaleString()} mUSD, but need $${Number(formatUnits(amountWei, 18)).toLocaleString()} mUSD. Claim 10,000 $mUSD from the Faucet in City Hall first.`
+    );
+  }
+
   const allowance = (await publicClient.readContract({
     address: MOCK_USD_ADDRESS,
     abi: MOCK_USD_ABI,
@@ -225,7 +237,10 @@ export async function recordBuildingOnchain(
       chain: bscTestnet,
     });
     onStatus?.("approve", approveHash);
-    await publicClient.waitForTransactionReceipt({ hash: approveHash });
+    const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
+    if (approveReceipt.status === "reverted") {
+      throw new Error("mUSD approval transaction reverted on-chain.");
+    }
   }
 
   onStatus?.("buy");
@@ -239,6 +254,11 @@ export async function recordBuildingOnchain(
   });
   onStatus?.("buy", hash);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status === "reverted") {
+    throw new Error(
+      `Transaction reverted on BSC Testnet (tx: ${hash.slice(0, 10)}…). Please ensure you have claimed $mUSD in City Hall.`
+    );
+  }
 
   const openedEvent = parseAbiItem(
     "event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)",
@@ -293,6 +313,18 @@ export async function recordBuildingsBatch(
   const tiers = items.map((i) => i.initialTier ?? 1);
   const total = amounts.reduce((sum, a) => sum + a, BigInt(0));
 
+  const balance = (await publicClient.readContract({
+    address: MOCK_USD_ADDRESS,
+    abi: MOCK_USD_ABI,
+    functionName: "balanceOf",
+    args: [account],
+  })) as bigint;
+  if (balance < total) {
+    throw new Error(
+      `Insufficient $mUSD balance. You have $${Number(formatUnits(balance, 18)).toLocaleString()} mUSD, but need $${Number(formatUnits(total, 18)).toLocaleString()} mUSD for this batch. Claim from the Faucet in City Hall first.`
+    );
+  }
+
   const allowance = (await publicClient.readContract({
     address: MOCK_USD_ADDRESS,
     abi: MOCK_USD_ABI,
@@ -310,7 +342,10 @@ export async function recordBuildingsBatch(
       chain: bscTestnet,
     });
     onStatus?.("approve", approveHash);
-    await publicClient.waitForTransactionReceipt({ hash: approveHash });
+    const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
+    if (approveReceipt.status === "reverted") {
+      throw new Error("mUSD approval transaction reverted on-chain.");
+    }
   }
 
   onStatus?.("buy");
@@ -329,6 +364,11 @@ export async function recordBuildingsBatch(
   });
   onStatus?.("buy", hash);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status === "reverted") {
+    throw new Error(
+      `Batch transaction reverted on BSC Testnet (tx: ${hash.slice(0, 10)}…). Please ensure you have claimed $mUSD in City Hall.`
+    );
+  }
 
   const openedEvent = parseAbiItem(
     "event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)",

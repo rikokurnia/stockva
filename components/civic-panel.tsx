@@ -65,6 +65,7 @@ type Props = {
   onClose: () => void;
   onRetry: () => void;
   onBuy: (kind: BuildingKind, amount: number) => void;
+  onBuyBundle: (items: { kind: BuildingKind; amount: number }[]) => string;
   onBuyPaper: (ticker: string, amount: number) => string;
   onSell: (ticker: string, fraction: number) => string;
   onSellPaper: (ticker: string, fraction: number) => string;
@@ -96,6 +97,7 @@ export default function CivicPanel({
   onClose,
   onRetry,
   onBuy,
+  onBuyBundle,
   onBuyPaper,
   onSell,
   onSellPaper,
@@ -121,6 +123,8 @@ export default function CivicPanel({
   const [faucetTxns, setFaucetTxns] = useState<`0x${string}`[]>([]);
   const [batchConfirming, setBatchConfirming] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
+  const [bundleAmounts, setBundleAmounts] = useState<Record<string, string>>({});
+  const [bundleMsg, setBundleMsg] = useState("");
   const [history, setHistory] = useState<HistoryFeed | null>(null);
   const [passport, setPassport] = useState<Passport | null>(null);
   const [network, setNetwork] = useState(0);
@@ -985,6 +989,93 @@ export default function CivicPanel({
                   </button>
                 </div>
                 {feed.error && <p className={styles.warning}>{feed.error}</p>}
+                {mode === "market" && (
+                  <section className={styles.trade}>
+                    <SectionTitle
+                      title="Bundle builder"
+                      detail="TOP 10 · 1 SIGNATURE"
+                    />
+                    <p className={styles.caption}>
+                      Set amounts, place each building on the island, then pay
+                      for all of them together in City Hall.
+                    </p>
+                    {assets
+                      .filter((a) => isHeroTicker(a.ticker))
+                      .map((a) => (
+                        <div
+                          key={a.ticker}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            marginTop: 6,
+                          }}
+                        >
+                          <StockLogo
+                            ticker={a.ticker}
+                            name={a.name}
+                            size={28}
+                            color={a.color}
+                            type="stock"
+                          />
+                          <span style={{ flex: 1, fontSize: 12 }}>
+                            <strong>{a.ticker}</strong>
+                            <small style={{ color: "var(--civic-muted)" }}>
+                              {" "}
+                              · {money(priceOf(a.ticker, prices))}
+                            </small>
+                          </span>
+                          <span style={{ fontSize: 11 }}>USD</span>
+                          <input
+                            aria-label={`${a.ticker} bundle amount`}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder="0"
+                            value={bundleAmounts[a.ticker] ?? ""}
+                            onChange={(e) =>
+                              setBundleAmounts((prev) => ({
+                                ...prev,
+                                [a.ticker]: e.target.value,
+                              }))
+                            }
+                            style={{
+                              width: 90,
+                              padding: "4px 6px",
+                              borderRadius: 4,
+                            }}
+                          />
+                        </div>
+                      ))}
+                    <button
+                      className={styles.primary}
+                      disabled={!hasExchange}
+                      onClick={() => {
+                        const items = assets
+                          .filter((a) => isHeroTicker(a.ticker))
+                          .flatMap((a) => {
+                            const v = Number(bundleAmounts[a.ticker]);
+                            if (!Number.isFinite(v) || v < 1) return [];
+                            const def = catalogue.find(
+                              (d) => d.ticker === a.ticker,
+                            );
+                            return def ? [{ kind: def.kind, amount: v }] : [];
+                          });
+                        setBundleMsg(onBuyBundle(items));
+                      }}
+                      style={{ marginTop: 10 }}
+                    >
+                      Place bundle
+                      <ArrowUpRight size={17} />
+                    </button>
+                    {bundleMsg && (
+                      <p role="status" className={styles.notice}>
+                        {bundleMsg}
+                      </p>
+                    )}
+                  </section>
+                )}
                 <label className={styles.search}>
                   <Search size={16} />
                   <input

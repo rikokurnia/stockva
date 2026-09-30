@@ -126,6 +126,9 @@ export default function StockCity() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [wallet, setWallet] = useState<`0x${string}` | null>(null);
   const [placeSource, setPlaceSource] = useState<"tray" | "exchange" | null>(null);
+  const [bundleQueue, setBundleQueue] = useState<
+    { kind: BuildingKind; amount: number }[]
+  >([]);
   const [assetTicker, setAssetTicker] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState(false);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
@@ -494,6 +497,8 @@ export default function StockCity() {
     setSelected(null);
     setPanel(null);
     setCategory(null);
+    setBundleQueue([]);
+    setPlaceSource(null);
   };
   const chooseCategory = (next: Category) => {
     if (next === "companies" && !hasExchange) {
@@ -537,6 +542,7 @@ export default function StockCity() {
     setSelected(null);
     setMoving(null);
     setPanel(null);
+    if (source === "tray") setBundleQueue([]);
     if (autoClose) {
       setCategory(null);
       notify(
@@ -647,9 +653,27 @@ export default function StockCity() {
               true,
             );
           });
-      } else {
+      } else if (!fromTray && bundleQueue.length > 1) {
+        // Bundle flow: advance to the next queued stock.
+        const rest = bundleQueue.slice(1);
+        const done = bundleQueue.length - rest.length;
+        const total = bundleQueue.length;
+        setBundleQueue(rest);
+        setAmount(rest[0].amount);
+        setTool("inspect");
+        setKind(null);
+        setPanel(null);
+        chooseBuilding(rest[0].kind, true, "exchange");
         notify(
-          `${defFor(kind).name} drafted as locked at ${money(entryPrice)} per share. Pay in City Hall to unlock it permanently.`,
+          `${defFor(kind).name} drafted locked (${done}/${total}). Now place ${defFor(rest[0].kind).name} — Esc stops the bundle.`,
+        );
+      } else {
+        const wasBundle = bundleQueue.length >= 1;
+        setBundleQueue([]);
+        notify(
+          wasBundle
+            ? `${defFor(kind).name} drafted locked. Bundle complete — pay once in City Hall to unlock everything permanently.`
+            : `${defFor(kind).name} drafted as locked at ${money(entryPrice)} per share. Pay in City Hall to unlock it permanently.`,
         );
       }
       return;
@@ -1677,6 +1701,19 @@ export default function StockCity() {
           onBuy={(kind, investment) => {
             setAmount(investment);
             chooseBuilding(kind, true, "exchange");
+          }}
+          onBuyBundle={(items) => {
+            if (!items.length) return "Pick at least one stock for the bundle.";
+            const totalCost = items.reduce((s, i) => s + i.amount, 0);
+            if (totalCost > city.cash)
+              return `Bundle costs ${money(totalCost)} but you have ${money(city.cash)}. Lower some amounts.`;
+            setBundleQueue(items);
+            setAmount(items[0].amount);
+            chooseBuilding(items[0].kind, true, "exchange");
+            notify(
+              `Bundle: place ${items.map((i) => defFor(i.kind).ticker).join(", ")} one by one, then pay once in City Hall.`,
+            );
+            return "";
           }}
           onBuyPaper={(ticker, investment) => {
             const result = buyPaper(
