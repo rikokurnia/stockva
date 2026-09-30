@@ -153,9 +153,9 @@
 
 .connectWalletImg {
   display: block;
-  height: 52px;
+  height: clamp(76px, 8.5vw, 112px);
   width: auto;
-  max-width: 170px;
+  max-width: 280px;
   object-fit: contain;
   pointer-events: none;
   user-select: none;
@@ -276,8 +276,8 @@
   }
 
   .connectWalletImg {
-    height: 42px;
-    max-width: 130px;
+    height: 56px;
+    max-width: 160px;
   }
 
   .content {
