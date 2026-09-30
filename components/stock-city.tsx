@@ -21,6 +21,7 @@ import {
   Route,
   Search,
   Settings,
+  SlidersHorizontal,
   Trash2,
   Undo2,
   X,
@@ -34,6 +35,7 @@ import BuildingSimulation from "./building-simulation";
 import CompanyIntel from "./company-intel";
 import portfolioStyles from "./portfolio-view.module.css";
 import type {
+  Building,
   BuildingKind,
   Category,
   Cell,
@@ -120,6 +122,7 @@ export default function StockCity() {
   const [scanMode, setScanMode] = useState(false);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
   const [intelId, setIntelId] = useState<string | null>(null);
+  const [gameMode, setGameMode] = useState<"live" | "simulation">("live");
   const [thresholds, setThresholds] =
     useState<TierThresholds>(DEFAULT_THRESHOLDS);
   const [simulationInterval, setSimulationInterval] = useState(6);
@@ -154,6 +157,33 @@ export default function StockCity() {
     panelRef = useRef<HTMLElement>(null),
     resetRef = useRef<HTMLDivElement>(null);
   const oldFocus = useRef<HTMLElement | null>(null);
+  const switchToLiveMode = useCallback(() => {
+    setGameMode("live");
+    setSimulationRunning(false);
+    setSimulationReturns(null);
+    setNotice(
+      "🟢 24/7 Live RWA Market: Buildings reflect real-time on-chain pricing.",
+    );
+    setNoticeError(false);
+  }, []);
+
+  const switchToSimulationMode = useCallback(() => {
+    setGameMode("simulation");
+    setSimulationReturns((prev) => {
+      if (prev !== null) return prev;
+      return Object.fromEntries(
+        city.buildings
+          .filter((b) => defFor(b.kind).ticker)
+          .map((b) => [b.id, returnOf(b, prices)]),
+      );
+    });
+    setSimulationRunning(true);
+    setNotice(
+      `⚡ Simulation Mode: Buildings cycle every ${simulationInterval}s based on custom thresholds.`,
+    );
+    setNoticeError(false);
+  }, [city.buildings, prices, simulationInterval]);
+
   useEffect(() => {
     try {
       const saved = JSON.parse(
@@ -178,7 +208,10 @@ export default function StockCity() {
     }
   }, [thresholds, simulationInterval, ready]);
   useEffect(() => {
-    if (!companyCount) setSimulationRunning(false);
+    if (!companyCount) {
+      setSimulationRunning(false);
+      setGameMode("live");
+    }
     setSimulationReturns((previous) =>
       previous === null
         ? null
@@ -193,7 +226,7 @@ export default function StockCity() {
     );
   }, [city.buildings, companyCount]);
   useEffect(() => {
-    if (!simulationRunning) return;
+    if (!simulationRunning || gameMode !== "simulation") return;
     const timer = setInterval(() => {
       setSimulationReturns((previous) => {
         const latest = simulationLatest.current;
@@ -206,12 +239,20 @@ export default function StockCity() {
       });
     }, simulationInterval * 1000);
     return () => clearInterval(timer);
-  }, [simulationRunning, simulationInterval, thresholds]);
+  }, [simulationRunning, gameMode, simulationInterval, thresholds]);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE);
       if (raw) {
-        const saved = JSON.parse(raw);
+        let saved = JSON.parse(raw);
+        if (saved && Array.isArray(saved.buildings)) {
+          saved = {
+            ...saved,
+            buildings: saved.buildings.filter((b: Building) =>
+              catalogue.some((d) => d.kind === b.kind),
+            ),
+          };
+        }
         if (isSavedCity(saved)) setCity(saved);
         else {
           setNotice("Saved city was invalid. An empty island is ready.");
@@ -674,7 +715,9 @@ export default function StockCity() {
         speed={speed}
         prices={prices}
         thresholds={thresholds}
-        simulationReturns={simulationReturns}
+        simulationReturns={
+          gameMode === "simulation" ? simulationReturns : null
+        }
         now={now}
         upgrades={upgrades}
         onZoom={changeZoom}
@@ -704,39 +747,40 @@ export default function StockCity() {
       />
       {!panel && !intelBuilding && !category && !scanMode && (
         <BuildingSimulation
+          mode={gameMode}
           thresholds={thresholds}
           interval={simulationInterval}
           running={simulationRunning}
-          active={simulationReturns !== null}
+          active={gameMode === "simulation" && simulationReturns !== null}
           count={companyCount}
           onThresholds={setThresholds}
           onInterval={setSimulationInterval}
           onToggle={() => {
             if (!companyCount) return;
-            if (simulationReturns === null)
-              setSimulationReturns(
-                Object.fromEntries(
-                  city.buildings
-                    .filter((b) => defFor(b.kind).ticker)
-                    .map((b) => [b.id, returnOf(b, prices)]),
-                ),
-              );
+            if (gameMode !== "simulation") {
+              switchToSimulationMode();
+              return;
+            }
             setSimulationRunning((v) => !v);
           }}
-          onReset={() => {
-            setSimulationRunning(false);
-            setSimulationReturns(null);
-          }}
+          onReset={switchToLiveMode}
+          onSwitchToLive={switchToLiveMode}
+          onSwitchToSimulation={switchToSimulationMode}
         />
       )}
       {intelBuilding && (
         <CompanyIntel
           key={intelBuilding.id}
+          mode={gameMode}
           building={intelBuilding}
           prices={prices}
           quote={feed.quotes[defFor(intelBuilding.kind).ticker!]}
           thresholds={thresholds}
-          simulatedReturn={simulationReturns?.[intelBuilding.id]}
+          simulatedReturn={
+            gameMode === "simulation"
+              ? simulationReturns?.[intelBuilding.id]
+              : undefined
+          }
           running={simulationRunning}
           hasExchange={hasExchange}
           hasData={hasData}
@@ -769,9 +813,9 @@ export default function StockCity() {
           <h2>Portfolio view</h2>
           <p>
             {city.buildings.some((b) => !!defFor(b.kind).ticker)
-              ? simulationReturns !== null
+              ? gameMode === "simulation" && simulationReturns !== null
                 ? `Simulated returns · ${simulationRunning ? "Running" : "Paused"}`
-                : "All holdings · Unrealized return"
+                : "24/7 Live RWA Market · Unrealized return"
               : "No holdings yet · Place a company to begin"}
           </p>
           <p>Select returns to your city</p>
@@ -814,6 +858,39 @@ export default function StockCity() {
             <GameArt index={5} />
             <span>Market</span>
           </button>
+          <div
+            className="mode-toggle-group"
+            role="radiogroup"
+            aria-label="Stockva Operating Mode"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={gameMode === "live"}
+              className={`mode-toggle-btn ${gameMode === "live" ? "active-live" : ""}`}
+              onClick={switchToLiveMode}
+              title="24/7 Live RWA Market: Real-time on-chain pricing without timer looping"
+            >
+              <span className="live-pulse-dot" />
+              <span>Live RWA (24/7)</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={gameMode === "simulation"}
+              className={`mode-toggle-btn ${gameMode === "simulation" ? "active-sim" : ""}`}
+              onClick={switchToSimulationMode}
+              title="Simulation Mode: Custom % thresholds and dynamic looping skyline transformation"
+            >
+              <SlidersHorizontal size={13} />
+              <span>Simulation</span>
+              {gameMode === "simulation" && simulationRunning && (
+                <span className="sim-speed-badge">
+                  {simulationInterval}s
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
       {tool !== "inspect" && !category && (

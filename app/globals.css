@@ -489,6 +489,72 @@ input {
 .header-resources .market-button > svg {
   color: #b4c8d3;
 }
+.mode-toggle-group {
+  display: flex;
+  align-items: center;
+  background: #111e27;
+  border: 1px solid #2e4453;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+  margin-left: 6px;
+}
+.mode-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #8da4b3;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.mode-toggle-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+.mode-toggle-btn.active-live {
+  background: #0d281a;
+  border-color: #1e6b45;
+  color: #4ade80;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+}
+.mode-toggle-btn.active-sim {
+  background: #2b1f07;
+  border-color: #85530a;
+  color: #facc15;
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.2);
+}
+.live-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+  animation: liveDotPulse 1.8s infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+@keyframes liveDotPulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 9px #4ade80; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+.sim-speed-badge {
+  font-size: 9px;
+  font-family: monospace;
+  background: #422904;
+  color: #fde047;
+  border: 1px solid #a16207;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 2px;
+}
 .world-meta {
   position: absolute;
   top: 68px;
@@ -3096,6 +3162,18 @@ input {
   }
   .header-resources .market-button {
     display: none;
+  }
+  .mode-toggle-group {
+    margin-left: 2px;
+    padding: 1px;
+  }
+  .mode-toggle-btn {
+    padding: 3px 6px;
+    font-size: 9px;
+    gap: 4px;
+  }
+  .mode-toggle-btn span:not(.live-pulse-dot) {
+    font-size: 9px;
   }
   .time-control {
     position: absolute;

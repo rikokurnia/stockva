@@ -583,22 +583,18 @@ export default function CivicPanel({
                     </span>
                   </div>
                   <div className={styles.marketState}>
-                    <span
-                      className={
-                        regularOpen ? styles.liveDot : styles.closedDot
-                      }
-                    />
-                    {marketLabel}
+                    <span className={styles.liveDot} />
+                    <span>24/7 On-Chain RWA Market</span>
                     <span>
                       {quote?.status === "live"
-                        ? "Token last trade"
+                        ? "Continuous trade"
                         : `${quote?.status ?? "fallback"} price`}
                     </span>
                   </div>
                   <p className={styles.caption}>
                     {passport?.period
-                      ? `Issuer session: ${passport.period}${passport.halted ? " · trading halted" : ""} · ${passport.nextChangeAt ? `next change ${stamp(passport.nextChangeAt)}` : ""}`
-                      : clock.next}
+                      ? `24/7 continuous on-chain trading · Issuer window: ${passport.period}${passport.halted ? " · trading halted" : ""}`
+                      : "Tokenized RWA assets trade 24/7 continuously on decentralized protocols."}
                   </p>
                 </div>
                 <div className={styles.chartHeader}>
@@ -676,24 +672,38 @@ export default function CivicPanel({
                           ? `≈ ${(input / priceOf(selected.ticker, prices)).toFixed(4)} units · ${money(city.cash)} available`
                           : `Enter $1–${money(city.cash)} in available demo funds.`}
                       </div>
-                      <button
-                        className={styles.primary}
-                        disabled={!validAmount || !hasExchange}
-                        onClick={() =>
-                          onBuy(
-                            catalogue.find((d) => d.ticker === selected.ticker)!
-                              .kind,
-                            input,
-                          )
-                        }
-                      >
-                        Buy & place building
-                        <ArrowUpRight size={17} />
-                      </button>
-                      <p className={styles.caption}>
-                        Funds are deducted when you place the building. Escape
-                        cancels.
-                      </p>
+                      {catalogue.find((d) => d.ticker === selected.ticker) ? (
+                        <>
+                          <button
+                            className={styles.primary}
+                            disabled={!validAmount || !hasExchange}
+                            onClick={() =>
+                              onBuy(
+                                catalogue.find((d) => d.ticker === selected.ticker)!
+                                  .kind,
+                                input,
+                              )
+                            }
+                          >
+                            Buy & place building
+                            <ArrowUpRight size={17} />
+                          </button>
+                          <p className={styles.caption}>
+                            Funds are deducted when you place the building. Escape
+                            cancels.
+                          </p>
+                        </>
+                      ) : (
+                        <div className={styles.watchlistNotice}>
+                          <div className={styles.watchlistPill}>
+                            <Landmark size={14} />
+                            <span>Watchlist RWA Asset</span>
+                          </div>
+                          <p className={styles.caption}>
+                            24/7 on-chain RWA oracle data is active. Island plot construction is reserved for the 10 Hero Stocks with bespoke 4-tier isometric architecture.
+                          </p>
+                        </div>
+                      )}
                     </section>
                     <section className={styles.trade}>
                       <SectionTitle

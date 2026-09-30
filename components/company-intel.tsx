@@ -30,6 +30,7 @@ import StockLogo from "./stock-logo";
 import styles from "./company-intel.module.css";
 
 type Props = {
+  mode?: "live" | "simulation";
   building: Building;
   prices: PriceMap;
   quote?: Quote;
@@ -178,15 +179,25 @@ export default function CompanyIntel(p: Props) {
                 {pct(gain)}
               </strong>
               <small>
-                {p.simulatedReturn !== undefined
-                  ? `SIMULATION · ${p.running ? "RUNNING" : "PAUSED"}`
-                  : "RETURN SINCE PURCHASE"}
+                {p.simulatedReturn !== undefined ? (
+                  <span className={styles.simBadge}>
+                    SIMULATION · {p.running ? "RUNNING" : "PAUSED"}
+                  </span>
+                ) : (
+                  <span className={styles.liveBadge}>
+                    <span
+                      className={styles.livePulseDot}
+                      style={{ width: 5, height: 5 }}
+                    />
+                    24/7 LIVE RWA MARKET
+                  </span>
+                )}
               </small>
             </div>
           </section>
           <div className={styles.quoteStrip}>
             <div>
-              <span>Token quote · {p.quote?.status ?? "fallback"}</span>
+              <span>24/7 RWA Quote · {p.quote?.status ?? "fallback"}</span>
               <strong>{money(priceOf(asset.ticker, p.prices))}</strong>
             </div>
             <div>
@@ -200,8 +211,9 @@ export default function CompanyIntel(p: Props) {
           </div>
           {p.simulatedReturn !== undefined && (
             <p className={styles.simNotice}>
-              Building returns are simulated. The token quote above remains the
-              latest market or fallback price.
+              Building tier and returns are active in the visual simulation
+              sandbox. The on-chain token quote above remains the latest 24/7
+              price.
             </p>
           )}
           {profile && (

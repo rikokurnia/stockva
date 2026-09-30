@@ -168,7 +168,6 @@ export type Cell = { r: number; c: number };
 export type Category = "roads" | "companies" | "services";
 export type Tool = "inspect" | "road" | "build" | "bulldoze" | "move";
 export type BuildingKind =
-  | `stock_${string}`
   | "nvidia"
   | "tesla"
   | "amazon"
@@ -182,6 +181,21 @@ export type BuildingKind =
   | "hall"
   | "exchange"
   | "oracle";
+export const HERO_TICKERS = [
+  "NVDA",
+  "TSLA",
+  "AMZN",
+  "BLK",
+  "MSFT",
+  "JPM",
+  "WMT",
+  "KO",
+  "XOM",
+  "UNH",
+] as const;
+export type HeroTicker = (typeof HERO_TICKERS)[number];
+export const isHeroTicker = (ticker: string): ticker is HeroTicker =>
+  (HERO_TICKERS as readonly string[]).includes(ticker);
 export type BuildingDef = {
   kind: BuildingKind;
   name: string;
@@ -320,30 +334,8 @@ export const catalogue: BuildingDef[] = [
       "Your city’s information hub. Select it to inspect the status of the demo data.",
   },
 ];
-// Reuse sector artwork for catalogue assets without a dedicated sprite.
-for (const asset of assets.filter(
-  (a) => !catalogue.some((d) => d.ticker === a.ticker),
-)) {
-  const art =
-    (
-      {
-        Technology: "microsoft",
-        Finance: "blackrock",
-        Consumer: "walmart",
-        Healthcare: "unitedhealth",
-        Energy: "exxonmobil",
-      } as Record<string, string>
-    )[asset.sector] ?? "blackrock";
-  catalogue.push({
-    kind: `stock_${asset.ticker}`,
-    name: asset.name,
-    category: "companies",
-    ticker: asset.ticker,
-    image: `${art}/level_1`,
-    cost: 500,
-    description: `Simulated ${asset.name} position. Shared sector building artwork.`,
-  });
-}
+// Catalogue strictly contains the 10 Hero Companies with dedicated 4-tier isometric sprites + 3 civic services.
+// Other assets remain in the 24/7 on-chain Stock Exchange market watchlist.
 export type Building = Cell & {
   id: string;
   kind: BuildingKind;

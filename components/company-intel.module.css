@@ -663,3 +663,95 @@
     min-width: 40px;
   }
 }
+
+.modeSwitchHeader {
+  display: flex;
+  background: rgba(18, 25, 33, 0.95);
+  border-bottom: 1px solid var(--line);
+  padding: 4px;
+  gap: 4px;
+  border-radius: 6px 6px 0 0;
+}
+.modeTab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.modeTab:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.05);
+}
+.modeTabActiveLive {
+  background: #0d281a;
+  border-color: #1e6b45;
+  color: #4ade80;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.2);
+}
+.modeTabActiveSim {
+  background: #2b1f07;
+  border-color: #85530a;
+  color: #facc15;
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.2);
+}
+.livePulseDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+  animation: liveDotPulseAnim 1.8s infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+@keyframes liveDotPulseAnim {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 9px #4ade80; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+.liveIndicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+}
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #0d281a;
+  color: #4ade80;
+  border: 1px solid #1e6b45;
+  text-transform: uppercase;
+}
+.simBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #2b1f07;
+  color: #facc15;
+  border: 1px solid #85530a;
+  text-transform: uppercase;
+}
+

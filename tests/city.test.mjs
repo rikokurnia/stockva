@@ -17,6 +17,9 @@ import {
   validCell,
   sellPosition,
   catalogue,
+  assets,
+  HERO_TICKERS,
+  isHeroTicker,
   buildingImage,
   marketClock,
   tier,
@@ -384,10 +387,13 @@ test("partial and complete liquidation conserve cash, units and remaining cost b
     assert.equal(sellPosition(city, "NVDA", fraction).state, city);
   assert.match(sellPosition(city, "TSLA", 1).error, /do not own/);
 });
-test("all 30+ catalogue assets have buildable valid art and persisted kinds", () => {
-  const defs = catalogue.filter((d) => d.ticker);
-  assert.ok(defs.length >= 30);
-  for (const def of defs) {
+test("hero catalogue contains 10 bespoke stocks with all 4 tier sprites, 3 civic services, and 30+ market assets", () => {
+  const companyDefs = catalogue.filter((d) => d.ticker);
+  assert.equal(companyDefs.length, 10);
+  assert.equal(catalogue.length, 13);
+  assert.ok(assets.length >= 30);
+  assert.equal(HERO_TICKERS.length, 10);
+  for (const def of catalogue) {
     const built = constructBuilding(
       def.kind,
       { r: 1, c: 1 },
@@ -403,6 +409,20 @@ test("all 30+ catalogue assets have buildable valid art and persisted kinds", ()
       ),
       path,
     );
+    if (def.ticker) {
+      assert.ok(isHeroTicker(def.ticker));
+      for (const lvl of ["minus", "level_1", "level_2", "level_3"]) {
+        assert.ok(
+          existsSync(
+            new URL(
+              `../public/assets/sprites/${def.kind}/${lvl}.png`,
+              import.meta.url,
+            ),
+          ),
+          `${def.kind}/${lvl}.png`,
+        );
+      }
+    }
   }
 });
 test("regular-session estimate handles DST, weekends and closing boundary", () => {
