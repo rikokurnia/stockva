@@ -834,49 +834,14 @@ export default function StockCity() {
         </div>
       )}
       <header className="game-header">
-        <div className="top-left-cluster">
-          <button
-            className={`menu-button ${panel === "settings" ? "active" : ""}`}
-            onClick={() => openPanel("settings")}
-            aria-label="Game menu"
-            title="Game settings"
-          >
-            <img src={sprite("buttons/settings")} alt="" />
-          </button>
-          <div
-            className="mode-toggle-group"
-            role="radiogroup"
-            aria-label="Stockva Operating Mode"
-          >
-            <button
-              type="button"
-              role="radio"
-              aria-checked={gameMode === "live"}
-              className={`mode-toggle-btn ${gameMode === "live" ? "active-live" : ""}`}
-              onClick={switchToLiveMode}
-              title="24/7 Live RWA Market: Real-time on-chain pricing without timer looping"
-            >
-              <span className="live-pulse-dot" />
-              <span>Live RWA (24/7)</span>
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={gameMode === "simulation"}
-              className={`mode-toggle-btn ${gameMode === "simulation" ? "active-sim" : ""}`}
-              onClick={switchToSimulationMode}
-              title="Simulation Mode: Custom % thresholds and dynamic looping skyline transformation"
-            >
-              <SlidersHorizontal size={13} />
-              <span>Simulation</span>
-              {gameMode === "simulation" && simulationRunning && (
-                <span className="sim-speed-badge">
-                  {simulationInterval}s
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
+        <button
+          className={`menu-button ${panel === "settings" ? "active" : ""}`}
+          onClick={() => openPanel("settings")}
+          aria-label="Game menu"
+          title="Game settings"
+        >
+          <img src={sprite("buttons/settings")} alt="" />
+        </button>
         <div className="header-resources">
           <div className="cash-resource-container">
             <button
@@ -1580,13 +1545,6 @@ export default function StockCity() {
           initialTicker={assetTicker}
           onClose={() => setPanel(null)}
           onRetry={() => setRefreshKey((n) => n + 1)}
-          onClaimFaucet={() => {
-            commit({
-              ...city,
-              cash: city.cash + 10_000,
-            });
-            notify("Claimed 10,000 $mUSD from BSC Testnet Faucet! Available funds updated.");
-          }}
           onBuy={(kind, investment) => {
             setAmount(investment);
             chooseBuilding(kind, true);
@@ -1630,6 +1588,74 @@ export default function StockCity() {
           </header>
           {panel === "settings" && (
             <div className="panel-body">
+              <div className="settings-mode-container">
+                <span className="settings-mode-label">Market Operating Mode</span>
+                <div
+                  className="mode-toggle-group"
+                  role="radiogroup"
+                  aria-label="Stockva Operating Mode"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={gameMode === "live"}
+                    className={`mode-toggle-btn ${gameMode === "live" ? "active-live" : ""}`}
+                    onClick={switchToLiveMode}
+                    title="24/7 Live RWA Market: Real-time on-chain pricing without timer looping"
+                  >
+                    <span className="live-pulse-dot" />
+                    <span>Live RWA (24/7)</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={gameMode === "simulation"}
+                    className={`mode-toggle-btn ${gameMode === "simulation" ? "active-sim" : ""}`}
+                    onClick={switchToSimulationMode}
+                    title="Simulation Mode: Custom % thresholds and dynamic looping skyline transformation"
+                  >
+                    <SlidersHorizontal size={13} />
+                    <span>Simulation</span>
+                    {gameMode === "simulation" && simulationRunning && (
+                      <span className="sim-speed-badge">
+                        {simulationInterval}s
+                      </span>
+                    )}
+                  </button>
+                </div>
+                <small className="settings-mode-hint">
+                  {gameMode === "live"
+                    ? "Live RWA: Real-time pricing via on-chain tokenized equity oracle feeds."
+                    : "Simulation: Dynamic visual tier cycling based on custom % thresholds."}
+                </small>
+                {gameMode === "simulation" && (
+                  <div className="settings-sim-subcontrols">
+                    <div className="settings-sim-row">
+                      <span className="settings-sim-sublabel">Cycle Speed</span>
+                      <div className="settings-interval-chips">
+                        {SIMULATION_INTERVALS.map((sec) => (
+                          <button
+                            key={sec}
+                            type="button"
+                            className={`interval-chip ${simulationInterval === sec ? "active" : ""}`}
+                            onClick={() => setSimulationInterval(sec)}
+                            title={`Loop every ${sec} seconds`}
+                          >
+                            {sec}s
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`settings-sim-toggle-btn ${simulationRunning ? "running" : "paused"}`}
+                      onClick={() => setSimulationRunning((r) => !r)}
+                    >
+                      {simulationRunning ? "Pause Simulation" : "Resume Simulation"}
+                    </button>
+                  </div>
+                )}
+              </div>
               <label className="setting-toggle">
                 <span>Island animation & traffic</span>
                 <input
