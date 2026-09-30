@@ -57,7 +57,7 @@ input:focus-visible,
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
-button:active:not(:disabled) {
+button:active:not(:disabled):not(.city-building) {
   transform: translateY(1px);
 }
 button,
@@ -177,17 +177,30 @@ input {
   width: 28px;
   height: 28px;
 }
-.city-building {
+.city-building,
+.city-building:hover,
+.city-building:active,
+.city-building:focus,
+.city-building:focus-visible,
+.city-building.selected {
   position: absolute;
+  transform: translate(-50%, -100%) !important;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.city-building {
   width: 160px;
   height: 195px;
-  transform: translate(-50%, -100%);
-  padding: 0;
   pointer-events: none;
 }
 .city-building.service {
   width: 137px;
   height: 143px;
+}
+.city-building:active .building-sprite,
+.city-building.selected .building-sprite {
+  transform: none !important;
 }
 .building-sprite {
   position: absolute;
@@ -495,8 +508,9 @@ input {
   display: flex;
   align-items: center;
   border-left: 1px solid #4b6270;
-  padding-left: 12px;
+  padding-left: 14px;
   margin-left: 4px;
+  height: 44px;
 }
 
 .onchain-wallet-img-btn {
@@ -510,6 +524,7 @@ input {
   justify-content: center;
   position: relative;
   line-height: 0;
+  height: 44px;
   transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s ease;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
 }
@@ -543,11 +558,12 @@ input {
   }
 }
 
+.header-resources .onchain-wallet-img,
 .onchain-wallet-img {
   display: block;
-  height: 50px;
-  width: auto;
-  max-width: 160px;
+  height: 44px !important;
+  width: auto !important;
+  max-width: 220px !important;
   object-fit: contain;
   pointer-events: none;
   user-select: none;
@@ -556,11 +572,12 @@ input {
 .onchain-wallet-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 33px;
-  padding: 0 12px;
-  border-radius: 6px;
-  font-size: 11px;
+  gap: 8px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 24px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -585,16 +602,20 @@ input {
 }
 
 .onchain-wallet-btn.connected-btn {
-  background: rgba(10, 24, 34, 0.85);
-  border: 1px solid rgba(34, 197, 94, 0.4);
+  background: linear-gradient(135deg, rgba(14, 34, 48, 0.94), rgba(20, 48, 64, 0.9));
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   color: #edf2f3;
   font-family: var(--mono, monospace);
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .onchain-wallet-btn.connected-btn:hover {
   border-color: #22c55e;
-  background: rgba(14, 34, 48, 0.95);
+  background: linear-gradient(135deg, rgba(20, 48, 64, 0.98), rgba(26, 58, 78, 0.94));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 12px rgba(34, 197, 94, 0.25);
 }
 
 .onchain-wallet-backdrop {
@@ -608,15 +629,15 @@ input {
   top: calc(100% + 8px);
   right: 0;
   z-index: 100;
-  min-width: 180px;
+  min-width: 200px;
   background: #101c24;
   border: 1px solid #2e4453;
   border-radius: 8px;
-  padding: 6px;
+  padding: 8px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .wallet-menu-header {
@@ -632,12 +653,31 @@ input {
   text-transform: uppercase;
   color: #f0b90b;
   display: block;
+  margin-bottom: 2px;
+}
+
+.wallet-user-label {
+  font-size: 10px;
+  color: #8b9ea8;
+  display: block;
 }
 
 .wallet-full-addr {
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--mono, monospace);
-  color: #cbd5e1;
+  color: #edf2f3;
+  display: block;
+  word-break: break-all;
+}
+
+.wallet-raw-addr {
+  display: block;
+  font-size: 10px;
+  font-family: var(--mono, monospace);
+  color: #728a99;
+  word-break: break-all;
+  margin-top: 3px;
+  user-select: all;
 }
 
 .wallet-menu-item {
@@ -2726,7 +2766,7 @@ input {
   font-size: 15px;
   font-family: var(--mono);
 }
-.header-resources img {
+.header-resources img:not(.onchain-wallet-img) {
   width: 32px;
   height: 32px;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
@@ -3349,7 +3389,7 @@ input {
     padding: 4px 8px 4px 4px;
     min-height: 36px;
   }
-  .header-resources img {
+  .header-resources img:not(.onchain-wallet-img) {
     width: 26px;
     height: 26px;
   }

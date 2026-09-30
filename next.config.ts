@@ -1,10 +1,9 @@
 import type { NextConfig } from "next";
-import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
-const config: NextConfig = {
+import path from "node:path";
+
+const nextConfig: NextConfig = {
   devIndicators: false,
-  outputFileTracingRoot: process.cwd(),
+  outputFileTracingRoot: path.join(__dirname),
 };
-export default (phase: string): NextConfig => ({
-  ...config,
-  distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next" : ".next-production",
-});
+
+export default nextConfig;

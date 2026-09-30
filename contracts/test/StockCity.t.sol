@@ -79,8 +79,7 @@ contract StockCityTest is Test {
         vm.stopPrank();
     }
 
-    function test_PartialAndFullLiquidation() public {
-        vm.startPrank(alice);
+    function test_PartialAndFullLiquidation() public {        vm.startPrank(alice);
         token.claimFaucet();
 
         uint256 buyAmount = 1000 * 1e18; // $1000 invested
@@ -109,6 +108,83 @@ contract StockCityTest is Test {
         StockCityVault.Position memory closedPos = vault.getUserPositions(alice)[0];
         assertFalse(closedPos.active);
         assertEq(closedPos.quantity, 0);
+        vm.stopPrank();
+    }
+
+    function test_BatchBuyRecordsManyPositionsInOneTx() public {
+        vm.startPrank(alice);
+        token.claimFaucet();
+
+        string[] memory tickers = new string[](3);
+        tickers[0] = "NVDA";
+        tickers[1] = "TSLA";
+        tickers[2] = "AMZN";
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = 500 * 1e18;
+        amounts[1] = 300 * 1e18;
+        amounts[2] = 200 * 1e18;
+        uint256[] memory prices = new uint256[](3);
+        prices[0] = 14287 * 1e16;
+        prices[1] = 24850 * 1e16;
+        prices[2] = 22432 * 1e16;
+        uint8[] memory tiers = new uint8[](3);
+        tiers[0] = 1;
+        tiers[1] = 1;
+        tiers[2] = 1;
+
+        // Single approval covers the whole batch
+        token.approve(address(vault), 1000 * 1e18);
+        bytes32[] memory ids = vault.buyPositionsBatch(tickers, amounts, prices, tiers);
+
+        assertEq(ids.length, 3);
+        assertEq(vault.totalPositionsCount(), 3);
+        assertEq(vault.totalVolumeUSD(), 1000 * 1e18);
+        assertEq(token.balanceOf(alice), 9_000 * 1e18);
+
+        StockCityVault.Position[] memory list = vault.getUserPositions(alice);
+        assertEq(list.length, 3);
+        assertEq(list[0].ticker, "NVDA");
+        assertEq(list[1].ticker, "TSLA");
+        assertEq(list[2].ticker, "AMZN");
+        vm.stopPrank();
+    }
+
+    function test_BatchBuyRejectsBadInput() public {
+        vm.startPrank(alice);
+        token.claimFaucet();
+        token.approve(address(vault), 1000 * 1e18);
+
+        string[] memory tickers = new string[](2);
+        tickers[0] = "NVDA";
+        tickers[1] = "TSLA";
+        uint256[] memory oneAmount = new uint256[](1);
+        oneAmount[0] = 100 * 1e18;
+        uint256[] memory prices = new uint256[](2);
+        prices[0] = 100 * 1e18;
+        prices[1] = 100 * 1e18;
+        uint8[] memory tiers = new uint8[](2);
+        tiers[0] = 1;
+        tiers[1] = 1;
+
+        vm.expectRevert("Array length mismatch");
+        vault.buyPositionsBatch(tickers, oneAmount, prices, tiers);
+
+        uint8[] memory badTier = new uint8[](2);
+        badTier[0] = 1;
+        badTier[1] = 9;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 100 * 1e18;
+        amounts[1] = 100 * 1e18;
+        vm.expectRevert("Invalid tier level");
+        vault.buyPositionsBatch(tickers, amounts, prices, badTier);
+
+        vm.expectRevert("Empty batch");
+        vault.buyPositionsBatch(
+            new string[](0),
+            new uint256[](0),
+            new uint256[](0),
+            new uint8[](0)
+        );
         vm.stopPrank();
     }
 }

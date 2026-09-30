@@ -31,6 +31,7 @@ test("BSC Testnet contract configuration and ABIs are valid", () => {
 
   const vaultFunctions = VAULT_ABI.filter((item) => item.type === "function").map((f) => f.name);
   assert.ok(vaultFunctions.includes("buyPosition"), "Vault must have buyPosition");
+  assert.ok(vaultFunctions.includes("buyPositionsBatch"), "Vault must have buyPositionsBatch");
   assert.ok(vaultFunctions.includes("sellPosition"), "Vault must have sellPosition");
   assert.ok(vaultFunctions.includes("updateTier"), "Vault must have updateTier");
   assert.ok(vaultFunctions.includes("getUserPositionIds"), "Vault must have getUserPositionIds");

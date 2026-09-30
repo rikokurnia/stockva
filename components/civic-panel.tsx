@@ -41,11 +41,14 @@ import {
   VAULT_ADDRESS,
   bscAddressLink,
   bscTxLink,
-  getLiveVaultStats,
   claimFaucetOnchain,
+  getFaucetTxns,
+  getLiveVaultStats,
   getOnchainPositions,
-  type OnChainVaultStats,
+  getPositionOpenTxns,
+  recordBuildingsBatch,
   type OnchainPosition,
+  type OnChainVaultStats,
 } from "../lib/contracts";
 import StockLogo from "./stock-logo";
 import TradingChart from "./trading-chart";
@@ -66,6 +69,9 @@ type Props = {
   onScan: () => void;
   walletAddress?: `0x${string}` | null;
   onClaimFaucet?: () => void;
+  onConfirmBatch?: (
+    receipts: { buildingId: string; hash: `0x${string}`; vaultId: string }[],
+  ) => void;
 };
 const stamp = (value?: string | null) =>
   value
@@ -92,6 +98,7 @@ export default function CivicPanel({
   onScan,
   walletAddress,
   onClaimFaucet,
+  onConfirmBatch,
 }: Props) {
   const [ticker, setTicker] = useState<string | null>(initialTicker);
   const [search, setSearch] = useState("");
@@ -105,6 +112,10 @@ export default function CivicPanel({
   const [faucetError, setFaucetError] = useState<string | null>(null);
   const [onchainPositions, setOnchainPositions] = useState<OnchainPosition[]>([]);
   const [onchainLoading, setOnchainLoading] = useState(false);
+  const [openTxns, setOpenTxns] = useState<Record<string, `0x${string}`>>({});
+  const [faucetTxns, setFaucetTxns] = useState<`0x${string}`[]>([]);
+  const [batchConfirming, setBatchConfirming] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryFeed | null>(null);
   const [passport, setPassport] = useState<Passport | null>(null);
   const [network, setNetwork] = useState(0);
@@ -121,6 +132,8 @@ export default function CivicPanel({
   useEffect(() => {
     if (!walletAddress) {
       setOnchainPositions([]);
+      setOpenTxns({});
+      setFaucetTxns([]);
       return;
     }
     let active = true;
@@ -133,10 +146,20 @@ export default function CivicPanel({
       .finally(() => {
         if (active) setOnchainLoading(false);
       });
+    getPositionOpenTxns(walletAddress)
+      .then((map) => {
+        if (active) setOpenTxns(map);
+      })
+      .catch(() => {});
+    getFaucetTxns(walletAddress)
+      .then((txns) => {
+        if (active) setFaucetTxns(txns);
+      })
+      .catch(() => {});
     return () => {
       active = false;
     };
-  }, [walletAddress]);
+  }, [walletAddress, faucetTxHash]);
 
   const handleClaimFaucet = async () => {
     if (!walletAddress) {
@@ -154,6 +177,60 @@ export default function CivicPanel({
       setFaucetError(msg);
     } finally {
       setFaucetClaiming(false);
+    }
+  };
+
+  const pendingBatch = city.buildings.filter(
+    (b) => defFor(b.kind).ticker && !b.vaultTx,
+  );
+
+  const handleConfirmBatch = async () => {
+    if (!walletAddress || !pendingBatch.length || batchConfirming) return;
+    setBatchError(null);
+    setBatchConfirming(true);
+    setMessage("Approve the spend in your wallet, then confirm all buildings…");
+    try {
+      const { hash, positionIds } = await recordBuildingsBatch(
+        walletAddress,
+        pendingBatch.map((b) => ({
+          buildingId: b.id,
+          ticker: defFor(b.kind).ticker!,
+          usdAmount: b.cost,
+          entryPrice: b.entry,
+          initialTier: 1,
+        })),
+        (step, stepHash) => {
+          if (step === "approve" && !stepHash)
+            setMessage("Confirm the mUSD approval popup in your wallet…");
+          else if (step === "approve" && stepHash)
+            setMessage(
+              `Approval sent. Now confirm all ${pendingBatch.length} buildings in one signature…`,
+            );
+          else if (step === "buy" && !stepHash)
+            setMessage(
+              `Confirm the batch purchase popup — ${pendingBatch.length} buildings, one signature…`,
+            );
+          else if (step === "buy" && stepHash)
+            setMessage("Batch sent. Waiting for BSC confirmation…");
+        },
+      );
+      onConfirmBatch?.(
+        pendingBatch.map((b, i) => ({
+          buildingId: b.id,
+          hash,
+          vaultId: positionIds[i] ?? "0x",
+        })),
+      );
+      setMessage(
+        `${pendingBatch.length} buildings recorded on-chain in one tx. Receipts below.`,
+      );
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Batch confirm failed";
+      setBatchError(msg);
+      setMessage(`Batch kept as local-sim: ${msg}`);
+    } finally {
+      setBatchConfirming(false);
     }
   };
   useEffect(() => {
@@ -461,6 +538,31 @@ export default function CivicPanel({
                   {faucetError}
                 </p>
               )}
+              {walletAddress && faucetTxns.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  <span style={{ color: "var(--civic-muted)", display: "block", fontSize: "10px", marginBottom: 4 }}>
+                    FAUCET HISTORY
+                  </span>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    {faucetTxns.map((hash) => (
+                      <a
+                        key={hash}
+                        href={bscTxLink(hash)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={styles.contractLink}
+                        title={`Faucet tx ${hash} on BscScan`}
+                        style={{ fontSize: 11 }}
+                      >
+                        <span>
+                          {hash.slice(0, 10)}…{hash.slice(-8)}
+                        </span>
+                        <ExternalLink size={11} />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <SectionTitle
               title="On-chain buildings"
@@ -519,18 +621,139 @@ export default function CivicPanel({
                       {(Number(p.quantity) / 1e18).toFixed(4)} units @ $
                       {(Number(p.entryPrice) / 1e18).toFixed(2)}
                     </div>
-                    <a
-                      href={bscAddressLink(VAULT_ADDRESS)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={styles.contractLink}
-                      title={`Position ${p.id} on BscScan`}
-                    >
-                      <span>Vault tx history</span>
-                      <ExternalLink size={11} />
-                    </a>
+                    {openTxns[p.id.toLowerCase()] ? (
+                      <a
+                        href={bscTxLink(openTxns[p.id.toLowerCase()])}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={styles.contractLink}
+                        title={`Open tx for position ${p.id} on BscScan`}
+                      >
+                        <span>Open tx on BscScan</span>
+                        <ExternalLink size={11} />
+                      </a>
+                    ) : (
+                      <a
+                        href={bscAddressLink(VAULT_ADDRESS)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={styles.contractLink}
+                        title={`Position ${p.id} on BscScan`}
+                      >
+                        <span>Vault tx history</span>
+                        <ExternalLink size={11} />
+                      </a>
+                    )}
                   </div>
                 ))}
+              </div>
+            )}
+            <SectionTitle
+              title="Confirm on-chain"
+              detail={
+                !walletAddress
+                  ? "Connect wallet"
+                  : pendingBatch.length
+                    ? `${pendingBatch.length} queued`
+                    : "All recorded"
+              }
+            />
+            {!walletAddress ? (
+              <p className={styles.empty}>
+                Connect your wallet to record queued buildings on BSC testnet.
+              </p>
+            ) : !pendingBatch.length ? (
+              <p className={styles.empty}>
+                Nothing queued. Place more buildings, then confirm them
+                together.
+              </p>
+            ) : (
+              <>
+                <div className={styles.faucetActionRow}>
+                  <button
+                    type="button"
+                    className={styles.faucetBtn}
+                    disabled={batchConfirming}
+                    onClick={() => void handleConfirmBatch()}
+                    title="One signature records all queued buildings"
+                  >
+                    <Coins size={14} />
+                    <span>
+                      {batchConfirming
+                        ? "Waiting for wallet signature…"
+                        : `Confirm ${pendingBatch.length} building${pendingBatch.length === 1 ? "" : "s"} (1 signature)`}
+                    </span>
+                  </button>
+                </div>
+                {batchError && (
+                  <p role="alert" className={styles.caption} style={{ color: "#f87171", marginTop: 6 }}>
+                    {batchError}
+                  </p>
+                )}
+              </>
+            )}
+            <SectionTitle
+              title="Placement receipts"
+              detail={
+                positions.filter((b) => b.vaultTx).length
+                  ? `${positions.filter((b) => b.vaultTx).length}/${positions.length} on-chain`
+                  : "local-sim"
+              }
+            />
+            {!positions.length ? (
+              <p className={styles.empty}>
+                No buildings placed yet. Buy &amp; place a company to get a
+                receipt.
+              </p>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {positions.map((b) => {
+                  const t = defFor(b.kind).ticker!;
+                  return (
+                    <div
+                      key={b.id}
+                      style={{
+                        background: "rgba(0,0,0,0.2)",
+                        padding: "8px 10px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <strong style={{ color: "#edf2f3" }}>
+                          {t} · {money(valueOf(b, prices))}
+                        </strong>
+                        {b.vaultTx ? (
+                          <a
+                            href={bscTxLink(b.vaultTx)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={styles.contractLink}
+                            title={`Buy tx for this ${t} building on BscScan`}
+                          >
+                            <span>Buy tx</span>
+                            <ExternalLink size={11} />
+                          </a>
+                        ) : (
+                          <span style={{ color: "#9e9e9e" }}>
+                            Local-sim only
+                          </span>
+                        )}
+                      </div>
+                      {b.vaultTx && (
+                        <div style={{ color: "var(--civic-muted)", marginTop: 2 }}>
+                          {b.vaultTx.slice(0, 10)}…{b.vaultTx.slice(-8)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             <SectionTitle

@@ -310,14 +310,21 @@ export default function CityMap(props: Props) {
           e.clientX - drag.current.x,
           e.clientY - drag.current.y,
         );
-        if (drag.current.pan)
+        if (drag.current.pan) {
+          if (
+            drag.current.startedOnBuilding &&
+            tool === "inspect" &&
+            drag.current.distance < 6
+          ) {
+            return;
+          }
           setPan(
             clampPan({
               x: drag.current.panX + e.clientX - drag.current.x,
               y: drag.current.panY + e.clientY - drag.current.y,
             }),
           );
-        else if (tool === "road") setPreview(roadLine(drag.current.cell, cell));
+        } else if (tool === "road") setPreview(roadLine(drag.current.cell, cell));
       }}
       onPointerUp={(e) => {
         const d = drag.current;
@@ -325,8 +332,13 @@ export default function CityMap(props: Props) {
         lastDragDistance.current = d.distance;
         const cell = cellFromEvent(e);
         if (d.pan) {
-          if (d.distance < 4 && tool === "inspect")
-            onSelect(d.buildingId ?? null);
+          if (tool === "inspect") {
+            if (d.startedOnBuilding && d.buildingId) {
+              if (d.distance < 8) onSelect(d.buildingId);
+            } else if (d.distance < 6) {
+              onSelect(null);
+            }
+          }
         } else if (tool === "road") onRoad(roadLine(d.cell, cell));
         else if (d.distance < 8) commit(cell);
         drag.current = null;
@@ -436,7 +448,7 @@ export default function CityMap(props: Props) {
                   onClick={(e) => {
                     if (tool === "inspect") {
                       e.stopPropagation();
-                      if (e.detail === 0) {
+                      if (e.detail === 0 || lastDragDistance.current < 8) {
                         onSelect(b.id);
                       }
                     }

@@ -31,7 +31,10 @@ import CityMap from "./city-map";
 import CivicPanel from "./civic-panel";
 import OnchainWallet from "./onchain-wallet";
 import { fallbackFeed, type MarketFeed } from "../lib/market";
-import { VAULT_ADDRESS, bscAddressLink } from "../lib/contracts";
+import {
+  VAULT_ADDRESS,
+  bscAddressLink,
+} from "../lib/contracts";
 import CityAdvisor from "./city-advisor";
 import StockLogo from "./stock-logo";
 import CompanyIntel from "./company-intel";
@@ -584,6 +587,12 @@ export default function StockCity() {
     if (defFor(kind).ticker) {
       setTool("inspect");
       setKind(null);
+      const ticker = defFor(kind).ticker!;
+      const entryPrice = priceOf(ticker, prices);
+      notify(
+        `${defFor(kind).name} placed at ${money(entryPrice)} per simulated share. Queued — confirm everything at once in City Hall.`,
+      );
+      return;
     }
     notify(
       `${defFor(kind).name} placed${defFor(kind).ticker ? ` at ${money(priceOf(defFor(kind).ticker!, prices))} per simulated share` : ""}${defFor(kind).ticker ? ". Investment placed." : ". Place another, or Esc."}`,
@@ -1581,6 +1590,17 @@ export default function StockCity() {
           onClose={() => setPanel(null)}
           onRetry={() => setRefreshKey((n) => n + 1)}
           walletAddress={wallet}
+          onConfirmBatch={(receipts) => {
+            const latest = simulationLatest.current.city;
+            const byId = new Map(receipts.map((r) => [r.buildingId, r]));
+            commit({
+              ...latest,
+              buildings: latest.buildings.map((b) => {
+                const r = byId.get(b.id);
+                return r ? { ...b, vaultTx: r.hash, vaultId: r.vaultId } : b;
+              }),
+            });
+          }}
           onBuy={(kind, investment) => {
             setAmount(investment);
             chooseBuilding(kind, true);

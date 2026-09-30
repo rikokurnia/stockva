@@ -78,28 +78,81 @@ contract StockCityVault is ReentrancyGuard, Ownable {
         require(bytes(ticker).length > 0, "Ticker cannot be empty");
         require(usdAmount > 0, "Amount must be greater than 0");
         require(entryPrice > 0, "Entry price must be greater than 0");
-
-        // Calculate position quantity: (usdAmount * 1e18) / entryPrice
-        uint256 quantity = (usdAmount * 1e18) / entryPrice;
-        require(quantity > 0, "Calculated quantity too small");
+        require(initialTier <= 3, "Invalid tier level");
 
         // Transfer payment token from user to vault
         paymentToken.safeTransferFrom(msg.sender, address(this), usdAmount);
 
+        positionId = _openPosition(msg.sender, ticker, usdAmount, entryPrice, initialTier);
+    }
+
+    /// @notice Demo-friendly batch buy: record many stock buildings in ONE tx
+    /// @dev Place freely in the UI, then confirm everything with one signature.
+    function buyPositionsBatch(
+        string[] calldata tickers,
+        uint256[] calldata usdAmounts,
+        uint256[] calldata entryPrices,
+        uint8[] calldata initialTiers
+    ) external nonReentrant returns (bytes32[] memory positionIds) {
+        uint256 n = tickers.length;
+        require(n > 0, "Empty batch");
+        require(n <= 50, "Batch too large");
+        require(
+            usdAmounts.length == n &&
+                entryPrices.length == n &&
+                initialTiers.length == n,
+            "Array length mismatch"
+        );
+
+        uint256 totalCost = 0;
+        for (uint256 i = 0; i < n; i++) {
+            require(bytes(tickers[i]).length > 0, "Ticker cannot be empty");
+            require(usdAmounts[i] > 0, "Amount must be greater than 0");
+            require(entryPrices[i] > 0, "Entry price must be greater than 0");
+            require(initialTiers[i] <= 3, "Invalid tier level");
+            totalCost += usdAmounts[i];
+        }
+
+        // Single transfer for the whole batch (one approval covers it)
+        paymentToken.safeTransferFrom(msg.sender, address(this), totalCost);
+
+        positionIds = new bytes32[](n);
+        for (uint256 i = 0; i < n; i++) {
+            positionIds[i] = _openPosition(
+                msg.sender,
+                tickers[i],
+                usdAmounts[i],
+                entryPrices[i],
+                initialTiers[i]
+            );
+        }
+    }
+
+    function _openPosition(
+        address owner,
+        string calldata ticker,
+        uint256 usdAmount,
+        uint256 entryPrice,
+        uint8 initialTier
+    ) internal returns (bytes32 positionId) {
+        // Calculate position quantity: (usdAmount * 1e18) / entryPrice
+        uint256 quantity = (usdAmount * 1e18) / entryPrice;
+        require(quantity > 0, "Calculated quantity too small");
+
         // Generate deterministic, unique position ID
         positionId = keccak256(
             abi.encodePacked(
-                msg.sender,
+                owner,
                 ticker,
                 block.timestamp,
-                _userPositionIds[msg.sender].length,
+                _userPositionIds[owner].length,
                 totalPositionsCount
             )
         );
 
         positions[positionId] = Position({
             id: positionId,
-            owner: msg.sender,
+            owner: owner,
             ticker: ticker,
             usdCost: usdAmount,
             entryPrice: entryPrice,
@@ -109,13 +162,13 @@ contract StockCityVault is ReentrancyGuard, Ownable {
             active: true
         });
 
-        _userPositionIds[msg.sender].push(positionId);
+        _userPositionIds[owner].push(positionId);
         totalPositionsCount++;
         totalVolumeUSD += usdAmount;
 
         emit PositionOpened(
             positionId,
-            msg.sender,
+            owner,
             ticker,
             usdAmount,
             entryPrice,

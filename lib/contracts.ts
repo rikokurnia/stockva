@@ -1,13 +1,14 @@
-import { createPublicClient, http, parseUnits, formatUnits, parseAbi } from "viem";
+import { createPublicClient, http, parseUnits, formatUnits, parseAbi, getAddress } from "viem";
 import { bscTestnet } from "viem/chains";
 
 export const BSC_TESTNET_CHAIN_ID = 97;
 export const BSC_TESTNET_RPC = "https://data-seed-prebsc-1-s1.binance.org:8545/";
+export const BSC_TESTNET_RPC_LOGS = "https://bsc-testnet-rpc.publicnode.com";
 export const BSC_EXPLORER_URL = "https://testnet.bscscan.com";
 
 // Deployed & Verified Contracts on BSC Testnet
 export const MOCK_USD_ADDRESS = "0xCA2Ab14Aa5F41705a2f3BF17b728a272441C4f21" as const;
-export const VAULT_ADDRESS = "0xc5456674Fb80Dc2DCA3eDd41c350EF4bbA49B849" as const;
+export const VAULT_ADDRESS = "0x1810b360e0a4d593117f0bfaf2e0939b2df5e415" as const;
 
 export const bscAddressLink = (address: string) =>
   `${BSC_EXPLORER_URL}/address/${address}`;
@@ -40,6 +41,7 @@ export const VAULT_ABI = parseAbi([
   "function getUserPositionIds(address user) view returns (bytes32[])",
   "function getUserPositions(address user) view returns (Position[])",
   "function buyPosition(string ticker, uint256 usdAmount, uint256 entryPrice, uint8 initialTier) returns (bytes32 positionId)",
+  "function buyPositionsBatch(string[] tickers, uint256[] usdAmounts, uint256[] entryPrices, uint8[] initialTiers) returns (bytes32[] positionIds)",
   "function updateTier(bytes32 positionId, uint8 newTier) external",
   "function sellPosition(bytes32 positionId, uint256 currentPrice, uint256 fractionBps) returns (uint256 payout)",
   "event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)",
@@ -116,8 +118,8 @@ export async function connectInjectedWallet(): Promise<`0x${string}`> {
   const accounts = (await window.ethereum!.request({
     method: "eth_requestAccounts",
   })) as string[];
-  if (!accounts?.length) throw new Error("No accounts returned");
-  return accounts[0] as `0x${string}`;
+  if (!accounts?.length || !accounts[0]) throw new Error("No accounts returned");
+  return getAddress(accounts[0]);
 }
 
 /** Send a real on-chain claimFaucet tx. Caller must have connected + switched chain. */
@@ -154,6 +156,286 @@ export async function getOnchainPositions(
   })) as unknown as OnchainPosition[];
 }
 
+/** First block with vault + token activity (deploy tx). Bounds log queries. */
+export const VAULT_DEPLOY_BLOCK = BigInt(134016336);
+
+export type RecordBuildingInput = {
+  ticker: string;
+  usdAmount: number;
+  entryPrice: number;
+  initialTier?: number;
+};
+
+export type RecordBuildingResult = {
+  hash: `0x${string}`;
+  positionId: `0x${string}`;
+};
+
+const toWei = (n: number): bigint => {
+  if (!Number.isFinite(n) || n <= 0) throw new Error("Invalid amount");
+  return parseUnits(n.toFixed(6), 18);
+};
+
+async function getClients(account: `0x${string}`) {
+  const { createWalletClient, custom, createPublicClient, http } =
+    await import("viem");
+  const { bscTestnet } = await import("viem/chains");
+  await ensureBscTestnet();
+  const publicClient = createPublicClient({
+    chain: bscTestnet,
+    transport: http(BSC_TESTNET_RPC, { timeout: 10_000, retryCount: 2 }),
+  });
+  const walletClient = createWalletClient({
+    account,
+    chain: bscTestnet,
+    transport: custom(window.ethereum!),
+  });
+  return { publicClient, walletClient, bscTestnet };
+}
+
+/**
+ * Record a placed stock building on-chain: approve mUSD if needed, then
+ * buyPosition. Each step prompts a wallet signature (popup).
+ */
+export async function recordBuildingOnchain(
+  account: `0x${string}`,
+  input: RecordBuildingInput,
+  onStatus?: (step: "approve" | "buy", hash?: `0x${string}`) => void,
+): Promise<RecordBuildingResult> {
+  const { decodeEventLog, parseAbiItem } = await import("viem");
+  const { publicClient, walletClient, bscTestnet } =
+    await getClients(account);
+  const amountWei = toWei(input.usdAmount);
+  const entryWei = toWei(input.entryPrice);
+
+  const allowance = (await publicClient.readContract({
+    address: MOCK_USD_ADDRESS,
+    abi: MOCK_USD_ABI,
+    functionName: "allowance",
+    args: [account, VAULT_ADDRESS],
+  })) as bigint;
+  if (allowance < amountWei) {
+    onStatus?.("approve");
+    const approveHash = await walletClient.writeContract({
+      address: MOCK_USD_ADDRESS,
+      abi: MOCK_USD_ABI,
+      functionName: "approve",
+      args: [VAULT_ADDRESS, amountWei],
+      account,
+      chain: bscTestnet,
+    });
+    onStatus?.("approve", approveHash);
+    await publicClient.waitForTransactionReceipt({ hash: approveHash });
+  }
+
+  onStatus?.("buy");
+  const hash = await walletClient.writeContract({
+    address: VAULT_ADDRESS,
+    abi: VAULT_ABI,
+    functionName: "buyPosition",
+    args: [input.ticker, amountWei, entryWei, input.initialTier ?? 1],
+    account,
+    chain: bscTestnet,
+  });
+  onStatus?.("buy", hash);
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+  const openedEvent = parseAbiItem(
+    "event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)",
+  );
+  let positionId: `0x${string}` = "0x";
+  for (const log of receipt.logs) {
+    try {
+      const decoded = decodeEventLog({
+        abi: [openedEvent],
+        data: log.data,
+        topics: log.topics,
+      });
+      if (decoded.eventName === "PositionOpened") {
+        positionId = (decoded.args as { id: `0x${string}` }).id;
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return { hash, positionId };
+}
+
+export type BatchBuildingInput = {
+  buildingId: string;
+  ticker: string;
+  usdAmount: number;
+  entryPrice: number;
+  initialTier?: number;
+};
+
+export type BatchRecordResult = {
+  hash: `0x${string}`;
+  positionIds: `0x${string}`[];
+};
+
+/**
+ * Demo batch confirm: approve once (if needed), then record ALL queued
+ * buildings in ONE buyPositionsBatch tx — a single wallet signature.
+ */
+export async function recordBuildingsBatch(
+  account: `0x${string}`,
+  items: BatchBuildingInput[],
+  onStatus?: (step: "approve" | "buy", hash?: `0x${string}`) => void,
+): Promise<BatchRecordResult> {
+  if (!items.length) throw new Error("Nothing to confirm");
+  const { decodeEventLog, parseAbiItem } = await import("viem");
+  const { publicClient, walletClient, bscTestnet } =
+    await getClients(account);
+  const amounts = items.map((i) => toWei(i.usdAmount));
+  const entries = items.map((i) => toWei(i.entryPrice));
+  const tiers = items.map((i) => i.initialTier ?? 1);
+  const total = amounts.reduce((sum, a) => sum + a, BigInt(0));
+
+  const allowance = (await publicClient.readContract({
+    address: MOCK_USD_ADDRESS,
+    abi: MOCK_USD_ABI,
+    functionName: "allowance",
+    args: [account, VAULT_ADDRESS],
+  })) as bigint;
+  if (allowance < total) {
+    onStatus?.("approve");
+    const approveHash = await walletClient.writeContract({
+      address: MOCK_USD_ADDRESS,
+      abi: MOCK_USD_ABI,
+      functionName: "approve",
+      args: [VAULT_ADDRESS, total],
+      account,
+      chain: bscTestnet,
+    });
+    onStatus?.("approve", approveHash);
+    await publicClient.waitForTransactionReceipt({ hash: approveHash });
+  }
+
+  onStatus?.("buy");
+  const hash = await walletClient.writeContract({
+    address: VAULT_ADDRESS,
+    abi: VAULT_ABI,
+    functionName: "buyPositionsBatch",
+    args: [
+      items.map((i) => i.ticker),
+      amounts,
+      entries,
+      tiers,
+    ],
+    account,
+    chain: bscTestnet,
+  });
+  onStatus?.("buy", hash);
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+  const openedEvent = parseAbiItem(
+    "event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)",
+  );
+  const positionIds: `0x${string}`[] = [];
+  for (const log of receipt.logs) {
+    try {
+      const decoded = decodeEventLog({
+        abi: [openedEvent],
+        data: log.data,
+        topics: log.topics,
+      });
+      if (decoded.eventName === "PositionOpened") {
+        positionIds.push((decoded.args as { id: `0x${string}` }).id);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return { hash, positionIds };
+}
+
+/** History RPC: the default seed endpoint rejects eth_getLogs, so log
+ * queries go to a secondary endpoint that supports them. */
+export function getLogsClient() {
+  return createPublicClient({
+    chain: bscTestnet,
+    transport: http(BSC_TESTNET_RPC_LOGS, {
+      timeout: 20_000,
+      retryCount: 2,
+    }),
+  });
+}
+
+/** Page through history in chunks to stay under RPC limits. */
+type RawLog = {
+  args?: Record<string, unknown>;
+  transactionHash?: `0x${string}` | null;
+};
+async function getLogsChunked(
+  client: ReturnType<typeof getLogsClient>,
+  args: Parameters<typeof client.getLogs>[0],
+  span = BigInt(20000),
+): Promise<RawLog[]> {
+  const latest = await client.getBlockNumber();
+  const pages: Promise<unknown>[] = [];
+  for (let from = VAULT_DEPLOY_BLOCK; from <= latest; from += span + BigInt(1)) {
+    const to = from + span > latest ? latest : from + span;
+    pages.push(client.getLogs({ ...args, fromBlock: from, toBlock: to } as never));
+  }
+  // Small concurrency to stay under RPC limits.
+  const out: RawLog[] = [];
+  for (let i = 0; i < pages.length; i += 3) {
+    const chunk = (await Promise.all(pages.slice(i, i + 3))) as RawLog[][];
+    for (const logs of chunk) out.push(...logs);
+  }
+  return out;
+}
+
+/** Map vault position id -> opening tx hash for an owner (real history). */export async function getPositionOpenTxns(
+  owner: `0x${string}`,
+): Promise<Record<string, `0x${string}`>> {
+  try {
+    const { parseAbiItem } = await import("viem");
+    const client = getLogsClient();
+    const logs = await getLogsChunked(client, {
+      address: VAULT_ADDRESS,
+      event: parseAbiItem(
+        "event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)",
+      ),
+      args: { owner },
+    });
+    const map: Record<string, `0x${string}`> = {};
+    for (const log of logs) {
+      const id = log.args?.id as `0x${string}` | undefined;
+      if (id && log.transactionHash) map[id.toLowerCase()] = log.transactionHash;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+/** Recent faucet claim tx hashes for a wallet (real history). */
+export async function getFaucetTxns(
+  recipient: `0x${string}`,
+  limit = 5,
+): Promise<`0x${string}`[]> {
+  try {
+    const { parseAbiItem } = await import("viem");
+    const client = getLogsClient();
+    const logs = await getLogsChunked(client, {
+      address: MOCK_USD_ADDRESS,
+      event: parseAbiItem(
+        "event FaucetClaimed(address indexed recipient, uint256 amount)",
+      ),
+      args: { recipient },
+    });
+    return logs
+      .map((l) => l.transactionHash)
+      .filter((h): h is `0x${string}` => !!h)
+      .slice(-limit)
+      .reverse();
+  } catch {
+    return [];
+  }
+}
 /** Public read-only client for BSC Testnet queries */
 export function getBscClient() {
   return createPublicClient({

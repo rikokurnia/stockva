@@ -343,6 +343,9 @@ export type Building = Cell & {
   entry: number;
   cost: number;
   builtAt: number;
+  /** On-chain receipt for stock buildings recorded via StockCityVault. */
+  vaultTx?: `0x${string}`;
+  vaultId?: string;
 };
 export type CityState = {
   version: 2;

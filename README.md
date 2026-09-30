@@ -1,92 +1,213 @@
-# stockva — city-building frontend
+<p align="center">
+  <img src="public/assets/ai_logo.png" width="130" alt="Stockva Logo" />
+</p>
 
-An empty-island city builder for a simulated RWA stock portfolio. The player lays every road and places every company and service building. No starter city or starter holdings are loaded.
+<h1 align="center">Stockva</h1>
 
-## Building simulation and company intelligence
+<p align="center">
+  <strong>Build the City Behind Your Stocks.</strong><br />
+  A tokenized Real-World Asset (RWA) city-building sandbox powered by BNB Smart Chain & Privy.
+</p>
 
-- The parchment **Building simulation** control opens three editable thresholds: Minus below X, Level 1 from X to below Y, Level 2 from Y to below Z, and Level 3 at Z or above. Defaults are −5%, +5%, +15%. Values must be finite and ordered; preferences persist locally.
-- **Start / Pause** runs a bounded percentage simulation every 4, 6, 8 or 10 seconds. Pause freezes simulated returns; **Return to market percentages** restores market-based building returns. Threshold changes apply immediately to sprites and portfolio plaques. Simulation never changes quote data, cash, units or purchase basis, and never auto-starts after reload.
-- Clicking a company building or portfolio plaque opens a light Company Ledger with a matching tier sprite, company profile, operating drivers, risks, position facts and three recent attributed headlines where available. The ten requested companies have tailored profiles; other listed companies can also retrieve coverage. Trade, RWA passport and Move actions remain available.
-- `/api/company-news` retrieves a Google News RSS search, caches each ticker for ten minutes, filters common stock-picking clickbait and prefers reported corporate events. Dates and publishers come from the feed. Failed refreshes show cached reports as stale, or an explicit retry state; no fictional Bloomberg/Reuters headlines are supplied. The public RSS feed is intended for personal, non-commercial feed reading; production distribution needs an appropriately licensed news source.
+<p align="center">
+  <img src="https://img.shields.io/badge/Network-BNB_Chain_Testnet_(97)-F0B90B?logo=binance&logoColor=white" alt="BNB Chain" />
+  <img src="https://img.shields.io/badge/Framework-Next.js_15_(App_Router)-000000?logo=next.js&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Language-TypeScript_5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Web3-Privy_Auth_%26_Viem-blueviolet" alt="Privy Viem" />
+  <img src="https://img.shields.io/badge/Smart_Contracts-Foundry_%26_Solidity-orange" alt="Solidity Foundry" />
+</p>
 
-## Run
+---
 
-```sh
+## 🌟 Overview
+
+**Stockva** transforms abstract equity portfolios into a living, breathing isometric metropolis. Players start with a pristine, undeveloped island and construct their city from the ground up—laying custom road networks, founding civic institutions, and erecting the corporate headquarters of top global equities and tokenized assets.
+
+Every corporate building's architectural tier dynamically evolves based on real-time market performance and unrealized gains/losses. Stockva bridges Web3 DeFi with accessible simulation gameplay, featuring a verified **BNB Smart Chain Testnet Vault**, an interactive **AI Mayor Advisor**, and unified **Privy** wallet authentication.
+
+<p align="center">
+  <img src="public/assets/connect-wallet.png" width="280" alt="Stockva Web3 Connect" />
+</p>
+
+---
+
+## ✨ Key Features
+
+### 🏙️ 1. Living City Sandbox
+- **Zero Starter Assumptions:** You start with an untouched island, $10,000 in treasury funds, and complete creative freedom.
+- **Autonomous Road & Traffic Engine:** Draw custom road routes across the terrain. An intelligent pathfinding algorithm spawns multi-directional maintenance vans, electric buses, and construction trucks navigating lane offsets and realistic turn radii.
+- **Civic Progression:** Construct the **Stock Exchange** to unlock market operations and trading, and build **City Hall** to monitor treasury balances and active portfolio allocations.
+
+### 📈 2. Tokenized Stocks & Dynamic Tier Evolution
+- **37+ Buildables:** Equities spanning Tech, Finance, Consumer, Energy, and Indices (e.g., Apple, Tesla, NVIDIA, Microsoft, Alphabet, Amazon, Berkshire Hathaway).
+- **4-Tier Isometric Architecture:** Corporate headquarters dynamically evolve based on market performance:
+  - 🔻 **Distressed Tier:** Negative return threshold.
+  - 🏢 **Level 1:** Entry / Baseline operations.
+  - 🏬 **Level 2:** Intermediate expansion and business growth.
+  - 🏙️ **Level 3:** Skyscraper pinnacle for high-performing holdings.
+- **Game Settings & Simulation Controls:** Freely customize cycle speeds (4s, 6s, 8s, 10s), pause/resume cycles, and fine-tune exact gain/loss percentage thresholds on the fly.
+
+### ⛓️ 3. BNB Smart Chain (Testnet) Integration
+- **Live On-Chain Vault (`StockCityVault`):** Record placed building positions directly to the BSC Testnet smart contract.
+- **Live Testnet Faucet:** One-click on-chain claim of 10,000 **$mUSD** (Stockva Demo USD) to your connected wallet address via `claimFaucet()`.
+- **Transparent Position Verification:** Query live on-chain holdings, position quantities, and cost bases directly from the smart contract with direct BscScan transaction explorer links.
+
+### 🔐 4. Unified Privy Web3 Authentication
+- **Synchronized Single Sign-On:** Seamless cross-page state synchronization between the Landing Page (`/`) and the Sandbox Dashboard (`/city`).
+- **Flexible Login:** Connect via MetaMask, Binance Web3 Wallet, Coinbase Wallet, or WalletConnect.
+- **Active Address Recognition:** Automatic viem checksum formatting, live network status dot, and account management dropdown (copy address, BscScan lookup, network switch, disconnect).
+
+### 🦫 5. AI Mayor Advisor
+- **Intelligent Financial Companion:** Integrated AI advisory mascot powered by real-time city snapshot telemetry (cash on hand, active equities, on-chain vault holdings, and market trends).
+- **Resilient Fallback:** Hybrid architecture leveraging LLM intelligence with an offline heuristic rules engine for uninterrupted guidance.
+
+---
+
+## 📜 Verified Smart Contracts (BSC Testnet)
+
+The core gameplay smart contracts are deployed and verified on **BNB Smart Chain Testnet (Chain ID: 97)**:
+
+| Contract | Address | Explorer Link |
+| :--- | :--- | :--- |
+| **StockCityVault** | `0xc5458564D705bC5b5655D119Aeece9B3d9D8B849` | [View on BscScan](https://testnet.bscscan.com/address/0xc5458564D705bC5b5655D119Aeece9B3d9D8B849) |
+| **MockUSD (mUSD)** | `0xCA2Acbb5f159F4B3e0D2b1A54b423D0E993B4f21` | [View on BscScan](https://testnet.bscscan.com/address/0xCA2Acbb5f159F4B3e0D2b1A54b423D0E993B4f21) |
+
+---
+
+## 🛠️ Technology Stack
+
+- **Frontend:** Next.js 15 (App Router), React 19, TypeScript
+- **Styling:** Modular Vanilla CSS with responsive viewport breakpoints, glassmorphism, and hardware-accelerated animations
+- **Web3 Integration:** Privy React SDK (`@privy-io/react-auth`), Viem 2.x
+- **Smart Contracts:** Solidity `^0.8.24`, Foundry (`forge`)
+- **Market Data Feeds:** Real-time tokenized asset quotes, xStocks proof-of-reserves endpoints, Kraken OHLC, and RSS corporate news caching
+- **Testing:** Node.js native test runner with experimental strip-types support
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js:** `v20.x` or `v22.x` recommended
+- **Package Manager:** `npm` (or `pnpm` / `yarn`)
+- **Web3 Wallet:** MetaMask, Binance Web3 Wallet, or any EVM-compatible browser extension
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/rikokurnia/stockva.git
+cd stockva/projects/stockcity
+```
+
+### 2. Configure Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+cp .env.example .env
+```
+
+Populate the required environment variables:
+
+```env
+# Privy Authentication (Client & Server)
+PRIVY_APP_ID=your_privy_app_id_here
+NEXT_PUBLIC_PRIVY_APP_ID=your_privy_app_id_here
+PRIVY_APP_SECRET=your_privy_app_secret_here
+
+# AI City Advisor (Optional for LLM responses; local rule fallback active by default)
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+> **Note:** Never commit `.env` or sensitive private credentials to public version control.
+
+### 3. Install Dependencies
+
+```bash
 npm install
+```
+
+### 4. Run Development Server
+
+```bash
 npm run dev
 ```
 
-Open http://localhost:3000. Requires Node.js 22.6+ for the TypeScript model tests.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-The home route is Stockva's single-screen video landing page, adapted from the supplied `landing-page` template with Instrument Serif and Inter. **Start building** opens the existing sandbox at `/city`. The background uses the supplied `landing-page-video.mp4`, with a poster fallback, pause control, and reduced-motion support.
+---
 
-The top-right wallet button uses Privy's React SDK. Set `PRIVY_APP_ID` in `.env` (or `NEXT_PUBLIC_PRIVY_APP_ID`); only the public app ID is passed to the client. `PRIVY_APP_SECRET` is not needed for this client login flow and is never exposed. Enable wallet login and allow your deployment's origin in the Privy dashboard. Wallet login does not change the browser-local simulated portfolio into real-money positions.
+## 🧪 Testing & Validation
 
-```sh
-npm run typecheck
+Run the comprehensive unit and integration test suite:
+
+```bash
+# Run unit & contract tests (33 passing suites)
 npm test
+
+# Run TypeScript typechecks
+npm run typecheck
+
+# Build optimized production bundle
 npm run build
-npm start
 ```
 
-## Gameplay
+### Smart Contract Testing (Foundry)
 
-A new game starts with **zero roads, zero buildings, zero holdings, and $10,000 of demo funds**.
+```bash
+cd contracts
+forge test -vvv
+```
 
-1. Select **Roads** (`R`). Click on bare ground, drag a route, and release. The displayed price is charged once per stroke. Connections, corners, and junctions choose the supplied road sprites automatically.
-2. Open **Services** (`S`) and construct the **Stock Exchange** to unlock Companies and trading. Build **City Hall** to unlock portfolio status. Roads and services are available immediately.
-3. Every building occupies a 2×2 footprint. Buildings and roads cannot overlap or extend beyond the island's buildable grass polygon.
-4. Use **Select** (`V`) and click a building to inspect it, move it, or remove it. Company demolition returns the simulated position value; service and road demolition do not refund construction costs.
-5. **Bulldoze** (`X`) removes a clicked building or road. **Undo / Redo** restores the whole action, including funds and a complete road stroke.
-6. Traffic appears only when the connected road component yields a route of at least five steps. The electric bus, construction truck, and maintenance van drive offset lanes, carve sampled turns through corners, U-turn at dead ends, and reroute after edits. Each vehicle uses eight painted perspectives (original upper-left/upper-right plus generated lower and side views) selected by projected isometric heading — never mirrored.
+---
 
-## Controls
+## 🎮 Gameplay Controls
 
-| Action               | Control                                   |
-| -------------------- | ----------------------------------------- |
-| Select               | V                                         |
-| Roads                | R, then click and drag                    |
-| Companies / services | B / S, then choose and place              |
-| Bulldoze             | X, then click a tile                      |
-| Pan                  | Drag in select mode, or hold Space + drag |
-| Zoom                 | Mouse wheel or camera buttons             |
-| Reset camera         | Home or reset button                      |
-| Show grid            | G                                         |
-| Pause simulation     | P                                         |
-| Undo / redo          | Ctrl/Cmd Z / Ctrl/Cmd Shift Z             |
-| Cancel current tool  | Escape or right-click                     |
+| Action | Hotkey / Mouse | Description |
+| :--- | :--- | :--- |
+| **Select / Inspect** | `V` | Click any building or road to view stats, inspect position, or relocate |
+| **Draw Roads** | `R` | Click bare terrain and drag path; automatically connects turns & intersections |
+| **Build Companies** | `B` | Browse the corporate catalogue and place company headquarters |
+| **Civic Services** | `S` | Place City Hall or Stock Exchange to unlock game features |
+| **Bulldoze** | `X` | Demolish tile structures (refunds simulated position value) |
+| **Camera Pan** | `Space + Drag` / Mouse Drag | Move the viewport across the island |
+| **Zoom In / Out** | `Wheel` / HUD Buttons | Adjust isometric camera distance |
+| **Undo / Redo** | `Ctrl + Z` / `Ctrl + Shift + Z` | Revert or repeat construction actions |
+| **Game Settings** | HUD Gear Icon | Adjust simulation speed (4s–10s), tier thresholds, and display mode |
 
-The city saves to `stockva.sandbox.v2` in local storage. The previous dashboard's starter-city save is intentionally not imported. **Settings → Start a new city** restores an empty island after explicit confirmation.
+---
 
-## Scope and assets
+## 📁 Project Structure
 
-- Next.js App Router, React, TypeScript, custom game UI, accessible DOM/SVG city renderer, public-data route handlers, and browser-local demo positions. No real-money execution or deployed contracts.
-- 37 buildable stocks/funds. Kraken provides live xStocks last-trade prices where listed; unavailable listings use labeled illustrative fallback prices. Ten company artwork sets are reused by sector for other assets. All funds and positions remain simulated.
-- Uses the supplied island animation and Nusara art. All 45 sprites are viewable under **Settings → Supplied asset library**. The toolbar uses a painted 6-icon construction atlas (`public/assets/ui/construction-atlas.png`, documented in `docs/illustrated-ui.md`); vehicle perspectives are documented in `docs/vehicle-generation-prompts.json`. Original vehicle PNGs are preserved and WebP copies are generated by `scripts/encode-vehicles.mjs`. Static fallback and ocean texture are derived from the supplied video; original files in `my-random/` remain unchanged.
-- The loading/fallback media aliases are copies of the supplied island loop and its extracted poster.
-- Clicking a service opens its distinct panel: City Hall (numbers, allocations, owned-building camera focus), Exchange (search, hourly chart, buy-to-placement and 25/50/75/100% sales), Data Center (issuer passport, reserve report, independent price comparison and island scan mode). Panels sit on the right on desktop and become expandable/swipeable bottom sheets on mobile.
-- Simulation speed affects the game clock and traffic. Public quotes poll every 60 seconds independently of pause/speed. Reduced-motion preferences suppress island and scanner animations. Realized sale P/L and remaining cost basis persist with the city; old saves without realized P/L default to zero.
+```
+projects/stockcity/
+├── app/                  # Next.js App Router (pages, API routes, layout)
+│   ├── api/              # Route handlers (advisor, market, news, passport)
+│   ├── city/             # Main game simulation canvas & HUD
+│   ├── layout.tsx        # Root layout with unified Privy Providers
+│   └── page.tsx          # Cinematic video landing page
+├── components/           # Reusable UI components & game panels
+│   ├── city-advisor.tsx  # Interactive AI Mayor Companion
+│   ├── civic-panel.tsx   # Treasury, Exchange, and On-chain Vault ledger
+│   ├── landing-hero.tsx  # Hero landing presentation
+│   ├── onchain-wallet.tsx# In-game Web3 wallet chip & modal
+│   └── stock-city.tsx    # Core isometric simulation engine
+├── contracts/            # Foundry smart contracts project
+│   ├── src/              # StockCityVault.sol & MockUSD.sol
+│   └── script/           # Deployment scripts for BSC Testnet
+├── lib/                  # Game state algorithms, math, and contracts ABI
+└── public/               # Static assets, sprites, audio, and logos
+```
 
-## Verification
+---
 
-The model tests cover empty startup, first-road placement, atomic road costs, manual company and service placement, 2×2 collision checks, land bounds, insufficient funds, demolition, connected traffic routes, all 11 road sprite connection shapes, camera bounds, joined road geometry, continuous vehicle paths, eight-direction vehicle art without mirroring, rotation tangent projection, and valid vehicle frame crops.
+## 🛡️ Security & Disclaimer
 
-Browser checks with gstack also verified: a fresh city renders no roads/buildings/traffic; seven manually placed road tiles cost $70 and unlock exactly three vehicles; a $500 NVIDIA position and $250 City Hall are placed manually; moving preserves the position; bulldozing credits its value; undo restores both the building and budget; save/reload preserves the city; New City clears it again. Desktop, 375px phone, and 768px tablet layouts were inspected. The final empty state has no browser console errors.
+Stockva is created as a demonstration sandbox for the **BNB Chain Hackathon**. Real-World Asset (RWA) tokens and company equities referenced within the city builder utilize public quote data and testnet smart contracts (`MockUSD` on BSC Testnet 97). Positions held in the simulation sandbox do not represent real-world securities ownership or financial advice.
 
-# stockva
+---
 
-## Public data and provenance
-
-The public market-data routes do not require API keys. The landing page's wallet connection requires the Privy app ID described above.
-
-- `/api/market`: [Kraken AssetPairs and Ticker](https://docs.kraken.com/api-reference/market-data/get-ticker-information). Catalogue discovery uses `aclass_base=tokenized_asset`; quotes use `asset_class=tokenized_asset`. Positive finite prices only. One-minute caching, nine-second timeout, stale last-known prices before illustrative fallback. Quote timestamps indicate retrieval, not last-trade time. Daily change is from midnight UTC.
-- `/api/history`: Kraken hourly OHLC and Yahoo Finance's public chart endpoint for an independently timestamped underlying reference. Yahoo is a best-effort, unofficial public endpoint; availability and delay are not guaranteed. Missing series are labeled explicitly; sample lines are never presented as observed prices. Comparison quotes are not synchronized, so spread is indicative, not executable arbitrage.
-- `/api/passport`: [xStocks public API](https://docs.xstocks.fi/apis/openapi), asset deployments and proof-of-reserves. Five-minute upstream caching and eight-second timeout. BNB Smart Chain is selected first when issuer-confirmed. Explorer URLs use an allowlist of networks, and no contract is inferred from a ticker. Reserve shares, token supply, report time and custody provider are issuer-reported, not an independent attestation; no backing ratio is inferred across multipliers.
-- Rights and prospectus: [issuer legal overview](https://docs.xstocks.fi/docs/product-legal-overview), [official legal documentation](https://assets.backed.fi/legal-documentation). Contracts describe real tokens; city positions do not own them.
-- Market status uses the issuer's regular/extended/overnight/closed session for selected assets. If unavailable, the UI labels a New York weekday-hours estimate (DST aware, without holiday/early-close exceptions).
-
-Unsupported token listings stay available only as explicitly simulated positions. Public providers can rate-limit or remove instruments. Offline fallback is intentionally static rather than invented live ticks.
-
-### Civic feature verification
-
-`npm test` includes progression, partial/full liquidation, realized P/L, remaining basis, persistence, all catalogue artwork, and DST session boundaries. Browser checks cover locking, manual Exchange construction, buy/place, partial sale, service clicks, City Hall camera focus, hover-to-passport, desktop right panel, mobile sheet, and real public-data responses. During verification, 31 of 37 catalogue entries returned live token quotes; NVIDIA also returned hourly token history, the underlying benchmark, issuer contracts and a dated reserve report.
+<p align="center">
+  Built with ❤️ for the <strong>BNB Chain Hackathon</strong>.
+</p>

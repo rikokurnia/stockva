@@ -14,6 +14,57 @@ async function get(path: string) {
     throw new Error("Provider unavailable");
   return data.result;
 }
+async function xstocksIndicative(symbol: string): Promise<number | null> {
+  try {
+    const response = await fetch(
+      `https://api.xstocks.fi/api/v2/public/assets/${symbol}/price-data`,
+      { signal: AbortSignal.timeout(8000) },
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const price = Number(data?.quote);
+    return Number.isFinite(price) && price > 0 ? price : null;
+  } catch {
+    return null;
+  }
+}
+
+async function yahooUnderlying(
+  ticker: string,
+): Promise<{ price: number; change: number } | null> {
+  try {
+    const symbol = encodeURIComponent(ticker.replace(".", "-"));
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=5d`,
+      {
+        signal: AbortSignal.timeout(8000),
+        headers: { "User-Agent": "Mozilla/5.0" },
+      },
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const result = data?.chart?.result?.[0];
+    const meta = result?.meta;
+    const closes = (result?.indicators?.quote?.[0]?.close as unknown) as
+      | number[]
+      | undefined;
+    const price = Number(meta?.regularMarketPrice);
+    const prev = Number(meta?.chartPreviousClose);
+    if (!Number.isFinite(price) || price <= 0) {
+      const valid = (closes ?? []).filter((c) => Number.isFinite(c) && c > 0);
+      const last = valid[valid.length - 1];
+      const before = valid[valid.length - 2];
+      if (!Number.isFinite(last) || last <= 0) return null;
+      return {
+        price: last,
+        change: before > 0 ? (last / before - 1) * 100 : 0,
+      };
+    }
+    return { price, change: prev > 0 ? (price / prev - 1) * 100 : 0 };
+  } catch {
+    return null;
+  }
+}
 export async function GET() {
   if (cache && Date.now() - cache.at < 60000)
     return NextResponse.json(cache.feed);
@@ -53,6 +104,54 @@ export async function GET() {
           tokenName: p.base,
         };
         break;
+      }
+    }
+    // Fallback chain for tickers Kraken doesn't list (e.g. BLK, WMT):
+    // 1) xStocks indicative token price (same issuer family),
+    // 2) Yahoo underlying reference (honestly labeled, never illustrative).
+    const missing = assets.filter(
+      (a) => feed.quotes[a.ticker]?.status !== "live",
+    );
+    if (missing.length) {
+      const indicative = await Promise.all(
+        missing.map(async (a) => ({
+          ticker: a.ticker,
+          price: await xstocksIndicative(`${a.ticker.replace(".", "")}x`),
+        })),
+      );
+      for (const { ticker, price } of indicative) {
+        if (price === null || feed.quotes[ticker]?.status === "live") continue;
+        feed.quotes[ticker] = {
+          ticker,
+          price,
+          change: 0,
+          source: "xStocks · indicative price",
+          status: "live",
+          fetchedAt: feed.fetchedAt,
+          tokenName: `${ticker}x`,
+        };
+      }
+      const stillMissing = missing.filter(
+        (a) => feed.quotes[a.ticker]?.status !== "live",
+      );
+      if (stillMissing.length) {
+        const underlying = await Promise.all(
+          stillMissing.map(async (a) => ({
+            ticker: a.ticker,
+            quote: await yahooUnderlying(a.ticker),
+          })),
+        );
+        for (const { ticker, quote } of underlying) {
+          if (!quote || feed.quotes[ticker]?.status === "live") continue;
+          feed.quotes[ticker] = {
+            ticker,
+            price: quote.price,
+            change: quote.change,
+            source: "Underlying reference · Yahoo",
+            status: "live",
+            fetchedAt: feed.fetchedAt,
+          };
+        }
       }
     }
     if (!Object.values(feed.quotes).some((q) => q.status === "live"))
