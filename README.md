@@ -194,10 +194,10 @@ projects/stockcity/
 
 ## Disclaimer
 
-Stockva is a technology demonstration developed for the **BNB Chain Hackathon**. Asset quotes and company references are utilized for educational simulation on the **BNB Smart Chain Testnet (Chain ID: 97)**. Virtual positions and balances inside the sandbox do not constitute financial instruments or investment advice.
+Stockva is a technology demonstration developed for the **Indonesia Web3 Hackathon**. Asset quotes and company references are utilized for educational simulation on the **BNB Smart Chain Testnet (Chain ID: 97)**. Virtual positions and balances inside the sandbox do not constitute financial instruments or investment advice.
 
 ---
 
 <p align="center">
-  Built with ❤️ for the <strong>BNB Chain Hackathon</strong>.
+  Built with ❤️ for the <strong>Indonesia Web3 Hackathon</strong>.
 </p>
