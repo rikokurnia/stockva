@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ExternalLink, LogOut, Wallet, Check, Copy } from "lucide-react";
+import { ExternalLink, LogOut, Check, Copy } from "lucide-react";
 import {
   bscAddressLink,
   connectInjectedWallet,
@@ -94,13 +94,17 @@ export default function OnchainWallet({ address, onChange }: Props) {
       <div className="onchain-wallet-wrapper">
         <button
           type="button"
-          className="onchain-wallet-btn connect-btn"
+          className="onchain-wallet-img-btn"
           onClick={handleConnect}
           disabled={connecting}
           title={error || "Connect MetaMask (BSC Testnet)"}
+          aria-label={connecting ? "Connecting wallet…" : "Connect Wallet"}
         >
-          <Wallet size={14} />
-          <span>{connecting ? "Connecting…" : "Connect Wallet"}</span>
+          <img
+            src="/assets/connect-wallet.png"
+            alt="Connect Wallet"
+            className="onchain-wallet-img"
+          />
         </button>
         {error && <div className="onchain-wallet-tooltip">{error}</div>}
       </div>

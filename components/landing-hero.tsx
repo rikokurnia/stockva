@@ -3,14 +3,23 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useRef } from "react";
-import { ArrowUpRight, Wallet } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import styles from "./landing-hero.module.css";
 
 const WalletConnect = dynamic(() => import("./wallet-connect"), {
   ssr: false,
   loading: () => (
-    <button className={styles.wallet} disabled aria-label="Loading wallet">
-      <Wallet size={15} /> Connect wallet
+    <button
+      className={styles.walletImgBtn}
+      disabled
+      aria-label="Loading wallet"
+      title="Loading wallet"
+    >
+      <img
+        src="/assets/connect-wallet.png"
+        alt="Connect Wallet"
+        className={styles.connectWalletImg}
+      />
     </button>
   ),
 });
@@ -62,39 +71,43 @@ export default function LandingHero({ appId }: { appId: string }) {
           </span>
         </Link>
 
-        <nav className={styles.nav} aria-label="Main navigation">
-          <Link href="/city" className={styles.navLink}>
-            Explore the city <ArrowUpRight size={14} className={styles.navIcon} />
-          </Link>
-        </nav>
-
         <div className={styles.walletArea}>
           {appId ? (
             <WalletConnect appId={appId} />
           ) : (
-            <button
-              className={styles.wallet}
-              disabled
-              title="Wallet connection is not configured"
+            <Link
+              href="/city"
+              className={styles.walletImgBtn}
+              aria-label="Connect wallet"
+              title="Enter Sandbox"
             >
-              <Wallet size={15} /> Wallet unavailable
-            </button>
+              <img
+                src="/assets/connect-wallet.png"
+                alt="Connect Wallet"
+                className={styles.connectWalletImg}
+              />
+            </Link>
           )}
         </div>
       </header>
 
       <section className={styles.content} aria-labelledby="hero-title">
-        <span className={styles.eyebrow}>City-Building Portfolio Sandbox</span>
+        <Link href="/city" className={styles.exploreBtn} aria-label="Explore the city">
+          Explore the city <ArrowUpRight size={14} className={styles.exploreIcon} />
+        </Link>
         <h1 id="hero-title">
           BUILD THE CITY
           <br />
           <em>behind</em> YOUR STOCKS.
         </h1>
+      </section>
+
+      <aside className={styles.bottomLeft} aria-label="About Stockva">
         <p className={styles.description}>
           Turn real-world equities into a living, breathing metropolis.
           Lay roads, place company headquarters, and watch your island thrive.
         </p>
-      </section>
+      </aside>
     </main>
   );
 }

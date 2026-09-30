@@ -499,6 +499,60 @@ input {
   margin-left: 4px;
 }
 
+.onchain-wallet-img-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  line-height: 0;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s ease;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+}
+
+.onchain-wallet-img-btn:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.05);
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 14px rgba(240, 185, 11, 0.5));
+}
+
+.onchain-wallet-img-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.97);
+}
+
+.onchain-wallet-img-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.onchain-wallet-img-btn:disabled .onchain-wallet-img {
+  animation: onchain-wallet-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes onchain-wallet-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+.onchain-wallet-img {
+  display: block;
+  height: 44px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
 .onchain-wallet-btn {
   display: inline-flex;
   align-items: center;
@@ -2044,6 +2098,10 @@ input {
     height: 50px;
     gap: 8px;
     padding-right: 9px;
+  }
+  .onchain-wallet-img {
+    height: 36px;
+    max-width: 110px;
   }
   .menu-button {
     width: 26px;
