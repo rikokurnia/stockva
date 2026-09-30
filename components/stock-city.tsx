@@ -8,7 +8,6 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  Coins,
   ExternalLink,
   Grid2X2,
   HelpCircle,
@@ -565,8 +564,20 @@ export default function StockCity() {
     (sum, b) => sum + valueOf(b, prices),
     0,
   );
+  const stockPositions = city.buildings.filter((b) => defFor(b.kind).ticker);
+  const stockCostBasis = stockPositions.reduce(
+    (sum, b) => sum + b.entry * b.quantity,
+    0,
+  );
+  const realizedPnl = city.realizedPnl ?? 0;
+  const unrealizedPnl = portfolio - stockCostBasis;
+  const totalPnl = unrealizedPnl + realizedPnl;
+  const totalReturnPct = stockCostBasis > 0
+    ? (totalPnl / stockCostBasis) * 100
+    : (realizedPnl !== 0 ? (realizedPnl > 0 ? 100 : -100) : 0);
+  const hasPositions = stockPositions.length > 0 || realizedPnl !== 0;
   const alloc = allocationOf(
-    city.buildings.filter((b) => defFor(b.kind).ticker),
+    stockPositions,
     prices,
   );
   useEffect(() => {
@@ -823,56 +834,14 @@ export default function StockCity() {
         </div>
       )}
       <header className="game-header">
-        <button
-          className={`menu-button ${panel === "settings" ? "active" : ""}`}
-          onClick={() => openPanel("settings")}
-          aria-label="Game menu"
-        >
-          <img src={sprite("buttons/settings")} alt="" />
-        </button>
-        <div className="header-resources">
+        <div className="top-left-cluster">
           <button
-            className="cash-resource"
-            onClick={() => openPanel("portfolio")}
+            className={`menu-button ${panel === "settings" ? "active" : ""}`}
+            onClick={() => openPanel("settings")}
+            aria-label="Game menu"
+            title="Game settings"
           >
-            <img src={sprite("buttons/portfolio")} alt="" aria-hidden="true" />
-            <span>
-              <small>DEMO FUNDS</small>
-              <b>{wholeMoney(city.cash)}</b>
-            </span>
-          </button>
-          <button
-            className="portfolio-resource"
-            onClick={() => openPanel("portfolio")}
-          >
-            <img src={sprite("buttons/buy")} alt="" aria-hidden="true" />
-            <span>
-              <small>STOCK VALUE</small>
-              <b>{hasHall ? wholeMoney(portfolio) : "Build City Hall"}</b>
-            </span>
-          </button>
-          <button
-            className="faucet-pill-button"
-            onClick={() => {
-              commit({
-                ...city,
-                cash: city.cash + 10_000,
-              });
-              notify("Claimed 10,000 $mUSD from BSC Testnet Faucet (0xCA2A...4f21)!");
-            }}
-            title="Claim 10,000 $mUSD from BSC Testnet Faucet"
-            aria-label="Claim demo faucet"
-          >
-            <Coins size={13} />
-            <span>Faucet +10k</span>
-          </button>
-          <button
-            className="market-button"
-            onClick={() => openPanel("market")}
-            title="Stock market"
-          >
-            <GameArt index={5} />
-            <span>Market</span>
+            <img src={sprite("buttons/settings")} alt="" />
           </button>
           <div
             className="mode-toggle-group"
@@ -907,6 +876,76 @@ export default function StockCity() {
               )}
             </button>
           </div>
+        </div>
+        <div className="header-resources">
+          <div className="cash-resource-container">
+            <button
+              className="cash-resource"
+              onClick={() => openPanel("portfolio")}
+              title="City Hall · Finances & Balances"
+            >
+              <img src={sprite("buttons/portfolio")} alt="" aria-hidden="true" />
+              <span>
+                <small>DEMO FUNDS</small>
+                <b>{wholeMoney(city.cash)}</b>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="add-funds-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                commit({
+                  ...city,
+                  cash: city.cash + 10_000,
+                });
+                notify("Added +$10,000 USD to Demo Funds!");
+              }}
+              title="Add +$10,000 USD demo funds"
+              aria-label="Add demo funds"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+          <button
+            className="portfolio-resource"
+            onClick={() => openPanel("portfolio")}
+            title={
+              hasPositions
+                ? `Total Return: ${totalPnl >= 0 ? "+" : ""}${wholeMoney(totalPnl)} (${totalReturnPct >= 0 ? "+" : ""}${totalReturnPct.toFixed(1)}%)`
+                : "Build City Hall to inspect your stock portfolio"
+            }
+          >
+            <img src={sprite("buttons/buy")} alt="" aria-hidden="true" />
+            <span>
+              <small>STOCK VALUE</small>
+              <b>
+                {hasHall ? (
+                  <>
+                    <span>{wholeMoney(portfolio)}</span>
+                    {hasPositions && (
+                      <span
+                        className={`portfolio-accumulator-badge ${totalPnl >= 0 ? "profit" : "loss"}`}
+                      >
+                        {totalReturnPct >= 0 ? "+" : ""}
+                        {totalReturnPct.toFixed(1)}%
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  "Build City Hall"
+                )}
+              </b>
+            </span>
+          </button>
+          <button
+            className="market-button"
+            onClick={() => openPanel("market")}
+            title="Stock market"
+          >
+            <GameArt index={5} />
+            <span>Market</span>
+          </button>
         </div>
       </header>
       {tool !== "inspect" && !category && (
