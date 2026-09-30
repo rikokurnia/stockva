@@ -13,7 +13,6 @@ import {
   Grid2X2,
   HelpCircle,
   Landmark,
-  Layers,
   Maximize2,
   Menu,
   Minus,
@@ -81,14 +80,13 @@ import {
   type TierThresholds,
 } from "../lib/city";
 type Panel =
-  "portfolio" | "market" | "settings" | "help" | "data" | "assets" | null;
-const titles = {
+  "portfolio" | "market" | "settings" | "help" | "data" | null;
+const titles: Record<string, string> = {
   portfolio: "City finances",
   market: "Stock market",
   settings: "Game settings",
   help: "Controls",
   data: "Data status",
-  assets: "Asset library",
 };
 export default function StockCity() {
   const [city, setCity] = useState<CityState>(newCity),
@@ -115,7 +113,6 @@ export default function StockCity() {
     [notice, setNotice] = useState("Empty island ready. Draw roads to begin."),
     [noticeError, setNoticeError] = useState(false),
     [confirmReset, setConfirmReset] = useState(false),
-    [libraryTab, setLibraryTab] = useState("Buildings"),
     [prices, setPrices] = useState<PriceMap>(basePrices),
     [now, setNow] = useState(Date.now()),
     [upgrades, setUpgrades] = useState<Record<string, number>>({});
@@ -1581,7 +1578,7 @@ export default function StockCity() {
       {panel && !["portfolio", "market", "data"].includes(panel) && (
         <aside
           ref={panelRef}
-          className={`utility-panel ${panel === "assets" ? "asset-panel" : ""}`}
+          className="utility-panel"
           role="dialog"
           aria-modal="false"
           aria-label={titles[panel]}
@@ -1623,10 +1620,6 @@ export default function StockCity() {
               <button className="menu-row" onClick={() => setPanel("help")}>
                 Controls & shortcuts
                 <HelpCircle size={15} />
-              </button>
-              <button className="menu-row" onClick={() => setPanel("assets")}>
-                Supplied asset library
-                <Layers size={15} />
               </button>
               <button
                 className="menu-row danger"
@@ -1670,88 +1663,6 @@ export default function StockCity() {
                 tiles are connected.
               </p>
             </div>
-          )}
-          {panel === "assets" && (
-            <>
-              <div className="library-tabs">
-                {["Buildings", "Roads", "Vehicles", "Effects", "Buttons"].map(
-                  (t) => (
-                    <button
-                      className={libraryTab === t ? "chosen" : ""}
-                      onClick={() => setLibraryTab(t)}
-                      key={t}
-                    >
-                      {t}
-                    </button>
-                  ),
-                )}
-              </div>
-              <div className="library-grid">
-                {(libraryTab === "Buildings"
-                  ? catalogue.flatMap((d) =>
-                      d.ticker
-                        ? ["minus", "level_1", "level_2", "level_3"].map(
-                            (t) => ({
-                              path: `${d.image.split("/")[0]}/${t}`,
-                              name: `${d.name} ${t.replaceAll("_", " ")}`,
-                            }),
-                          )
-                        : [{ path: d.image, name: d.name }],
-                    )
-                  : libraryTab === "Roads"
-                    ? [
-                        "straight_ul_lr",
-                        "straight_ur_ll",
-                        "corner_ul_ur",
-                        "corner_ll_ul",
-                        "corner_lr_ll",
-                        "corner_ur_lr",
-                        "t_ul_ur_ll",
-                        "t_ul_ur_lr",
-                        "t_ul_ll_lr",
-                        "t_ur_ll_lr",
-                        "intersection",
-                      ].map((t) => ({
-                        path: `roads/${t}`,
-                        name: t.replaceAll("_", " "),
-                      }))
-                    : libraryTab === "Vehicles"
-                      ? [
-                          "electric_bus",
-                          "construction_truck",
-                          "maintenance_van",
-                        ].flatMap((v) =>
-                          [
-                            "upper_left",
-                            "upper_right",
-                            "lower_left",
-                            "lower_right",
-                          ].map((t) => ({
-                            path: `vehicles/${v}/${t}`,
-                            name: `${v.replaceAll("_", " ")} ${t.replace("_", " ")}`,
-                          })),
-                        )
-                      : libraryTab === "Effects"
-                        ? [
-                            "construction",
-                            "upgrade",
-                            "negative_performance",
-                            "selection",
-                          ].map((t) => ({
-                            path: `effects/${t}`,
-                            name: t.replaceAll("_", " "),
-                          }))
-                        : ["buy", "sell", "swap", "portfolio", "settings"].map(
-                            (t) => ({ path: `buttons/${t}`, name: t }),
-                          )
-                ).map((item) => (
-                  <figure key={item.path}>
-                    <img src={sprite(item.path)} alt={item.name} />
-                    <figcaption>{item.name}</figcaption>
-                  </figure>
-                ))}
-              </div>
-            </>
           )}
         </aside>
       )}
