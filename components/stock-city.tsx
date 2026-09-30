@@ -1926,7 +1926,7 @@ export default function StockCity() {
         </nav>
       </footer>
       {hasHall && !panel && !scanMode && !intelBuilding && (
-        <CityAdvisor city={city} prices={prices} />
+        <CityAdvisor city={city} prices={prices} walletAddress={wallet} />
       )}
       {confirmReset && (
         <div className="confirm-overlay">

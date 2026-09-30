@@ -1,16 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { defFor, hasRoad, wholeMoney, valueOf } from "../lib/city";
+import { defFor, hasRoad, priceOf, returnOf, valueOf, wholeMoney } from "../lib/city";
 import type { CityState, PriceMap } from "../lib/city";
+import {
+  getOnchainPositions,
+  type OnchainPosition,
+} from "../lib/contracts";
 import styles from "./city-advisor.module.css";
 
 type Message = { role: "guide" | "user"; text: string };
 
-export default function CityAdvisor({ city, prices }: { city: CityState; prices: PriceMap }) {
+type Props = {
+  city: CityState;
+  prices: PriceMap;
+  walletAddress?: `0x${string}` | null;
+};
+
+export default function CityAdvisor({ city, prices, walletAddress }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [thinking, setThinking] = useState(false);
+  const [onchain, setOnchain] = useState<OnchainPosition[]>([]);
   const toggle = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const log = useRef<HTMLDivElement>(null);
@@ -26,14 +38,33 @@ export default function CityAdvisor({ city, prices }: { city: CityState; prices:
         : `${holdings.length} company ${holdings.length === 1 ? "building" : "buildings"} · ${wholeMoney(total)} in stock value.`;
 
   useEffect(() => { if (open) input.current?.focus({ preventScroll: true }); }, [open]);
-  useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [messages, open]);
+  useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [messages, open, thinking]);
 
-  function reply(question: string) {
+  // Keep the advisor's view of on-chain vault positions fresh.
+  useEffect(() => {
+    if (!open || !walletAddress) {
+      if (!walletAddress) setOnchain([]);
+      return;
+    }
+    let cancelled = false;
+    getOnchainPositions(walletAddress)
+      .then((positions) => {
+        if (!cancelled) setOnchain(positions);
+      })
+      .catch(() => {
+        if (!cancelled) setOnchain([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, walletAddress]);
+
+  function localReply(question: string) {
     const q = question.toLowerCase();
     if (/buy|sell|rotate|trade|rebalance|defensive|transaction/.test(q))
       return "I can help you explore your city here. Trading commands aren’t connected in this preview. Select a company building to review its position and available actions; this chat won’t move your funds.";
     if (/allocation|portfolio|stock|holding/.test(q)) {
-      if (!holdings.length) return `Your portfolio is still empty, with ${wholeMoney(city.cash)} in demo funds. Open Build to choose your first company, then place it beside a road. Portfolio will reveal each building’s return and level.`;
+      if (!holdings.length && !onchain.filter((p) => p.active).length) return `Your portfolio is still empty, with ${wholeMoney(city.cash)} in demo funds. Open Build to choose your first company, then place it beside a road. Portfolio will reveal each building’s return and level.`;
       const groups = new Map<string, number>();
       holdings.forEach((b) => { const name = defFor(b.kind).name; groups.set(name, (groups.get(name) ?? 0) + valueOf(b, prices)); });
       return `${wholeMoney(total)} in simulated stock positions. ${Array.from(groups).sort((a, b) => b[1] - a[1]).map(([name, value]) => `${name}: ${total > 0 ? (value / total * 100).toFixed(1) : "0"}%`).join(" · ")}. Open Portfolio to see returns and building levels across your island.`;
@@ -43,12 +74,72 @@ export default function CityAdvisor({ city, prices }: { city: CityState; prices:
     return "Try asking for a city review, your portfolio allocation, or what to build next. This preview guide uses your current city and available market prices (including labeled fallbacks).";
   }
 
-  function send(text: string) {
+  async function send(text: string) {
     const question = text.trim();
-    if (!question) return;
-    setMessages((previous) => [...previous, { role: "user", text: question }, { role: "guide", text: reply(question) }]);
+    if (!question || thinking) return;
+    const history = [...messages, { role: "user", text: question } as Message];
+    setMessages(history);
     setDraft("");
     input.current?.focus({ preventScroll: true });
+
+    // Realtime snapshot: local buildings + live on-chain vault positions.
+    const snapshot = {
+      cash: city.cash,
+      totalValue: total,
+      walletConnected: !!walletAddress,
+      onchainCount: onchain.filter((p) => p.active).length,
+      holdings: [
+        ...holdings.map((b) => {
+          const ticker = defFor(b.kind).ticker!;
+          return {
+            ticker,
+            name: defFor(b.kind).name,
+            units: b.quantity,
+            entry: b.entry,
+            price: priceOf(ticker, prices),
+            value: valueOf(b, prices),
+            returnPct: returnOf(b, prices) * 100,
+            onchain: false,
+            active: true,
+          };
+        }),
+        ...onchain.map((p) => ({
+          ticker: p.ticker,
+          units: Number(p.quantity) / 1e18,
+          entry: Number(p.entryPrice) / 1e18,
+          price: undefined,
+          value: undefined,
+          returnPct: undefined,
+          tier: p.buildingTier,
+          onchain: true,
+          active: p.active,
+        })),
+      ].slice(0, 20),
+    };
+
+    setThinking(true);
+    try {
+      const res = await fetch("/api/advisor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: question,
+          history: history.slice(-6),
+          snapshot,
+        }),
+        signal: AbortSignal.timeout(55000),
+      });
+      if (!res.ok) throw new Error(`advisor ${res.status}`);
+      const data = (await res.json()) as { reply?: string };
+      if (!data.reply) throw new Error("empty reply");
+      setMessages((previous) => [...previous, { role: "guide", text: data.reply as string }]);
+    } catch {
+      // Offline fallback: local rule-based insights so chat always answers.
+      setMessages((previous) => [...previous, { role: "guide", text: localReply(question) }]);
+    } finally {
+      setThinking(false);
+      input.current?.focus({ preventScroll: true });
+    }
   }
 
   return (
@@ -61,13 +152,14 @@ export default function CityAdvisor({ city, prices }: { city: CityState; prices:
         <div ref={log} className={styles.messages} role="log" aria-live="polite" aria-relevant="additions">
           <p className={styles.welcome}>Let’s grow your island, one good decision at a time. Ask about your city or your portfolio.</p>
           {messages.map((message, index) => <p key={index} className={message.role === "user" ? styles.user : styles.answer}><span>{message.role === "user" ? "You" : "City advisor"}</span>{message.text}</p>)}
+          {thinking && <p className={styles.answer}><span>City advisor</span>Thinking…</p>}
         </div>
-        <div className={styles.prompts} aria-label="Suggested questions">{["Review my city", "Portfolio allocation", "What to build next?"].map((prompt) => <button key={prompt} onClick={() => send(prompt)}>{prompt}</button>)}</div>
-        <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); send(draft); }}>
+        <div className={styles.prompts} aria-label="Suggested questions">{["Review my city", "Portfolio allocation", "What to build next?"].map((prompt) => <button key={prompt} onClick={() => void send(prompt)} disabled={thinking}>{prompt}</button>)}</div>
+        <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); void send(draft); }}>
           <input ref={input} value={draft} maxLength={500} onChange={(event) => setDraft(event.target.value)} aria-label="Ask your city advisor" placeholder="Ask about your island…" autoComplete="off" />
-          <button type="submit" disabled={!draft.trim()} aria-label="Send message">Send</button>
+          <button type="submit" disabled={!draft.trim() || thinking} aria-label="Send message">Send</button>
         </form>
-        <p className={styles.note}>Local city insights · Simulated assets</p>
+        <p className={styles.note}>Live insights · Simulated assets</p>
       </section>}
       <button ref={toggle} className={styles.capsule} aria-expanded={open} aria-controls="city-advisor-content" onClick={() => setOpen((value) => !value)}>
         <img src="/assets/ai_logo.png" alt="" width="64" height="64" draggable={false} />

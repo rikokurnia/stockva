@@ -71,6 +71,12 @@ export default function LandingHero({ appId }: { appId: string }) {
           </span>
         </Link>
 
+        <nav className={styles.nav} aria-label="Main navigation">
+          <Link href="/city" className={styles.exploreBtn} aria-label="Explore the city">
+            Explore the city <ArrowUpRight size={14} className={styles.exploreIcon} />
+          </Link>
+        </nav>
+
         <div className={styles.walletArea}>
           {appId ? (
             <WalletConnect appId={appId} />
@@ -92,9 +98,6 @@ export default function LandingHero({ appId }: { appId: string }) {
       </header>
 
       <section className={styles.content} aria-labelledby="hero-title">
-        <Link href="/city" className={styles.exploreBtn} aria-label="Explore the city">
-          Explore the city <ArrowUpRight size={14} className={styles.exploreIcon} />
-        </Link>
         <h1 id="hero-title">
           BUILD THE CITY
           <br />
