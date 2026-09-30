@@ -64,7 +64,9 @@ type Props = {
   onClose: () => void;
   onRetry: () => void;
   onBuy: (kind: BuildingKind, amount: number) => void;
+  onBuyPaper: (ticker: string, amount: number) => string;
   onSell: (ticker: string, fraction: number) => string;
+  onSellPaper: (ticker: string, fraction: number) => string;
   onFocus: (building: Building) => void;
   onScan: () => void;
   walletAddress?: `0x${string}` | null;
@@ -93,7 +95,9 @@ export default function CivicPanel({
   onClose,
   onRetry,
   onBuy,
+  onBuyPaper,
   onSell,
+  onSellPaper,
   onFocus,
   onScan,
   walletAddress,
@@ -181,7 +185,7 @@ export default function CivicPanel({
   };
 
   const pendingBatch = city.buildings.filter(
-    (b) => defFor(b.kind).ticker && !b.vaultTx,
+    (b) => defFor(b.kind).ticker && b.locked,
   );
 
   const handleConfirmBatch = async () => {
@@ -320,20 +324,45 @@ export default function CivicPanel({
       : "U.S. market closed"
     : clock.label;
   const selected = assets.find((a) => a.ticker === ticker);
-  const positions = city.buildings.filter((b) => defFor(b.kind).ticker);
-  const total = positions.reduce((sum, b) => sum + valueOf(b, prices), 0);
+  const paper = city.paper ?? [];
+  const paperValue = (t?: string) =>
+    paper
+      .filter((p) => !t || p.ticker === t)
+      .reduce((sum, p) => sum + p.quantity * priceOf(p.ticker, prices), 0);
+  const paperBasis = (t?: string) =>
+    paper
+      .filter((p) => !t || p.ticker === t)
+      .reduce((sum, p) => sum + p.cost, 0);
+  const positions = city.buildings.filter(
+    (b) => defFor(b.kind).ticker && !b.locked,
+  );
+  const total =
+    positions.reduce((sum, b) => sum + valueOf(b, prices), 0) + paperValue();
   const realizedPnl = city.realizedPnl ?? 0;
-  const basis = positions.reduce((sum, b) => sum + b.entry * b.quantity, 0);
+  const basis =
+    positions.reduce((sum, b) => sum + b.entry * b.quantity, 0) +
+    paperBasis();
   const totalPnl = total - basis + realizedPnl;
-  const companies = [...new Set(positions.map((b) => defFor(b.kind).ticker!))];
+  const companies = [
+    ...new Set([
+      ...positions.map((b) => defFor(b.kind).ticker!),
+      ...paper.map((p) => p.ticker),
+    ]),
+  ];
   const held = positions.filter((b) => defFor(b.kind).ticker === ticker);
-  const heldValue = held.reduce((sum, b) => sum + valueOf(b, prices), 0);
+  const heldPaper = ticker ? paper.filter((p) => p.ticker === ticker) : [];
+  const heldValue =
+    held.reduce((sum, b) => sum + valueOf(b, prices), 0) +
+    paperValue(ticker ?? undefined);
   const sectors = [
-    ...new Set(
-      positions.map(
+    ...new Set([
+      ...positions.map(
         (b) => assets.find((a) => a.ticker === defFor(b.kind).ticker)!.sector,
       ),
-    ),
+      ...paper.map(
+        (p) => assets.find((a) => a.ticker === p.ticker)?.sector ?? "Other",
+      ),
+    ]),
   ];
   const input = Number(amount);
   const validAmount =
@@ -767,13 +796,24 @@ export default function CivicPanel({
               </p>
             )}
             {sectors.map((sector) => {
-              const value = positions
-                .filter(
-                  (b) =>
-                    assets.find((a) => a.ticker === defFor(b.kind).ticker)
-                      ?.sector === sector,
-                )
-                .reduce((s, b) => s + valueOf(b, prices), 0);
+              const value =
+                positions
+                  .filter(
+                    (b) =>
+                      assets.find((a) => a.ticker === defFor(b.kind).ticker)
+                        ?.sector === sector,
+                  )
+                  .reduce((s, b) => s + valueOf(b, prices), 0) +
+                paper
+                  .filter(
+                    (p) =>
+                      (assets.find((a) => a.ticker === p.ticker)?.sector ??
+                        "Other") === sector,
+                  )
+                  .reduce(
+                    (s, p) => s + p.quantity * priceOf(p.ticker, prices),
+                    0,
+                  );
               return (
                 <div className={styles.sector} key={sector}>
                   <div>
@@ -798,15 +838,28 @@ export default function CivicPanel({
                   const buildings = positions.filter(
                     (b) => defFor(b.kind).ticker === ticker,
                   );
-                  const value = buildings.reduce(
-                    (sum, b) => sum + valueOf(b, prices),
-                    0,
-                  );
+                  const paperHoldings = paper.filter((p) => p.ticker === ticker);
+                  const value =
+                    buildings.reduce(
+                      (sum, b) => sum + valueOf(b, prices),
+                      0,
+                    ) +
+                    paperHoldings.reduce(
+                      (sum, p) => sum + p.quantity * priceOf(p.ticker, prices),
+                      0,
+                    );
+                  const paperOnly = !buildings.length && paperHoldings.length > 0;
                   return (
                     <button
                       key={ticker}
                       className={styles.assetRow}
-                      onClick={() => onFocus(buildings[0])}
+                      onClick={() => {
+                        if (buildings[0]) onFocus(buildings[0]);
+                        else {
+                          setTicker(ticker);
+                          setMessage("");
+                        }
+                      }}
                     >
                       <StockLogo
                         ticker={ticker}
@@ -819,9 +872,10 @@ export default function CivicPanel({
                           {assets.find((a) => a.ticker === ticker)?.name}
                         </strong>
                         <small>
-                          {buildings.length} building
-                          {buildings.length === 1 ? "" : "s"} ·{" "}
-                          {total ? ((value / total) * 100).toFixed(1) : 0}%
+                          {paperOnly
+                            ? `${paperHoldings.length} position${paperHoldings.length === 1 ? "" : "s"} · no building`
+                            : `${buildings.length} building${buildings.length === 1 ? "" : "s"}`}{" "}
+                          · {total ? ((value / total) * 100).toFixed(1) : 0}%
                           allocation
                         </small>
                       </span>
@@ -860,10 +914,12 @@ export default function CivicPanel({
                     </span>
                   )}
                   <span>
-                    <strong>{def.name}</strong>
+                    <strong>
+                      {def.name} {b.locked ? "🔒" : ""}
+                    </strong>
                     <small>
                       {def.ticker
-                        ? `${b.quantity.toFixed(4)} units · ${assets.find((a) => a.ticker === def.ticker)?.sector}`
+                        ? `${b.quantity.toFixed(4)} units · ${assets.find((a) => a.ticker === def.ticker)?.sector}${b.locked ? " · locked" : ""}`
                         : "Public service"}
                     </small>
                   </span>
@@ -947,8 +1003,14 @@ export default function CivicPanel({
                       .toLowerCase()
                       .includes(search.toLowerCase()),
                   )
+                  .sort((a, b) => {
+                    const ab = isHeroTicker(a.ticker) ? 0 : 1;
+                    const bb = isHeroTicker(b.ticker) ? 0 : 1;
+                    return ab - bb;
+                  })
                   .map((a) => {
                     const q = feed.quotes[a.ticker];
+                    const buildable = isHeroTicker(a.ticker);
                     return (
                       <button
                         className={styles.assetRow}
@@ -974,6 +1036,9 @@ export default function CivicPanel({
                               {q?.status === "live"
                                 ? "xStocks"
                                 : (q?.status ?? "fallback")}
+                            </span>{" "}
+                            <span className={styles.tag}>
+                              {buildable ? "🏢 Builds a building" : "Position only"}
                             </span>
                           </small>
                         </span>
@@ -1169,20 +1234,28 @@ export default function CivicPanel({
                             <ArrowUpRight size={17} />
                           </button>
                           <p className={styles.caption}>
-                            Funds are deducted when you place the building. Escape
-                            cancels.
+                            Places a locked draft on the island. Pay in City
+                            Hall (bundle, 1 signature) to unlock it
+                            permanently.
                           </p>
                         </>
                       ) : (
-                        <div className={styles.watchlistNotice}>
-                          <div className={styles.watchlistPill}>
-                            <Landmark size={14} />
-                            <span>Watchlist RWA Asset</span>
-                          </div>
+                        <>
+                          <button
+                            className={styles.primary}
+                            disabled={!validAmount}
+                            onClick={() =>
+                              setMessage(onBuyPaper(selected.ticker, input))
+                            }
+                          >
+                            Buy position (no building)
+                            <ArrowUpRight size={17} />
+                          </button>
                           <p className={styles.caption}>
-                            24/7 on-chain RWA oracle data is active. Island plot construction is reserved for the 10 Hero Stocks with bespoke 4-tier isometric architecture.
+                            Position-only asset: tracked in City Hall without
+                            an island building.
                           </p>
-                        </div>
+                        </>
                       )}
                     </section>
                     <section className={styles.trade}>
@@ -1190,7 +1263,7 @@ export default function CivicPanel({
                         title="Your position"
                         detail={money(heldValue)}
                       />
-                      {held.length ? (
+                      {held.length || heldPaper.length ? (
                         <>
                           <div className={styles.segment}>
                             {[25, 50, 75, 100].map((n) => (
@@ -1204,21 +1277,52 @@ export default function CivicPanel({
                               </button>
                             ))}
                           </div>
-                          <button
-                            className={styles.sell}
-                            disabled={!hasExchange}
-                            onClick={() =>
-                              setMessage(onSell(selected.ticker, sale / 100))
-                            }
-                          >
-                            {sale === 100
-                              ? "Liquidate holding"
-                              : `Sell ${sale}%`}{" "}
-                            · {money((heldValue * sale) / 100)}
-                          </button>
+                          {held.length > 0 && (
+                            <button
+                              className={styles.sell}
+                              disabled={!hasExchange}
+                              onClick={() =>
+                                setMessage(onSell(selected.ticker, sale / 100))
+                              }
+                            >
+                              {sale === 100
+                                ? "Liquidate buildings"
+                                : `Sell ${sale}% buildings`}{" "}
+                              ·{" "}
+                              {money(
+                                (held.reduce(
+                                  (s, b) => s + valueOf(b, prices),
+                                  0,
+                                ) *
+                                  sale) /
+                                  100,
+                              )}
+                            </button>
+                          )}
+                          {heldPaper.length > 0 && (
+                            <button
+                              className={styles.sell}
+                              disabled={!hasExchange}
+                              onClick={() =>
+                                setMessage(
+                                  onSellPaper(selected.ticker, sale / 100),
+                                )
+                              }
+                              style={{ marginTop: 8 }}
+                            >
+                              {sale === 100
+                                ? "Liquidate position"
+                                : `Sell ${sale}% position`}{" "}
+                              ·{" "}
+                              {money(
+                                (paperValue(selected.ticker) * sale) / 100,
+                              )}
+                            </button>
+                          )}
                           <p className={styles.caption}>
-                            A full sale removes all {selected.ticker} buildings.
-                            Partial sales keep their remaining units.
+                            A full sale removes all {selected.ticker} buildings
+                            and positions. Partial sales keep their remaining
+                            units.
                           </p>
                         </>
                       ) : (

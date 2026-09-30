@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { getAddress } from "viem";
 import { LogOut } from "lucide-react";
@@ -23,12 +24,32 @@ export default function WalletConnect({ appId }: { appId?: string }) {
     ? `${formatted.slice(0, 6)}…${formatted.slice(-4)}`
     : "Connected";
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (authenticated && formatted) {
+      localStorage.setItem("stockcity_connected_wallet", formatted);
+    } else if (ready && !authenticated) {
+      localStorage.removeItem("stockcity_connected_wallet");
+    }
+  }, [ready, authenticated, formatted]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // ignore
+    }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("stockcity_connected_wallet");
+    }
+  };
+
   if (authenticated && formatted) {
     return (
       <button
         className={styles.wallet}
         disabled={!ready}
-        onClick={() => logout()}
+        onClick={handleLogout}
         aria-label={`Disconnect wallet ${label}`}
         title={`Connected: ${formatted} · Click to disconnect`}
       >

@@ -7,7 +7,6 @@ import { ExternalLink, LogOut, Check, Copy } from "lucide-react";
 import {
   bscAddressLink,
   connectInjectedWallet,
-  hasInjectedWallet,
 } from "../lib/contracts";
 
 type Props = {
@@ -38,7 +37,7 @@ export default function OnchainWallet({ address, onChange }: Props) {
       } catch {
         onChange(rawAddr as `0x${string}`);
       }
-    } else if (!authenticated && !hasInjectedWallet()) {
+    } else if (ready && !authenticated) {
       onChange(null);
       if (typeof window !== "undefined") {
         localStorage.removeItem("stockcity_connected_wallet");
@@ -46,66 +45,17 @@ export default function OnchainWallet({ address, onChange }: Props) {
     }
   }, [ready, authenticated, user?.wallet?.address, wallets, onChange]);
 
-  // Fallback: auto-detect injected wallet if Privy is not yet connected but user has active injected account
-  useEffect(() => {
-    if (authenticated || typeof window === "undefined" || !window.ethereum?.request) return;
-
-    const saved = localStorage.getItem("stockcity_connected_wallet");
-    if (saved && saved.startsWith("0x")) {
-      try {
-        onChange(getAddress(saved) as `0x${string}`);
-      } catch {}
+  const rawAddr = user?.wallet?.address || wallets?.[0]?.address;
+  let privyFormatted: `0x${string}` | null = null;
+  if (authenticated && rawAddr) {
+    try {
+      privyFormatted = getAddress(rawAddr);
+    } catch {
+      privyFormatted = rawAddr as `0x${string}`;
     }
+  }
 
-    window.ethereum
-      .request({ method: "eth_accounts" })
-      .then((res: unknown) => {
-        const accounts = res as string[];
-        if (accounts && accounts.length > 0 && accounts[0]) {
-          try {
-            const formatted = getAddress(accounts[0]);
-            onChange(formatted);
-            localStorage.setItem("stockcity_connected_wallet", formatted);
-          } catch {
-            onChange(accounts[0] as `0x${string}`);
-          }
-        }
-      })
-      .catch(() => {});
-
-    const handleAccountsChanged = (accounts: unknown) => {
-      const accs = accounts as string[];
-      if (accs && accs.length > 0 && accs[0]) {
-        try {
-          const formatted = getAddress(accs[0]);
-          onChange(formatted);
-          localStorage.setItem("stockcity_connected_wallet", formatted);
-        } catch {
-          onChange(accs[0] as `0x${string}`);
-        }
-      } else {
-        onChange(null);
-        localStorage.removeItem("stockcity_connected_wallet");
-      }
-    };
-
-    window.ethereum.on?.("accountsChanged", handleAccountsChanged);
-    return () => {
-      window.ethereum?.removeListener?.("accountsChanged", handleAccountsChanged);
-    };
-  }, [authenticated, onChange]);
-
-  const activeAddress =
-    address ||
-    (user?.wallet?.address
-      ? (() => {
-          try {
-            return getAddress(user.wallet.address);
-          } catch {
-            return user.wallet.address as `0x${string}`;
-          }
-        })()
-      : null);
+  const activeAddress = privyFormatted || address;
 
   const handleConnect = async () => {
     try {

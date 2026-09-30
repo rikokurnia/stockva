@@ -26,7 +26,9 @@ export default function CityAdvisor({ city, prices, walletAddress }: Props) {
   const toggle = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const log = useRef<HTMLDivElement>(null);
-  const holdings = city.buildings.filter((b) => defFor(b.kind).ticker);
+  const holdings = city.buildings.filter(
+    (b) => defFor(b.kind).ticker && !b.locked,
+  );
   const disconnected = city.buildings.filter((b) => !hasRoad(b, city.roads)).length;
   const total = holdings.reduce((sum, b) => sum + valueOf(b, prices), 0);
   const briefing = !city.roads.length
@@ -82,10 +84,11 @@ export default function CityAdvisor({ city, prices, walletAddress }: Props) {
     setDraft("");
     input.current?.focus({ preventScroll: true });
 
-    // Realtime snapshot: local buildings + live on-chain vault positions.
+    // Realtime snapshot: unlocked buildings + position-only holdings.
+    const paper = city.paper ?? [];
     const snapshot = {
       cash: city.cash,
-      totalValue: total,
+      totalValue: total + paper.reduce((s, p) => s + p.quantity * priceOf(p.ticker, prices), 0),
       walletConnected: !!walletAddress,
       onchainCount: onchain.filter((p) => p.active).length,
       holdings: [
@@ -103,6 +106,19 @@ export default function CityAdvisor({ city, prices, walletAddress }: Props) {
             active: true,
           };
         }),
+        ...paper.map((p) => ({
+          ticker: p.ticker,
+          units: p.quantity,
+          entry: p.entry,
+          price: priceOf(p.ticker, prices),
+          value: p.quantity * priceOf(p.ticker, prices),
+          returnPct:
+            p.entry > 0
+              ? ((priceOf(p.ticker, prices) - p.entry) / p.entry) * 100
+              : 0,
+          onchain: false,
+          active: true,
+        })),
         ...onchain.map((p) => ({
           ticker: p.ticker,
           units: Number(p.quantity) / 1e18,

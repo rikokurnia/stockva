@@ -343,9 +343,21 @@ export type Building = Cell & {
   entry: number;
   cost: number;
   builtAt: number;
+  /** True while the building is an unpaid draft: ghost on the map,
+   * excluded from portfolio until the on-chain purchase confirms. */
+  locked?: boolean;
   /** On-chain receipt for stock buildings recorded via StockCityVault. */
   vaultTx?: `0x${string}`;
   vaultId?: string;
+};
+/** Position-only holding (no map building) for non-buildable assets. */
+export type PaperHolding = {
+  id: string;
+  ticker: string;
+  quantity: number;
+  entry: number;
+  cost: number;
+  boughtAt: number;
 };
 export type CityState = {
   version: 2;
@@ -353,6 +365,7 @@ export type CityState = {
   realizedPnl?: number;
   buildings: Building[];
   roads: Cell[];
+  paper?: PaperHolding[];
 };
 export const STORAGE = "stockva.sandbox.v2";
 export const ROAD_COST = 10;
@@ -812,6 +825,16 @@ export function isSavedCity(input: unknown): input is CityState {
     (s.realizedPnl === undefined || Number.isFinite(s.realizedPnl)) &&
     Array.isArray(s.roads) &&
     Array.isArray(s.buildings) &&
+    (s.paper === undefined ||
+      (Array.isArray(s.paper) &&
+        s.paper.every(
+          (p) =>
+            typeof p?.id === "string" &&
+            typeof p?.ticker === "string" &&
+            Number.isFinite(p?.quantity) &&
+            Number.isFinite(p?.entry) &&
+            Number.isFinite(p?.cost),
+        ))) &&
     s.roads.every(validCell) &&
     s.buildings.every(
       (b) =>
@@ -824,6 +847,74 @@ export function isSavedCity(input: unknown): input is CityState {
         b.quantity >= 0,
     )
   );
+}
+
+/** Buy a position-only holding (no map building) for non-buildable assets. */
+export function buyPaper(
+  state: CityState,
+  ticker: string,
+  amount: number,
+  price: number,
+) {
+  if (!Number.isFinite(amount) || amount < 1)
+    return { state, error: "Enter a position amount of at least $1" };
+  if (amount > state.cash) return { state, error: "Not enough demo funds" };
+  if (!Number.isFinite(price) || price <= 0)
+    return { state, error: "No live price for this asset right now" };
+  const holding: PaperHolding = {
+    id: globalThis.crypto.randomUUID(),
+    ticker,
+    quantity: amount / price,
+    entry: price,
+    cost: amount,
+    boughtAt: Date.now(),
+  };
+  return {
+    state: {
+      ...state,
+      cash: state.cash - amount,
+      paper: [...(state.paper ?? []), holding],
+    },
+    error: "",
+  };
+}
+
+/** Sell a fraction of all paper holdings for a ticker. */
+export function sellPaper(
+  state: CityState,
+  ticker: string,
+  fraction: number,
+  prices?: PriceMap,
+) {
+  const holdings = (state.paper ?? []).filter((p) => p.ticker === ticker);
+  if (!holdings.length) return { state, error: "You do not own this asset." };
+  if (!Number.isFinite(fraction) || fraction <= 0 || fraction > 1)
+    return { state, error: "Choose a valid sell percentage." };
+  let proceeds = 0;
+  let realized = 0;
+  const ids = new Set(holdings.map((p) => p.id));
+  const paper = (state.paper ?? [])
+    .map((p) => {
+      if (!ids.has(p.id)) return p;
+      const price = priceOf(p.ticker, prices);
+      const value = p.quantity * price;
+      proceeds += value * fraction;
+      realized += (value - p.quantity * p.entry) * fraction;
+      if (fraction === 1) return null;
+      const quantity = p.quantity * (1 - fraction);
+      return { ...p, quantity, cost: p.cost * (1 - fraction) };
+    })
+    .filter((p): p is PaperHolding => p !== null);
+  return {
+    state: {
+      ...state,
+      cash: state.cash + proceeds,
+      realizedPnl: (state.realizedPnl ?? 0) + realized,
+      paper,
+    },
+    error: "",
+    payout: proceeds,
+  };
 }
 
 export function sellPosition(

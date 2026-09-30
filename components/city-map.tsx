@@ -431,11 +431,13 @@ export default function CityMap(props: Props) {
                 <button
                   key={b.id}
                   data-building-id={b.id}
-                  className={`city-building ${props.scanMode && hoveredBuilding?.id === b.id ? "scan-active" : ""} ${def.category === "companies" ? "company" : "service"} ${selected === b.id ? "selected" : ""} ${moving === b.id ? "being-moved" : ""} ${tool === "bulldoze" && hoveredBuilding?.id === b.id ? "demolish" : ""}`}
+                  data-locked={b.locked ? "true" : undefined}
+                  className={`city-building ${props.scanMode && hoveredBuilding?.id === b.id ? "scan-active" : ""} ${def.category === "companies" ? "company" : "service"} ${selected === b.id ? "selected" : ""} ${moving === b.id ? "being-moved" : ""} ${tool === "bulldoze" && hoveredBuilding?.id === b.id ? "demolish" : ""} ${b.locked ? "locked" : ""}`}
                   style={{
                     left: p.x,
                     top: p.y + 36,
                     zIndex: Math.round(p.y + 36),
+                    opacity: b.locked ? 0.55 : undefined,
                   }}
                   onPointerEnter={() => {
                     if (props.scanMode) props.onScanTarget?.(b.id);
@@ -453,7 +455,7 @@ export default function CityMap(props: Props) {
                       }
                     }
                   }}
-                  aria-label={`${def.name} building`}
+                  aria-label={`${def.name} building${b.locked ? ", locked unpaid" : ""}`}
                   tabIndex={tool === "inspect" ? 0 : -1}
                 >
                   {props.scanMode &&
@@ -511,10 +513,22 @@ export default function CityMap(props: Props) {
                     draggable={false}
                   />
                   <span className="building-name">
-                    {def.ticker
-                      ? `${def.ticker} ${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%`
-                      : def.name}
+                    {b.locked && def.ticker
+                      ? `${def.ticker} 🔒 UNPAID`
+                      : def.ticker
+                        ? `${def.ticker} ${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%`
+                        : def.name}
                   </span>
+                  {b.locked && def.ticker && (
+                    <span
+                      className="no-road"
+                      title="Locked — pay in City Hall to unlock"
+                      aria-label="Locked, unpaid building"
+                      style={{ background: "#f0b90b", color: "#1a1a1a" }}
+                    >
+                      🔒
+                    </span>
+                  )}
                   {!hasRoad(b, city.roads) && (
                     <span
                       className="no-road"

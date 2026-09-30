@@ -34,6 +34,7 @@ import { fallbackFeed, type MarketFeed } from "../lib/market";
 import {
   VAULT_ADDRESS,
   bscAddressLink,
+  recordBuildingOnchain,
 } from "../lib/contracts";
 import CityAdvisor from "./city-advisor";
 import StockLogo from "./stock-logo";
@@ -57,6 +58,8 @@ import {
   assets,
   buildingImage,
   bulldoze,
+  buyPaper,
+  sellPaper,
   sellPosition,
   catalogue,
   constructBuilding,
@@ -122,6 +125,7 @@ export default function StockCity() {
   const [feedLoading, setFeedLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [wallet, setWallet] = useState<`0x${string}` | null>(null);
+  const [placeSource, setPlaceSource] = useState<"tray" | "exchange" | null>(null);
   const [assetTicker, setAssetTicker] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState(false);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
@@ -150,7 +154,7 @@ export default function StockCity() {
   const simulationLatest = useRef({ city, prices });
   simulationLatest.current = { city, prices };
   const companyCount = city.buildings.filter(
-    (b) => defFor(b.kind).ticker,
+    (b) => defFor(b.kind).ticker && !b.locked,
   ).length;
   const [focusTarget, setFocusTarget] = useState<{
     r: number;
@@ -186,7 +190,7 @@ export default function StockCity() {
       if (prev !== null) return prev;
       return Object.fromEntries(
         city.buildings
-          .filter((b) => defFor(b.kind).ticker)
+          .filter((b) => defFor(b.kind).ticker && !b.locked)
           .map((b) => [b.id, returnOf(b, prices)]),
       );
     });
@@ -280,7 +284,7 @@ export default function StockCity() {
         ? null
         : Object.fromEntries(
             city.buildings
-              .filter((b) => defFor(b.kind).ticker)
+              .filter((b) => defFor(b.kind).ticker && !b.locked)
               .map((b) => [
                 b.id,
                 previous[b.id] ?? returnOf(b, simulationLatest.current.prices),
@@ -295,7 +299,7 @@ export default function StockCity() {
         const latest = simulationLatest.current;
         const values = Object.fromEntries(
           latest.city.buildings
-            .filter((b) => defFor(b.kind).ticker)
+            .filter((b) => defFor(b.kind).ticker && !b.locked)
             .map((b) => [b.id, previous?.[b.id] ?? returnOf(b, latest.prices)]),
         );
         return simulationStep(values, thresholds);
@@ -517,11 +521,16 @@ export default function StockCity() {
       }
     }
   };
-  const chooseBuilding = (value: BuildingKind, autoClose = false) => {
+  const chooseBuilding = (
+    value: BuildingKind,
+    autoClose = false,
+    source: "tray" | "exchange" = "tray",
+  ) => {
     if (defFor(value).ticker && !hasExchange) {
       notify("Build the Stock Exchange first.", true);
       return;
     }
+    setPlaceSource(defFor(value).ticker ? source : null);
     setScanMode(false);
     setKind(value);
     setTool("build");
@@ -583,17 +592,69 @@ export default function StockCity() {
       notify(result.error, true);
       return;
     }
-    commit(result.state);
     if (defFor(kind).ticker) {
       setTool("inspect");
       setKind(null);
+      const lockedState: CityState = {
+        ...result.state,
+        buildings: result.state.buildings.map((b, i) =>
+          i === result.state.buildings.length - 1 ? { ...b, locked: true } : b,
+        ),
+      };
+      commit(lockedState);
+      const placed =
+        lockedState.buildings[lockedState.buildings.length - 1];
       const ticker = defFor(kind).ticker!;
       const entryPrice = priceOf(ticker, prices);
-      notify(
-        `${defFor(kind).name} placed at ${money(entryPrice)} per simulated share. Queued — confirm everything at once in City Hall.`,
-      );
+      const fromTray = placeSource !== "exchange";
+      setPlaceSource(null);
+      if (fromTray && wallet) {
+        // Build-menu flow: one building, one signature, immediately.
+        const account = wallet;
+        const buildingId = placed.id;
+        notify(
+          `${defFor(kind).name} drafted. Confirm the purchase popup in your wallet…`,
+        );
+        void recordBuildingOnchain(
+          account,
+          { ticker, usdAmount: amount, entryPrice, initialTier: 1 },
+          (step, hash) => {
+            if (step === "approve" && !hash)
+              notify("Confirm the mUSD approval popup in your wallet…");
+            else if (step === "approve" && hash)
+              notify(`Approval sent. Now confirm the building purchase…`);
+            else if (step === "buy" && hash)
+              notify(`Purchase sent. Waiting for BSC confirmation…`);
+          },
+        )
+          .then(({ hash, positionId }) => {
+            const latest = simulationLatest.current.city;
+            commit({
+              ...latest,
+              buildings: latest.buildings.map((b) =>
+                b.id === buildingId
+                  ? { ...b, locked: false, vaultTx: hash, vaultId: positionId }
+                  : b,
+              ),
+            });
+            notify(
+              `${defFor(kind).name} unlocked and permanent. Receipt in City Hall.`,
+            );
+          })
+          .catch((err: unknown) => {
+            notify(
+              `Kept locked: on-chain payment failed (${err instanceof Error ? err.message : "wallet rejected"}). Retry in City Hall.`,
+              true,
+            );
+          });
+      } else {
+        notify(
+          `${defFor(kind).name} drafted as locked at ${money(entryPrice)} per share. Pay in City Hall to unlock it permanently.`,
+        );
+      }
       return;
     }
+    commit(result.state);
     notify(
       `${defFor(kind).name} placed${defFor(kind).ticker ? ` at ${money(priceOf(defFor(kind).ticker!, prices))} per simulated share` : ""}${defFor(kind).ticker ? ". Investment placed." : ". Place another, or Esc."}`,
     );
@@ -629,15 +690,24 @@ export default function StockCity() {
   const current = city.buildings.find((b) => b.id === selected),
     definition = current ? defFor(current.kind) : null,
     buildDef = kind ? defFor(kind) : null;
-  const portfolio = city.buildings.reduce(
-    (sum, b) => sum + valueOf(b, prices),
+  const paperHoldings = city.paper ?? [];
+  const paperValue = paperHoldings.reduce(
+    (sum, p) => sum + p.quantity * priceOf(p.ticker, prices),
     0,
   );
-  const stockPositions = city.buildings.filter((b) => defFor(b.kind).ticker);
-  const stockCostBasis = stockPositions.reduce(
-    (sum, b) => sum + b.entry * b.quantity,
-    0,
+  const paperBasis = paperHoldings.reduce((sum, p) => sum + p.cost, 0);
+  const portfolio =
+    city.buildings.reduce(
+      (sum, b) =>
+        sum + (defFor(b.kind).ticker && !b.locked ? valueOf(b, prices) : 0),
+      0,
+    ) + paperValue;
+  const stockPositions = city.buildings.filter(
+    (b) => defFor(b.kind).ticker && !b.locked,
   );
+  const stockCostBasis =
+    stockPositions.reduce((sum, b) => sum + b.entry * b.quantity, 0) +
+    paperBasis;
   const realizedPnl = city.realizedPnl ?? 0;
   const unrealizedPnl = portfolio - stockCostBasis;
   const totalPnl = unrealizedPnl + realizedPnl;
@@ -1597,19 +1667,39 @@ export default function StockCity() {
               ...latest,
               buildings: latest.buildings.map((b) => {
                 const r = byId.get(b.id);
-                return r ? { ...b, vaultTx: r.hash, vaultId: r.vaultId } : b;
+                return r
+                  ? { ...b, locked: false, vaultTx: r.hash, vaultId: r.vaultId }
+                  : b;
               }),
             });
+            notify("Buildings unlocked and permanent. Receipts in City Hall.");
           }}
           onBuy={(kind, investment) => {
             setAmount(investment);
-            chooseBuilding(kind, true);
+            chooseBuilding(kind, true, "exchange");
+          }}
+          onBuyPaper={(ticker, investment) => {
+            const result = buyPaper(
+              city,
+              ticker,
+              investment,
+              priceOf(ticker, prices),
+            );
+            if (result.error) return result.error;
+            commit(result.state);
+            return `${ticker} position opened (no building). Visible in City Hall.`;
           }}
           onSell={(ticker, fraction) => {
             const result = sellPosition(city, ticker, fraction, prices);
             if (result.error) return result.error;
             commit(result.state);
             return `${fraction === 1 ? "Entire holding" : `${fraction * 100}% of holding`} sold. Demo funds updated.`;
+          }}
+          onSellPaper={(ticker, fraction) => {
+            const result = sellPaper(city, ticker, fraction, prices);
+            if (result.error) return result.error;
+            commit(result.state);
+            return `${fraction === 1 ? "Entire position" : `${fraction * 100}% of position`} sold. Demo funds updated.`;
           }}
           onFocus={(b) => {
             setPanel(null);

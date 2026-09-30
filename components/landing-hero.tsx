@@ -78,22 +78,7 @@ export default function LandingHero({ appId }: { appId: string }) {
         </nav>
 
         <div className={styles.walletArea}>
-          {appId ? (
-            <WalletConnect appId={appId} />
-          ) : (
-            <Link
-              href="/city"
-              className={styles.walletImgBtn}
-              aria-label="Connect wallet"
-              title="Enter Sandbox"
-            >
-              <img
-                src="/assets/connect-wallet.png"
-                alt="Connect Wallet"
-                className={styles.connectWalletImg}
-              />
-            </Link>
-          )}
+          <WalletConnect />
         </div>
       </header>
 
