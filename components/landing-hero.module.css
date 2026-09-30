@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap");
 
 .hero {
   position: relative;
@@ -7,11 +7,12 @@
   width: 100%;
   overflow: auto;
   background: #263f3c;
-  color: #fff;
-  font-family: Inter, sans-serif;
+  color: #fff6df;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   display: flex;
   flex-direction: column;
 }
+
 .video,
 .shade {
   position: absolute;
@@ -20,232 +21,254 @@
   height: 100%;
   pointer-events: none;
 }
+
 .video {
   object-fit: cover;
   object-position: center 55%;
   z-index: -3;
 }
+
 .shade {
   z-index: -2;
   background: linear-gradient(
     180deg,
-    rgba(7, 24, 27, 0.39) 0%,
-    rgba(8, 27, 31, 0.3) 42%,
-    rgba(7, 24, 27, 0.02) 70%,
-    rgba(7, 24, 27, 0.57) 100%
+    rgba(7, 24, 27, 0.42) 0%,
+    rgba(8, 27, 31, 0.28) 42%,
+    rgba(7, 24, 27, 0.04) 70%,
+    rgba(7, 24, 27, 0.62) 100%
   );
 }
+
 .header {
   display: flex;
   align-items: center;
-  gap: 48px;
-  padding: 25px 4.5%;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 5%;
   flex-shrink: 0;
+  z-index: 10;
 }
+
 .brand {
-  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   text-decoration: none;
-  font-size: 27px;
-  font-weight: 600;
-  letter-spacing: -1.4px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
+
+.brand:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.brandLogo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: contain;
+  flex-shrink: 0;
+  border: 1.5px solid #bda275;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  display: block;
+}
+
+.brandText {
+  font-family: Georgia, "Instrument Serif", serif;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #fff6df;
+  line-height: 1;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
 .brandDot {
   color: #d2e4bc;
 }
-.nav a {
+
+.nav {
+  display: flex;
+  align-items: center;
+}
+
+.navLink {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff6df;
+  background: rgba(255, 246, 223, 0.12);
+  border: 1px solid rgba(255, 246, 223, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 24px;
+  padding: 8px 16px;
   text-decoration: none;
-  font-size: 12px;
-  font-weight: 400;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
+
+.navLink:hover {
+  background: rgba(255, 246, 223, 0.22);
+  border-color: rgba(255, 246, 223, 0.55);
+  transform: translateY(-1px);
+}
+
+.navIcon {
+  color: #d2e4bc;
+  transition: transform 0.18s ease;
+}
+
+.navLink:hover .navIcon {
+  transform: translate(1px, -1px);
+}
+
 .walletArea {
-  margin-left: auto;
+  display: flex;
+  align-items: center;
 }
+
 .wallet {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 9px;
-  min-height: 42px;
-  padding: 11px 20px;
-  background: #fff;
+  min-height: 40px;
+  padding: 10px 20px;
+  background: #fff6df;
   color: #1c2924;
   border: 1px solid transparent;
   border-radius: 30px;
-  font:
-    500 12px Inter,
-    sans-serif;
-  transition: background 0.2s;
+  font: 500 13px Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
 }
-.wallet:disabled {
-  opacity: 0.75;
-}
-.wallet:hover:not(:disabled),
-.primary:hover {
+
+.wallet:hover:not(:disabled) {
   background: #eaf0e3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
+
+.wallet:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .content {
-  text-align: center;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: clamp(8px, 1.2vh, 16px) 22px 20px;
-  transform: translateY(-24px);
+  justify-content: center;
+  text-align: center;
+  padding: clamp(16px, 3vh, 32px) 24px 48px;
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+  transform: translateY(-16px);
 }
+
+.eyebrow {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #d4c5a5;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+  margin-bottom: 18px;
+}
+
 .content h1 {
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(40px, 4.55vw, 70px);
+  font-family: Georgia, "Instrument Serif", "Times New Roman", serif;
+  font-size: clamp(42px, 5.5vw, 76px);
   font-weight: 400;
-  line-height: 0.98;
-  letter-spacing: -1.2px;
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+  color: #fff6df;
   margin: 0;
-  text-shadow: 0 2px 18px #09211a52;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.55), 0 1px 6px rgba(0, 0, 0, 0.4);
+  text-wrap: balance;
 }
+
 .content h1 em {
+  font-style: italic;
   font-weight: 400;
+  color: #d2e4bc;
 }
+
 .description {
-  font-size: 12px;
-  font-weight: 300;
-  line-height: 1.7;
-  margin: 16px 0 18px;
-  color: #fff;
-  text-shadow: 0 1px 8px #142a33aa;
+  font-size: clamp(15px, 1.4vw, 18px);
+  font-weight: 400;
+  line-height: 1.65;
+  margin: 20px 0 0;
+  color: #ebe4d5;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
+  max-width: 540px;
+  text-wrap: balance;
 }
-.primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 24px;
-  border-radius: 30px;
-  padding: 14px 24px;
-  background: #fff;
-  color: #1c2924;
-  text-decoration: none;
-  font-size: 12px;
-  font-weight: 500;
-  transition: background 0.2s;
-}
-.primary svg {
-  transition: transform 0.2s;
-}
-.primary:hover svg {
-  transform: translateX(3px);
-}
-.footer {
-  margin-top: auto;
-  padding: 20px 4.5% 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  font-size: 9px;
-  letter-spacing: 1.5px;
-}
-.footerRight {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-}
-.demoLabel {
-  font-size: 10px;
-  letter-spacing: 0.1px;
-  color: #ffffffbf;
-}
-.videoControl {
-  display: grid;
-  place-items: center;
-  border: 1px solid #ffffff66;
-  width: 33px;
-  height: 33px;
-  border-radius: 50%;
-  background: #16352c26;
-  flex-shrink: 0;
-}
-.videoControl:hover {
-  background: #ffffff26;
-}
+
 .hero a:focus-visible,
 .hero button:focus-visible {
-  outline: 2px solid white;
-  outline-offset: 5px;
+  outline: 2px solid #d2e4bc;
+  outline-offset: 3px;
 }
-@media (min-width: 1600px) {
-  .content {
-    padding-top: 2vh;
-  }
-}
-@media (max-width: 700px) {
+
+@media (max-width: 720px) {
   .header {
-    padding: 20px 22px;
+    padding: 18px 20px;
+    gap: 12px;
   }
-  .brand {
-    font-size: 25px;
+
+  .brandLogo {
+    width: 34px;
+    height: 34px;
   }
-  .nav {
-    display: none;
+
+  .brandText {
+    font-size: 22px;
   }
-  .wallet {
-    min-height: 40px;
-    padding: 10px 15px;
-    font-size: 11px;
-  }
-  .content {
-    padding-top: 22px;
-    transform: translateY(-14px);
-  }
-  .content h1 {
-    font-size: clamp(34px, 7.15vw, 47px);
-    letter-spacing: -0.6px;
-    line-height: 1.02;
-  }
-  .description {
+
+  .navLink {
+    padding: 7px 12px;
     font-size: 12px;
-    margin: 14px 0 18px;
   }
-  .video {
-    object-position: 50% center;
+
+  .wallet {
+    padding: 7px 14px;
+    font-size: 12px;
+    min-height: 36px;
   }
-  .shade {
-    background: linear-gradient(
-      180deg,
-      #091d285e,
-      #091d2852 40%,
-      #091d2808 70%,
-      #091d28a8
-    );
-  }
-  .footer {
-    padding: 18px 22px;
-    font-size: 8px;
-    line-height: 1.8;
-    letter-spacing: 1px;
-  }
-  .demoLabel {
-    display: none;
-  }
-}
-@media (max-height: 600px) and (min-width: 701px) {
-  .header {
-    padding-top: 14px;
-    padding-bottom: 14px;
-  }
+
   .content {
-    padding-top: 0;
+    padding: 16px 20px 36px;
+    transform: translateY(-8px);
   }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+  }
+
   .content h1 {
-    font-size: 46px;
+    font-size: clamp(34px, 8.5vw, 48px);
+    line-height: 1.08;
   }
+
   .description {
-    margin: 10px 0 12px;
-  }
-  .footer {
-    padding-bottom: 12px;
+    font-size: 14px;
+    margin-top: 16px;
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   .hero *,
   .hero *::before,

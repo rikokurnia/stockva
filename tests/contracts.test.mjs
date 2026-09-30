@@ -33,4 +33,11 @@ test("BSC Testnet contract configuration and ABIs are valid", () => {
   assert.ok(vaultFunctions.includes("buyPosition"), "Vault must have buyPosition");
   assert.ok(vaultFunctions.includes("sellPosition"), "Vault must have sellPosition");
   assert.ok(vaultFunctions.includes("updateTier"), "Vault must have updateTier");
+  assert.ok(vaultFunctions.includes("getUserPositionIds"), "Vault must have getUserPositionIds");
+
+  // getUserPositions must match StockCityVault.sol: single Position[] return
+  const getUserPositions = VAULT_ABI.find((f) => f.type === "function" && f.name === "getUserPositions");
+  assert.ok(getUserPositions, "Vault must have getUserPositions");
+  assert.equal(getUserPositions.outputs.length, 1);
+  assert.equal(getUserPositions.outputs[0].type, "tuple[]");
 });

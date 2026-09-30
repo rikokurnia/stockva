@@ -40,8 +40,12 @@ import {
   MOCK_USD_ADDRESS,
   VAULT_ADDRESS,
   bscAddressLink,
+  bscTxLink,
   getLiveVaultStats,
+  claimFaucetOnchain,
+  getOnchainPositions,
   type OnChainVaultStats,
+  type OnchainPosition,
 } from "../lib/contracts";
 import StockLogo from "./stock-logo";
 import TradingChart from "./trading-chart";
@@ -60,6 +64,7 @@ type Props = {
   onSell: (ticker: string, fraction: number) => string;
   onFocus: (building: Building) => void;
   onScan: () => void;
+  walletAddress?: `0x${string}` | null;
   onClaimFaucet?: () => void;
 };
 const stamp = (value?: string | null) =>
@@ -85,6 +90,7 @@ export default function CivicPanel({
   onSell,
   onFocus,
   onScan,
+  walletAddress,
   onClaimFaucet,
 }: Props) {
   const [ticker, setTicker] = useState<string | null>(initialTicker);
@@ -95,6 +101,10 @@ export default function CivicPanel({
   const [expanded, setExpanded] = useState(false);
   const [vaultStats, setVaultStats] = useState<OnChainVaultStats | null>(null);
   const [faucetClaiming, setFaucetClaiming] = useState(false);
+  const [faucetTxHash, setFaucetTxHash] = useState<string | null>(null);
+  const [faucetError, setFaucetError] = useState<string | null>(null);
+  const [onchainPositions, setOnchainPositions] = useState<OnchainPosition[]>([]);
+  const [onchainLoading, setOnchainLoading] = useState(false);
   const [history, setHistory] = useState<HistoryFeed | null>(null);
   const [passport, setPassport] = useState<Passport | null>(null);
   const [network, setNetwork] = useState(0);
@@ -107,6 +117,45 @@ export default function CivicPanel({
   const passportTicker = useRef<string | null>(null);
   const deployment = passport?.deployments[network];
   const quote = ticker ? feed.quotes[ticker] : undefined;
+
+  useEffect(() => {
+    if (!walletAddress) {
+      setOnchainPositions([]);
+      return;
+    }
+    let active = true;
+    setOnchainLoading(true);
+    getOnchainPositions(walletAddress)
+      .then((positions) => {
+        if (active) setOnchainPositions(positions);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setOnchainLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [walletAddress]);
+
+  const handleClaimFaucet = async () => {
+    if (!walletAddress) {
+      if (onClaimFaucet) onClaimFaucet();
+      return;
+    }
+    try {
+      setFaucetClaiming(true);
+      setFaucetError(null);
+      const hash = await claimFaucetOnchain(walletAddress);
+      setFaucetTxHash(hash);
+      if (onClaimFaucet) onClaimFaucet();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to claim faucet";
+      setFaucetError(msg);
+    } finally {
+      setFaucetClaiming(false);
+    }
+  };
   useEffect(() => {
     setTicker(initialTicker);
     setMessage("");
@@ -377,23 +426,113 @@ export default function CivicPanel({
                 </div>
               </div>
 
-              {onClaimFaucet && (
-                <div className={styles.faucetActionRow}>
-                  <button
-                    type="button"
-                    className={styles.faucetBtn}
-                    onClick={() => {
-                      setFaucetClaiming(true);
-                      onClaimFaucet();
-                      setTimeout(() => setFaucetClaiming(false), 1000);
-                    }}
+              <div className={styles.faucetActionRow}>
+                <button
+                  type="button"
+                  className={styles.faucetBtn}
+                  disabled={faucetClaiming}
+                  onClick={handleClaimFaucet}
+                >
+                  <Coins size={14} />
+                  <span>
+                    {faucetClaiming
+                      ? "Confirming on BSC Testnet…"
+                      : walletAddress
+                        ? "Claim 10,000 $mUSD (On-chain Faucet)"
+                        : "Claim 10,000 $mUSD (Connect Wallet)"}
+                  </span>
+                </button>
+              </div>
+              {faucetTxHash && (
+                <p className={styles.caption} style={{ color: "#4caf50", marginTop: 6 }}>
+                  Claimed!{" "}
+                  <a
+                    href={bscTxLink(faucetTxHash)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={styles.contractLink}
                   >
-                    <Coins size={14} />
-                    <span>{faucetClaiming ? "Claimed +10,000 $mUSD!" : "Claim 10,000 $mUSD (Faucet)"}</span>
-                  </button>
-                </div>
+                    View on BscScan <ExternalLink size={11} />
+                  </a>
+                </p>
+              )}
+              {faucetError && (
+                <p role="alert" className={styles.caption} style={{ color: "#f87171", marginTop: 6 }}>
+                  {faucetError}
+                </p>
               )}
             </div>
+            <SectionTitle
+              title="On-chain buildings"
+              detail={
+                walletAddress
+                  ? onchainLoading
+                    ? "Syncing…"
+                    : `${onchainPositions.filter((p) => p.active).length} active`
+                  : "Connect wallet"
+              }
+            />
+            {!walletAddress ? (
+              <p className={styles.empty}>
+                Connect your wallet to see vault positions recorded on BSC
+                testnet.
+              </p>
+            ) : onchainLoading ? (
+              <p className={styles.empty}>Reading vault positions…</p>
+            ) : !onchainPositions.length ? (
+              <p className={styles.empty}>
+                No on-chain positions yet for this wallet. Claim the faucet,
+                then buy &amp; place a building.
+              </p>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {onchainPositions.map((p) => (
+                  <div
+                    key={p.id}
+                    style={{
+                      background: "rgba(0,0,0,0.2)",
+                      padding: "8px 10px",
+                      borderRadius: 6,
+                      fontSize: 11,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <strong style={{ color: "#edf2f3" }}>
+                        {p.ticker} · Tier {p.buildingTier}
+                      </strong>
+                      <span
+                        style={{
+                          color: p.active ? "#4caf50" : "#9e9e9e",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {p.active ? "ACTIVE" : "CLOSED"}
+                      </span>
+                    </div>
+                    <div style={{ color: "var(--civic-muted)", marginTop: 2 }}>
+                      {(Number(p.quantity) / 1e18).toFixed(4)} units @ $
+                      {(Number(p.entryPrice) / 1e18).toFixed(2)}
+                    </div>
+                    <a
+                      href={bscAddressLink(VAULT_ADDRESS)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={styles.contractLink}
+                      title={`Position ${p.id} on BscScan`}
+                    >
+                      <span>Vault tx history</span>
+                      <ExternalLink size={11} />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
             <SectionTitle
               title="Sector allocation"
               detail={`${sectors.length} sectors`}
@@ -763,29 +902,32 @@ export default function CivicPanel({
                             ? `≈ ${(input / priceOf(selected.ticker, prices)).toFixed(4)} units · ${money(city.cash)} available`
                             : `Enter $1–${money(city.cash)} in available demo funds.`}
                         </span>
-                        {onClaimFaucet && (
-                          <button
-                            type="button"
-                            onClick={onClaimFaucet}
-                            style={{
-                              background: "rgba(240, 185, 11, 0.15)",
-                              border: "1px solid rgba(240, 185, 11, 0.4)",
-                              color: "#f0b90b",
-                              borderRadius: "4px",
-                              fontSize: "10px",
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              padding: "2px 7px",
-                            }}
-                            title="Claim 10,000 $mUSD from BSC Testnet Faucet"
-                          >
-                            <Coins size={11} />
-                            +10k Faucet
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={handleClaimFaucet}
+                          disabled={faucetClaiming}
+                          style={{
+                            background: "rgba(240, 185, 11, 0.15)",
+                            border: "1px solid rgba(240, 185, 11, 0.4)",
+                            color: "#f0b90b",
+                            borderRadius: "4px",
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            padding: "2px 7px",
+                          }}
+                          title={
+                            walletAddress
+                              ? "Claim 10,000 $mUSD from BSC Testnet Faucet"
+                              : "Connect wallet to claim 10,000 $mUSD on BSC Testnet"
+                          }
+                        >
+                          <Coins size={11} />
+                          {faucetClaiming ? "Claiming…" : "+10k Faucet"}
+                        </button>
                       </div>
                       {catalogue.find((d) => d.ticker === selected.ticker) ? (
                         <>

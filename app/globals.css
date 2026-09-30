@@ -489,6 +489,145 @@ input {
 .header-resources .market-button > svg {
   color: #b4c8d3;
 }
+
+.onchain-wallet-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-left: 1px solid #4b6270;
+  padding-left: 12px;
+  margin-left: 4px;
+}
+
+.onchain-wallet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 33px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.onchain-wallet-btn.connect-btn {
+  background: linear-gradient(135deg, rgba(240, 185, 11, 0.15), rgba(240, 185, 11, 0.25));
+  border: 1px solid rgba(240, 185, 11, 0.5);
+  color: #f0b90b;
+}
+
+.onchain-wallet-btn.connect-btn:hover:not(:disabled) {
+  background: #f0b90b;
+  color: #0b0e11;
+  box-shadow: 0 0 12px rgba(240, 185, 11, 0.4);
+}
+
+.onchain-wallet-btn.connect-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.onchain-wallet-btn.connected-btn {
+  background: rgba(10, 24, 34, 0.85);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #edf2f3;
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+}
+
+.onchain-wallet-btn.connected-btn:hover {
+  border-color: #22c55e;
+  background: rgba(14, 34, 48, 0.95);
+}
+
+.onchain-wallet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+.onchain-wallet-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 100;
+  min-width: 180px;
+  background: #101c24;
+  border: 1px solid #2e4453;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wallet-menu-header {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+}
+
+.wallet-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #f0b90b;
+  display: block;
+}
+
+.wallet-full-addr {
+  font-size: 11px;
+  font-family: var(--mono, monospace);
+  color: #cbd5e1;
+}
+
+.wallet-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #9cb1bf;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.wallet-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.wallet-menu-item.danger {
+  color: #f87171;
+}
+
+.wallet-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.onchain-wallet-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+}
 .mode-toggle-group {
   display: flex;
   align-items: center;

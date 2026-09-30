@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
-import { ArrowRight, ArrowUpRight, Pause, Play, Wallet } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { ArrowUpRight, Wallet } from "lucide-react";
 import styles from "./landing-hero.module.css";
 
 const WalletConnect = dynamic(() => import("./wallet-connect"), {
   ssr: false,
   loading: () => (
-    <button className={styles.wallet} disabled>
+    <button className={styles.wallet} disabled aria-label="Loading wallet">
       <Wallet size={15} /> Connect wallet
     </button>
   ),
@@ -17,24 +17,20 @@ const WalletConnect = dynamic(() => import("./wallet-connect"), {
 
 export default function LandingHero({ appId }: { appId: string }) {
   const video = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const sync = () => {
-      if (preference.matches) video.current?.pause();
-      else void video.current?.play().catch(() => setPlaying(false));
+      if (preference.matches) {
+        video.current?.pause();
+      } else {
+        void video.current?.play().catch(() => {});
+      }
     };
     sync();
     preference.addEventListener("change", sync);
     return () => preference.removeEventListener("change", sync);
   }, []);
-
-  function toggleVideo() {
-    if (video.current?.paused)
-      void video.current.play().catch(() => setPlaying(false));
-    else video.current?.pause();
-  }
 
   return (
     <main className={styles.hero}>
@@ -46,21 +42,32 @@ export default function LandingHero({ appId }: { appId: string }) {
         loop
         muted
         playsInline
+        autoPlay
         preload="metadata"
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
         aria-hidden="true"
       />
       <div className={styles.shade} />
+
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="Stockva home">
-          stockva<span className={styles.brandDot}>.</span>
+          <img
+            src="/assets/ai_logo.png"
+            alt="Stockva logo"
+            className={styles.brandLogo}
+            width={40}
+            height={40}
+          />
+          <span className={styles.brandText}>
+            Stockva<span className={styles.brandDot}>.</span>
+          </span>
         </Link>
+
         <nav className={styles.nav} aria-label="Main navigation">
-          <Link href="/city">
-            Explore the city <ArrowUpRight size={13} />
+          <Link href="/city" className={styles.navLink}>
+            Explore the city <ArrowUpRight size={14} className={styles.navIcon} />
           </Link>
         </nav>
+
         <div className={styles.walletArea}>
           {appId ? (
             <WalletConnect appId={appId} />
@@ -77,34 +84,17 @@ export default function LandingHero({ appId }: { appId: string }) {
       </header>
 
       <section className={styles.content} aria-labelledby="hero-title">
+        <span className={styles.eyebrow}>City-Building Portfolio Sandbox</span>
         <h1 id="hero-title">
           BUILD THE CITY
           <br />
           <em>behind</em> YOUR STOCKS.
         </h1>
         <p className={styles.description}>
-          Build roads. Place the companies you follow.
+          Turn real-world equities into a living, breathing metropolis.
+          Lay roads, place company headquarters, and watch your island thrive.
         </p>
-        <Link href="/city" className={styles.primary}>
-          Enter Stockva <ArrowRight size={17} />
-        </Link>
       </section>
-
-      <footer className={styles.footer}>
-        <span>STOCKVA · CITY-BUILDING PORTFOLIO DEMO</span>
-        <div className={styles.footerRight}>
-          <span className={styles.demoLabel}>Simulated holdings</span>
-          <button
-            className={styles.videoControl}
-            onClick={toggleVideo}
-            aria-label={
-              playing ? "Pause background video" : "Play background video"
-            }
-          >
-            {playing ? <Pause size={14} /> : <Play size={14} />}
-          </button>
-        </div>
-      </footer>
     </main>
   );
 }

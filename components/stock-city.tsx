@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import CityMap from "./city-map";
 import CivicPanel from "./civic-panel";
+import OnchainWallet from "./onchain-wallet";
 import { fallbackFeed, type MarketFeed } from "../lib/market";
 import { VAULT_ADDRESS, bscAddressLink } from "../lib/contracts";
 import CityAdvisor from "./city-advisor";
@@ -117,6 +118,7 @@ export default function StockCity() {
   const [feed, setFeed] = useState<MarketFeed>(fallbackFeed);
   const [feedLoading, setFeedLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [wallet, setWallet] = useState<`0x${string}` | null>(null);
   const [assetTicker, setAssetTicker] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState(false);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
@@ -943,6 +945,7 @@ export default function StockCity() {
             <GameArt index={5} />
             <span>Market</span>
           </button>
+          <OnchainWallet address={wallet} onChange={setWallet} />
         </div>
       </header>
       {tool !== "inspect" && !category && (
@@ -1577,6 +1580,7 @@ export default function StockCity() {
           initialTicker={assetTicker}
           onClose={() => setPanel(null)}
           onRetry={() => setRefreshKey((n) => n + 1)}
+          walletAddress={wallet}
           onBuy={(kind, investment) => {
             setAmount(investment);
             chooseBuilding(kind, true);

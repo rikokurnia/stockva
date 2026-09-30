@@ -37,7 +37,8 @@ export const VAULT_ABI = parseAbi([
   "function totalPositionsCount() view returns (uint256)",
   "function totalVolumeUSD() view returns (uint256)",
   "function positions(bytes32 id) view returns (bytes32 id, address owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint256 openedAt, uint8 buildingTier, bool active)",
-  "function getUserPositions(address user) view returns (bytes32[] ids, Position[] memory pos)",
+  "function getUserPositionIds(address user) view returns (bytes32[])",
+  "function getUserPositions(address user) view returns (Position[])",
   "function buyPosition(string ticker, uint256 usdAmount, uint256 entryPrice, uint8 initialTier) returns (bytes32 positionId)",
   "function updateTier(bytes32 positionId, uint8 newTier) external",
   "function sellPosition(bytes32 positionId, uint256 currentPrice, uint256 fractionBps) returns (uint256 payout)",
@@ -45,6 +46,113 @@ export const VAULT_ABI = parseAbi([
   "event PositionTierUpdated(bytes32 indexed id, address indexed owner, uint8 oldTier, uint8 newTier)",
   "event PositionSold(bytes32 indexed id, address indexed owner, string ticker, uint256 soldQuantity, uint256 payoutUSD, int256 pnlUSD, uint256 fractionBps, bool fullyClosed)"
 ]);
+
+export type OnchainPosition = {
+  id: `0x${string}`;
+  owner: `0x${string}`;
+  ticker: string;
+  usdCost: bigint;
+  entryPrice: bigint;
+  quantity: bigint;
+  openedAt: bigint;
+  buildingTier: number;
+  active: boolean;
+};
+
+declare global {
+  interface Window {
+    ethereum?: {
+      request: (args: { method: string; params?: unknown }) => Promise<unknown>;
+      on?: (event: string, handler: (...args: unknown[]) => void) => void;
+      removeListener?: (
+        event: string,
+        handler: (...args: unknown[]) => void,
+      ) => void;
+    };
+  }
+}
+
+export function hasInjectedWallet(): boolean {
+  return typeof window !== "undefined" && !!window.ethereum?.request;
+}
+
+const BSC_TESTNET_CHAIN_HEX = "0x61";
+
+export async function ensureBscTestnet(): Promise<void> {
+  if (!hasInjectedWallet()) throw new Error("No wallet found");
+  try {
+    await window.ethereum!.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: BSC_TESTNET_CHAIN_HEX }],
+    });
+  } catch (err: unknown) {
+    const code =
+      typeof err === "object" && err !== null && "code" in err
+        ? (err as { code: unknown }).code
+        : undefined;
+    if (code === 4902) {
+      await window.ethereum!.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: BSC_TESTNET_CHAIN_HEX,
+            chainName: "BNB Smart Chain Testnet",
+            nativeCurrency: { name: "tBNB", symbol: "tBNB", decimals: 18 },
+            rpcUrls: [BSC_TESTNET_RPC],
+            blockExplorerUrls: [BSC_EXPLORER_URL],
+          },
+        ],
+      });
+    } else {
+      throw err;
+    }
+  }
+}
+
+export async function connectInjectedWallet(): Promise<`0x${string}`> {
+  if (!hasInjectedWallet())
+    throw new Error("MetaMask not found. Install it to connect.");
+  await ensureBscTestnet();
+  const accounts = (await window.ethereum!.request({
+    method: "eth_requestAccounts",
+  })) as string[];
+  if (!accounts?.length) throw new Error("No accounts returned");
+  return accounts[0] as `0x${string}`;
+}
+
+/** Send a real on-chain claimFaucet tx. Caller must have connected + switched chain. */
+export async function claimFaucetOnchain(
+  account: `0x${string}`,
+): Promise<`0x${string}`> {
+  const { createWalletClient, custom } = await import("viem");
+  const { bscTestnet } = await import("viem/chains");
+  await ensureBscTestnet();
+  const walletClient = createWalletClient({
+    account,
+    chain: bscTestnet,
+    transport: custom(window.ethereum!),
+  });
+  return walletClient.writeContract({
+    address: MOCK_USD_ADDRESS,
+    abi: MOCK_USD_ABI,
+    functionName: "claimFaucet",
+    account,
+    chain: bscTestnet,
+  });
+}
+
+/** Read live on-chain vault positions for a wallet. */
+export async function getOnchainPositions(
+  user: `0x${string}`,
+): Promise<OnchainPosition[]> {
+  const client = getBscClient();
+  return (await client.readContract({
+    address: VAULT_ADDRESS,
+    abi: VAULT_ABI,
+    functionName: "getUserPositions",
+    args: [user],
+  })) as unknown as OnchainPosition[];
+}
 
 /** Public read-only client for BSC Testnet queries */
 export function getBscClient() {
