@@ -3762,3 +3762,26 @@ input {
 
 /* Civic services share the island's steel and construction-yellow palette. */
 .companies-locked{display:flex;align-items:center;gap:18px;padding:24px;color:#e7eef2;min-height:160px;width:100%}.companies-locked>svg{color:#f4cd60}.companies-locked strong{font-size:16px}.companies-locked p{color:#b6c6ce;font-size:12px;margin:8px 0}.companies-locked button{display:flex;gap:8px;align-items:center;margin-left:auto;border:1px solid #65727a;background:#283f4c;color:#f4cd60;padding:12px;border-radius:6px}.scan-toolbar{position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:18px;background:#142b35;color:#f4cd60;border:1px solid #48626a;border-radius:7px;padding:8px 12px;font-size:10px;white-space:nowrap}.scan-toolbar button{display:flex;align-items:center;gap:7px;padding:8px;background:transparent;color:#e7eef2;border:0}.scan-card{position:fixed;z-index:65;right:24px;top:145px;width:270px;padding:20px;background:#142b35;border:1px solid #668b8c;border-radius:10px;box-shadow:0 20px 50px #07131d55;color:#e7eef2}.scan-card small{font-size:9px;letter-spacing:1.5px;color:#f4cd60}.scan-card h3{font-size:24px;margin:10px 0 5px}.scan-card p{font-size:12px;color:#b6c6ce}.scan-card dl{font-size:11px;line-height:1.7}.scan-card dt{color:#b6c6ce;margin-top:10px}.scan-card dd{margin:0}.scan-card button{display:flex;justify-content:space-between;width:100%;padding:12px;background:#f4cd60;color:#142b35;border:0;border-radius:5px;font-size:12px}.scan-beam{pointer-events:none;position:absolute;bottom:24px;left:20%;width:60%;height:100%;background:linear-gradient(0deg,#81efcf44,transparent);border-bottom:2px solid #adffe2;opacity:.45}.city-building:hover .scan-beam,.city-building:focus .scan-beam{opacity:1;box-shadow:0 8px 18px #80ffd955}@media(prefers-reduced-motion:no-preference){.city-building:hover .scan-beam{animation:scan-sweep 1.8s ease-in-out infinite alternate}@keyframes scan-sweep{from{transform:scaleY(.4)}to{transform:scaleY(1)}}}@media(max-width:640px){.scan-card{top:auto;bottom:95px;right:12px;width:245px}.scan-toolbar{top:70px;font-size:8px;gap:4px}.companies-locked{flex-wrap:wrap;padding:16px;gap:10px}.companies-locked button{margin-left:0}}
+
+.faucet-pill-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(240, 185, 11, 0.15);
+  color: #f0b90b;
+  border: 1px solid rgba(240, 185, 11, 0.45);
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.faucet-pill-button:hover {
+  background: #f0b90b;
+  color: #0b0e11;
+  transform: translateY(-1px);
+}
+

@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Building2,
   ChevronRight,
+  Coins,
   Crosshair,
   ExternalLink,
   Landmark,
@@ -35,6 +36,13 @@ import {
   type PricePoint,
   type Passport,
 } from "../lib/market";
+import {
+  MOCK_USD_ADDRESS,
+  VAULT_ADDRESS,
+  bscAddressLink,
+  getLiveVaultStats,
+  type OnChainVaultStats,
+} from "../lib/contracts";
 import StockLogo from "./stock-logo";
 import TradingChart from "./trading-chart";
 import styles from "./civic-panel.module.css";
@@ -52,6 +60,7 @@ type Props = {
   onSell: (ticker: string, fraction: number) => string;
   onFocus: (building: Building) => void;
   onScan: () => void;
+  onClaimFaucet?: () => void;
 };
 const stamp = (value?: string | null) =>
   value
@@ -76,6 +85,7 @@ export default function CivicPanel({
   onSell,
   onFocus,
   onScan,
+  onClaimFaucet,
 }: Props) {
   const [ticker, setTicker] = useState<string | null>(initialTicker);
   const [search, setSearch] = useState("");
@@ -83,6 +93,8 @@ export default function CivicPanel({
   const [sale, setSale] = useState(25);
   const [message, setMessage] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [vaultStats, setVaultStats] = useState<OnChainVaultStats | null>(null);
+  const [faucetClaiming, setFaucetClaiming] = useState(false);
   const [history, setHistory] = useState<HistoryFeed | null>(null);
   const [passport, setPassport] = useState<Passport | null>(null);
   const [network, setNetwork] = useState(0);
@@ -109,6 +121,11 @@ export default function CivicPanel({
   useEffect(() => {
     const timer = setInterval(() => setClock(marketClock()), 30000);
     return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    getLiveVaultStats().then((stats) => {
+      if (stats) setVaultStats(stats);
+    });
   }, []);
   useEffect(() => {
     if (!ticker || mode === "portfolio") return;
@@ -303,6 +320,79 @@ export default function CivicPanel({
                 <br />
                 {healthOf(city.buildings, prices).detail}
               </span>
+            </div>
+            <div className={styles.bnbVaultCard}>
+              <div className={styles.bnbVaultHeader}>
+                <span className={styles.bnbBadge}>
+                  <ShieldCheck size={13} />
+                  BNB Chain Testnet (97)
+                </span>
+                <span style={{ fontSize: "11px", color: "#f0b90b", fontWeight: 600 }}>
+                  {vaultStats?.verified ? "Contracts Verified" : "Syncing RPC..."}
+                </span>
+              </div>
+
+              <div className={styles.contractInfoRow}>
+                <div className={styles.contractLabel}>
+                  <strong>MockUSD Faucet Token (mUSD)</strong>
+                  <small>{MOCK_USD_ADDRESS.slice(0, 10)}...{MOCK_USD_ADDRESS.slice(-8)}</small>
+                </div>
+                <a
+                  href={bscAddressLink(MOCK_USD_ADDRESS)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.contractLink}
+                  title="View MockUSD on BscScan"
+                >
+                  <span>BscScan</span>
+                  <ExternalLink size={11} />
+                </a>
+              </div>
+
+              <div className={styles.contractInfoRow}>
+                <div className={styles.contractLabel}>
+                  <strong>StockCityVault Contract</strong>
+                  <small>{VAULT_ADDRESS.slice(0, 10)}...{VAULT_ADDRESS.slice(-8)}</small>
+                </div>
+                <a
+                  href={bscAddressLink(VAULT_ADDRESS)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.contractLink}
+                  title="View StockCityVault on BscScan"
+                >
+                  <span>BscScan</span>
+                  <ExternalLink size={11} />
+                </a>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "11px", marginTop: "2px" }}>
+                <div style={{ background: "rgba(0,0,0,0.2)", padding: "6px 8px", borderRadius: "4px" }}>
+                  <span style={{ color: "var(--civic-muted)", display: "block", fontSize: "10px" }}>VAULT RESERVES</span>
+                  <strong style={{ color: "#edf2f3" }}>${vaultStats?.vaultReserves.toLocaleString() ?? "200,000"} mUSD</strong>
+                </div>
+                <div style={{ background: "rgba(0,0,0,0.2)", padding: "6px 8px", borderRadius: "4px" }}>
+                  <span style={{ color: "var(--civic-muted)", display: "block", fontSize: "10px" }}>ON-CHAIN POSITIONS</span>
+                  <strong style={{ color: "#edf2f3" }}>{vaultStats?.totalPositions ?? 0} Recorded</strong>
+                </div>
+              </div>
+
+              {onClaimFaucet && (
+                <div className={styles.faucetActionRow}>
+                  <button
+                    type="button"
+                    className={styles.faucetBtn}
+                    onClick={() => {
+                      setFaucetClaiming(true);
+                      onClaimFaucet();
+                      setTimeout(() => setFaucetClaiming(false), 1000);
+                    }}
+                  >
+                    <Coins size={14} />
+                    <span>{faucetClaiming ? "Claimed +10,000 $mUSD!" : "Claim 10,000 $mUSD (Faucet)"}</span>
+                  </button>
+                </div>
+              )}
             </div>
             <SectionTitle
               title="Sector allocation"
@@ -667,10 +757,35 @@ export default function CivicPanel({
                           aria-describedby="amount-hint"
                         />
                       </div>
-                      <div id="amount-hint" className={styles.caption}>
-                        {validAmount
-                          ? `≈ ${(input / priceOf(selected.ticker, prices)).toFixed(4)} units · ${money(city.cash)} available`
-                          : `Enter $1–${money(city.cash)} in available demo funds.`}
+                      <div id="amount-hint" className={styles.caption} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>
+                          {validAmount
+                            ? `≈ ${(input / priceOf(selected.ticker, prices)).toFixed(4)} units · ${money(city.cash)} available`
+                            : `Enter $1–${money(city.cash)} in available demo funds.`}
+                        </span>
+                        {onClaimFaucet && (
+                          <button
+                            type="button"
+                            onClick={onClaimFaucet}
+                            style={{
+                              background: "rgba(240, 185, 11, 0.15)",
+                              border: "1px solid rgba(240, 185, 11, 0.4)",
+                              color: "#f0b90b",
+                              borderRadius: "4px",
+                              fontSize: "10px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              padding: "2px 7px",
+                            }}
+                            title="Claim 10,000 $mUSD from BSC Testnet Faucet"
+                          >
+                            <Coins size={11} />
+                            +10k Faucet
+                          </button>
+                        )}
                       </div>
                       {catalogue.find((d) => d.ticker === selected.ticker) ? (
                         <>

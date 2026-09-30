@@ -8,6 +8,8 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Coins,
+  ExternalLink,
   Grid2X2,
   HelpCircle,
   Landmark,
@@ -21,6 +23,7 @@ import {
   Route,
   Search,
   Settings,
+  ShieldCheck,
   SlidersHorizontal,
   Trash2,
   Undo2,
@@ -29,6 +32,7 @@ import {
 import CityMap from "./city-map";
 import CivicPanel from "./civic-panel";
 import { fallbackFeed, type MarketFeed } from "../lib/market";
+import { VAULT_ADDRESS, bscAddressLink } from "../lib/contracts";
 import CityAdvisor from "./city-advisor";
 import StockLogo from "./stock-logo";
 import BuildingSimulation from "./building-simulation";
@@ -851,6 +855,21 @@ export default function StockCity() {
             </span>
           </button>
           <button
+            className="faucet-pill-button"
+            onClick={() => {
+              commit({
+                ...city,
+                cash: city.cash + 10_000,
+              });
+              notify("Claimed 10,000 $mUSD from BSC Testnet Faucet (0xCA2A...4f21)!");
+            }}
+            title="Claim 10,000 $mUSD from BSC Testnet Faucet"
+            aria-label="Claim demo faucet"
+          >
+            <Coins size={13} />
+            <span>Faucet +10k</span>
+          </button>
+          <button
             className="market-button"
             onClick={() => openPanel("market")}
             title="Stock market"
@@ -1361,9 +1380,29 @@ export default function StockCity() {
                         {feed.quotes[definition.ticker!]?.status}
                       </small>
                     </div>
-                    <span className="chain-link">
-                      Demo position · no on-chain transaction
-                    </span>
+                    <div className="chain-link" style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                      <a
+                        href={bscAddressLink(VAULT_ADDRESS)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          color: "#f0b90b",
+                          fontWeight: 600,
+                          fontSize: "11px",
+                          textDecoration: "none",
+                        }}
+                      >
+                        <ShieldCheck size={13} />
+                        <span>BNB Chain Vault: {VAULT_ADDRESS.slice(0, 6)}…{VAULT_ADDRESS.slice(-4)}</span>
+                        <ExternalLink size={11} />
+                      </a>
+                      <small style={{ color: "#8b9ea7", fontSize: "10px" }}>
+                        Tracked & liquidatable on BSC Testnet (Chain ID 97)
+                      </small>
+                    </div>
                   </>
                 );
               })()
@@ -1505,6 +1544,13 @@ export default function StockCity() {
           initialTicker={assetTicker}
           onClose={() => setPanel(null)}
           onRetry={() => setRefreshKey((n) => n + 1)}
+          onClaimFaucet={() => {
+            commit({
+              ...city,
+              cash: city.cash + 10_000,
+            });
+            notify("Claimed 10,000 $mUSD from BSC Testnet Faucet! Available funds updated.");
+          }}
           onBuy={(kind, investment) => {
             setAmount(investment);
             chooseBuilding(kind, true);
