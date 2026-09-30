@@ -33,7 +33,7 @@ export default function LandingHero({ appId }: { appId: string }) {
       if (preference.matches) {
         video.current?.pause();
       } else {
-        void video.current?.play().catch(() => {});
+        void video.current?.play().catch(() => { });
       }
     };
     sync();
@@ -86,7 +86,7 @@ export default function LandingHero({ appId }: { appId: string }) {
         <h1 id="hero-title">
           BUILD THE CITY
           <br />
-          <em>behind</em> YOUR STOCKS.
+          <em>behind</em> YOUR <em>tokenized</em> STOCKS.
         </h1>
       </section>
 

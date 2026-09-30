@@ -159,27 +159,27 @@ export default function CityAdvisor({ city, prices, walletAddress }: Props) {
   }
 
   return (
-    <aside className={styles.advisor} data-open={open} aria-label="City advisor" onKeyDown={(event) => {
+    <aside className={styles.advisor} data-open={open} aria-label="cokoo" onKeyDown={(event) => {
       event.stopPropagation();
       if (event.key === "Escape" && open) { setOpen(false); toggle.current?.focus(); }
     }}>
-      {open && <section id="city-advisor-content" className={styles.content} aria-label="Advisor conversation">
-        <header className={styles.heading}><div><span className={styles.eyebrow}>A LITTLE GUIDANCE</span><h2>What’s next, Mayor?</h2></div><span className={styles.demo}>Demo guide</span></header>
+      {open && <section id="city-advisor-content" className={styles.content} aria-label="cokoo conversation">
+        <header className={styles.heading}><div><span className={styles.eyebrow}>YOUR ISLAND BUDDY</span><h2>Hey, I'm cokoo!</h2></div></header>
         <div ref={log} className={styles.messages} role="log" aria-live="polite" aria-relevant="additions">
-          <p className={styles.welcome}>Let’s grow your island, one good decision at a time. Ask about your city or your portfolio.</p>
-          {messages.map((message, index) => <p key={index} className={message.role === "user" ? styles.user : styles.answer}><span>{message.role === "user" ? "You" : "City advisor"}</span>{message.text}</p>)}
-          {thinking && <p className={styles.answer}><span>City advisor</span>Thinking…</p>}
+          <p className={styles.welcome}>Let's grow your island together, one good decision at a time. Ask me about your city or your portfolio!</p>
+          {messages.map((message, index) => <p key={index} className={message.role === "user" ? styles.user : styles.answer}><span>{message.role === "user" ? "You" : "cokoo"}</span>{message.text}</p>)}
+          {thinking && <p className={styles.answer}><span>cokoo</span>Thinking…</p>}
         </div>
         <div className={styles.prompts} aria-label="Suggested questions">{["Review my city", "Portfolio allocation", "What to build next?"].map((prompt) => <button key={prompt} onClick={() => void send(prompt)} disabled={thinking}>{prompt}</button>)}</div>
         <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); void send(draft); }}>
-          <input ref={input} value={draft} maxLength={500} onChange={(event) => setDraft(event.target.value)} aria-label="Ask your city advisor" placeholder="Ask about your island…" autoComplete="off" />
+          <input ref={input} value={draft} maxLength={500} onChange={(event) => setDraft(event.target.value)} aria-label="Ask cokoo" placeholder="Ask cokoo anything…" autoComplete="off" />
           <button type="submit" disabled={!draft.trim() || thinking} aria-label="Send message">Send</button>
         </form>
         <p className={styles.note}>Live insights · Simulated assets</p>
       </section>}
       <button ref={toggle} className={styles.capsule} aria-expanded={open} aria-controls="city-advisor-content" onClick={() => setOpen((value) => !value)}>
         <img src="/assets/ai_logo.png" alt="" width="64" height="64" draggable={false} />
-        <span className={styles.brief}><span className={styles.title}><i />City Advisor<span>{open ? "Close" : "Ask me"}</span></span><span className={styles.summary}>{briefing}</span></span>
+        <span className={styles.brief}><span className={styles.title}><i />cokoo<span>{open ? "Close" : "Ask me"}</span></span><span className={styles.summary}>{briefing}</span></span>
         <span className={styles.chevron} aria-hidden="true" />
       </button>
     </aside>

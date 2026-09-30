@@ -180,7 +180,8 @@ export type BuildingKind =
   | "unitedhealth"
   | "hall"
   | "exchange"
-  | "oracle";
+  | "oracle"
+  | "monument";
 export const HERO_TICKERS = [
   "NVDA",
   "TSLA",
@@ -333,8 +334,17 @@ export const catalogue: BuildingDef[] = [
     description:
       "Your city’s information hub. Select it to inspect the status of the demo data.",
   },
+  {
+    kind: "monument",
+    name: "BNB Monument",
+    category: "services",
+    image: "functional/bnb_monument",
+    cost: 500,
+    description:
+      "A grand golden monument honoring BNB Smart Chain and the Web3 builders. A proud island landmark.",
+  },
 ];
-// Catalogue strictly contains the 10 Hero Companies with dedicated 4-tier isometric sprites + 3 civic services.
+// Catalogue strictly contains the 10 Hero Companies with dedicated 4-tier isometric sprites + 4 civic services.
 // Other assets remain in the 24/7 on-chain Stock Exchange market watchlist.
 export type Building = Cell & {
   id: string;

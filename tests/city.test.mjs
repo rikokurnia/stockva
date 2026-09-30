@@ -387,10 +387,10 @@ test("partial and complete liquidation conserve cash, units and remaining cost b
     assert.equal(sellPosition(city, "NVDA", fraction).state, city);
   assert.match(sellPosition(city, "TSLA", 1).error, /do not own/);
 });
-test("hero catalogue contains 10 bespoke stocks with all 4 tier sprites, 3 civic services, and 30+ market assets", () => {
+test("hero catalogue contains 10 bespoke stocks with all 4 tier sprites, 4 civic services, and 30+ market assets", () => {
   const companyDefs = catalogue.filter((d) => d.ticker);
   assert.equal(companyDefs.length, 10);
-  assert.equal(catalogue.length, 13);
+  assert.equal(catalogue.length, 14);
   assert.ok(assets.length >= 30);
   assert.equal(HERO_TICKERS.length, 10);
   for (const def of catalogue) {

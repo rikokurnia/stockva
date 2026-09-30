@@ -1548,7 +1548,7 @@ export default function StockCity() {
             ) : (
               <p className="service-description">{definition.description}</p>
             )}
-            {!definition.ticker && (
+            {!definition.ticker && current.kind !== "monument" && (
               <button
                 className="panel-action"
                 onClick={() =>
@@ -1569,6 +1569,33 @@ export default function StockCity() {
                     : "data status"}
                 <ChevronRight size={14} />
               </button>
+            )}
+            {current.kind === "monument" && (
+              <div
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(240, 185, 11, 0.15), rgba(240, 185, 11, 0.05))",
+                  border: "1px solid rgba(240, 185, 11, 0.35)",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: 6,
+                }}
+              >
+                <span style={{ fontSize: 16 }}>🏛️</span>
+                <div>
+                  <strong
+                    style={{ color: "#f0b90b", fontSize: 11, display: "block" }}
+                  >
+                    BNB Chain Landmark
+                  </strong>
+                  <small style={{ color: "#8b9ea8", fontSize: 10 }}>
+                    Official ecosystem landmark on BNB Smart Chain.
+                  </small>
+                </div>
+              </div>
             )}
             {definition.ticker && (
               <div className="inspection-actions">
