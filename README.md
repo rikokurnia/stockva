@@ -1,126 +1,118 @@
 <p align="center">
-  <img src="public/assets/ai_logo.png" width="130" alt="Stockva Logo" />
+  <img src="public/assets/ai_logo.png" width="120" alt="Stockva Logo" />
 </p>
 
 <h1 align="center">Stockva</h1>
 
 <p align="center">
   <strong>Build the City Behind Your Stocks.</strong><br />
-  A tokenized Real-World Asset (RWA) city-building sandbox powered by BNB Smart Chain & Privy.
+  A tokenized Real-World Asset (RWA) city-building sandbox powered by BNB Smart Chain.
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Network-BNB_Chain_Testnet_(97)-F0B90B?logo=binance&logoColor=white" alt="BNB Chain" />
   <img src="https://img.shields.io/badge/Framework-Next.js_15_(App_Router)-000000?logo=next.js&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/Language-TypeScript_5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Web3-Privy_Auth_%26_Viem-blueviolet" alt="Privy Viem" />
+  <img src="https://img.shields.io/badge/Web3-EVM_Wallet_%26_Viem-blueviolet" alt="Web3 Viem" />
   <img src="https://img.shields.io/badge/Smart_Contracts-Foundry_%26_Solidity-orange" alt="Solidity Foundry" />
 </p>
 
 ---
 
-## 🌟 Overview
+## Overview
 
-**Stockva** transforms abstract equity portfolios into a living, breathing isometric metropolis. Players start with a pristine, undeveloped island and construct their city from the ground up—laying custom road networks, founding civic institutions, and erecting the corporate headquarters of top global equities and tokenized assets.
+**Stockva** transforms abstract equity portfolios and tokenized Real-World Assets (RWA) into an interactive isometric metropolis. Players start on an undeveloped island and construct their financial city from the ground up—laying custom road networks, founding civic institutions, and placing headquarters for global equities and tokenized assets.
 
-Every corporate building's architectural tier dynamically evolves based on real-time market performance and unrealized gains/losses. Stockva bridges Web3 DeFi with accessible simulation gameplay, featuring a verified **BNB Smart Chain Testnet Vault**, an interactive **AI Mayor Advisor**, and unified **Privy** wallet authentication.
-
-<p align="center">
-  <img src="public/assets/connect-wallet.png" width="280" alt="Stockva Web3 Connect" />
-</p>
+Every corporate headquarters dynamically evolves across architectural tiers based on live market pricing and performance. Stockva bridges on-chain DeFi verification with accessible simulation gameplay, backed by a verified **BNB Smart Chain Testnet Vault**, an interactive **AI Mayor Companion**, and seamless Web3 wallet integration.
 
 ---
 
-## ✨ Key Features
+## Architecture & Key Features
 
-### 🏙️ 1. Living City Sandbox
-- **Zero Starter Assumptions:** You start with an untouched island, $10,000 in treasury funds, and complete creative freedom.
-- **Autonomous Road & Traffic Engine:** Draw custom road routes across the terrain. An intelligent pathfinding algorithm spawns multi-directional maintenance vans, electric buses, and construction trucks navigating lane offsets and realistic turn radii.
-- **Civic Progression:** Construct the **Stock Exchange** to unlock market operations and trading, and build **City Hall** to monitor treasury balances and active portfolio allocations.
+### 1. Living Isometric Simulation Engine
+- **Unconstrained Creative Freedom:** Start on a clean island canvas with full layout autonomy and demo treasury reserves.
+- **Autonomous Road & Traffic Mechanics:** Construct custom road networks with continuous curves and automatic intersection joins. The pathfinding system coordinates multi-directional vehicles (maintenance vans, transit buses, utility haulers) navigating lane offsets and turn tangents.
+- **Civic Progression Hierarchy:** Founding the **Stock Exchange** unlocks active market trading, while establishing **City Hall** enables treasury budgeting, portfolio telemetry, and on-chain settlement.
 
-### 📈 2. Tokenized Stocks & Dynamic Tier Evolution
-- **37+ Buildables:** Equities spanning Tech, Finance, Consumer, Energy, and Indices (e.g., Apple, Tesla, NVIDIA, Microsoft, Alphabet, Amazon, Berkshire Hathaway).
-- **4-Tier Isometric Architecture:** Corporate headquarters dynamically evolve based on market performance:
-  - 🔻 **Distressed Tier:** Negative return threshold.
-  - 🏢 **Level 1:** Entry / Baseline operations.
-  - 🏬 **Level 2:** Intermediate expansion and business growth.
-  - 🏙️ **Level 3:** Skyscraper pinnacle for high-performing holdings.
-- **Game Settings & Simulation Controls:** Freely customize cycle speeds (4s, 6s, 8s, 10s), pause/resume cycles, and fine-tune exact gain/loss percentage thresholds on the fly.
+### 2. Tokenized Stocks & Dynamic Tier Evolution
+- **37+ Buildables & Assets:** Diverse equity coverage across Technology, Finance, Consumer, Energy, and Indices (e.g., Apple, Tesla, NVIDIA, Microsoft, Alphabet, Amazon, Berkshire Hathaway).
+- **Dynamic 4-Tier Architectural State:** Corporate buildings adapt their visual presence in response to market returns:
+  - **Distressed Tier:** Active when returns fall below the liquidation threshold.
+  - **Level 1 (Foundation):** Standard entry-level commercial operations.
+  - **Level 2 (Growth):** Expanded commercial facilities with increased civic activity.
+  - **Level 3 (Skyscraper):** Modern high-rise pinnacle for top-performing holdings.
+- **Simulation Control:** Adjustable cycle frequencies (4s–10s), pause/resume execution, and user-configurable tier threshold parameters.
 
-### ⛓️ 3. BNB Smart Chain (Testnet) Integration
-- **Live On-Chain Vault (`StockCityVault`):** Record placed building positions directly to the BSC Testnet smart contract.
-- **Live Testnet Faucet:** One-click on-chain claim of 10,000 **$mUSD** (Stockva Demo USD) to your connected wallet address via `claimFaucet()`.
-- **Transparent Position Verification:** Query live on-chain holdings, position quantities, and cost bases directly from the smart contract with direct BscScan transaction explorer links.
+### 3. BNB Smart Chain (Testnet) Integration
+- **On-Chain Settlement (`StockCityVault`):** Record placed building positions and paper allocations directly to the BSC Testnet smart contract.
+- **Faucet Distribution:** Built-in one-click distribution of 10,000 **$mUSD** (Stockva Demo USD) via the verified `claimFaucet()` interface.
+- **Position Transparency:** Live querying of user position IDs, entry prices, quantities, and cost bases directly from the blockchain with automated BscScan explorer linking.
 
-### 🔐 4. Unified Privy Web3 Authentication
-- **Synchronized Single Sign-On:** Seamless cross-page state synchronization between the Landing Page (`/`) and the Sandbox Dashboard (`/city`).
-- **Flexible Login:** Connect via MetaMask, Binance Web3 Wallet, Coinbase Wallet, or WalletConnect.
-- **Active Address Recognition:** Automatic viem checksum formatting, live network status dot, and account management dropdown (copy address, BscScan lookup, network switch, disconnect).
+### 4. Unified Web3 Wallet Experience
+- **Cross-Route Session Synchronization:** Persistent wallet connectivity shared between the cinematic Landing Page (`/`) and the interactive City Sandbox (`/city`).
+- **Standard EVM Wallet Support:** Compatible with MetaMask, Binance Web3 Wallet, Coinbase Wallet, and WalletConnect.
+- **Live Account Status:** Checksummed address formatting, live network indicators, one-click address copy, explorer lookup, and disconnection management.
 
-### 🦫 5. AI Mayor Advisor
-- **Intelligent Financial Companion:** Integrated AI advisory mascot powered by real-time city snapshot telemetry (cash on hand, active equities, on-chain vault holdings, and market trends).
-- **Resilient Fallback:** Hybrid architecture leveraging LLM intelligence with an offline heuristic rules engine for uninterrupted guidance.
+### 5. Intelligent City Advisor
+- **Context-Aware Recommendations:** Financial and municipal advisory system conditioned on real-time city state (cash reserves, active buildings, portfolio allocation, and market movements).
+- **Resilient Fallback Design:** Dual-engine architecture with intelligent fallback heuristics ensuring continuous, prompt advice even during network disruptions.
 
 ---
 
-## 📜 Verified Smart Contracts (BSC Testnet)
+## Verified Smart Contracts (BSC Testnet)
 
-The core gameplay smart contracts are deployed and verified on **BNB Smart Chain Testnet (Chain ID: 97)**:
+The core game logic and ledger contracts are deployed and verified on **BNB Smart Chain Testnet (Chain ID: 97)**:
 
-| Contract | Address | Explorer Link |
+| Contract | Address | Explorer |
 | :--- | :--- | :--- |
-| **StockCityVault** | `0xc5458564D705bC5b5655D119Aeece9B3d9D8B849` | [View on BscScan](https://testnet.bscscan.com/address/0xc5458564D705bC5b5655D119Aeece9B3d9D8B849) |
-| **MockUSD (mUSD)** | `0xCA2Acbb5f159F4B3e0D2b1A54b423D0E993B4f21` | [View on BscScan](https://testnet.bscscan.com/address/0xCA2Acbb5f159F4B3e0D2b1A54b423D0E993B4f21) |
+| **StockCityVault** | `0x1810b360e0a4d593117f0bfaf2e0939b2df5e415` | [View on BscScan](https://testnet.bscscan.com/address/0x1810b360e0a4d593117f0bfaf2e0939b2df5e415) |
+| **MockUSD (mUSD)** | `0xCA2Ab14Aa5F41705a2f3BF17b728a272441C4f21` | [View on BscScan](https://testnet.bscscan.com/address/0xCA2Ab14Aa5F41705a2f3BF17b728a272441C4f21) |
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 - **Frontend:** Next.js 15 (App Router), React 19, TypeScript
-- **Styling:** Modular Vanilla CSS with responsive viewport breakpoints, glassmorphism, and hardware-accelerated animations
-- **Web3 Integration:** Privy React SDK (`@privy-io/react-auth`), Viem 2.x
+- **Styling:** Modular Vanilla CSS, responsive viewport design, glassmorphism, hardware-accelerated transforms
+- **Web3 Integration:** Viem 2.x, EVM Provider standards
 - **Smart Contracts:** Solidity `^0.8.24`, Foundry (`forge`)
-- **Market Data Feeds:** Real-time tokenized asset quotes, xStocks proof-of-reserves endpoints, Kraken OHLC, and RSS corporate news caching
-- **Testing:** Node.js native test runner with experimental strip-types support
+- **Data Pipeline:** Tokenized quote feeds, xStocks reserves endpoints, Kraken OHLC, and cached corporate news syndication
+- **Testing:** Node.js native test runner with experimental strip-types
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- **Node.js:** `v20.x` or `v22.x` recommended
+- **Node.js:** `v20.x` or higher
 - **Package Manager:** `npm` (or `pnpm` / `yarn`)
-- **Web3 Wallet:** MetaMask, Binance Web3 Wallet, or any EVM-compatible browser extension
+- **Web3 Wallet:** Any EVM-compatible browser wallet (MetaMask, Binance Web3 Wallet, etc.)
 
-### 1. Clone the Repository
+### 1. Clone Repository
 
 ```bash
 git clone https://github.com/rikokurnia/stockva.git
 cd stockva/projects/stockcity
 ```
 
-### 2. Configure Environment Variables
+### 2. Environment Setup
 
-Create a `.env` file in the project root:
+Copy the environment template:
 
 ```bash
 cp .env.example .env
 ```
 
-Populate the required environment variables:
+Template variables:
 
 ```env
-# Privy Authentication (Client & Server)
-PRIVY_APP_ID=your_privy_app_id_here
-NEXT_PUBLIC_PRIVY_APP_ID=your_privy_app_id_here
-PRIVY_APP_SECRET=your_privy_app_secret_here
+# Web3 Provider
+NEXT_PUBLIC_APP_ID=
 
-# AI City Advisor (Optional for LLM responses; local rule fallback active by default)
-GEMINI_API_KEY=your_gemini_api_key_here
+# AI Advisory Engine (Optional — automated heuristic fallback active by default)
+AI_API_KEY=
 ```
-
-> **Note:** Never commit `.env` or sensitive private credentials to public version control.
 
 ### 3. Install Dependencies
 
@@ -134,16 +126,14 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🧪 Testing & Validation
-
-Run the comprehensive unit and integration test suite:
+## Testing & Validation
 
 ```bash
-# Run unit & contract tests (33 passing suites)
+# Run unit & contract integration tests
 npm test
 
 # Run TypeScript typechecks
@@ -153,7 +143,7 @@ npm run typecheck
 npm run build
 ```
 
-### Smart Contract Testing (Foundry)
+### Smart Contract Verification (Foundry)
 
 ```bash
 cd contracts
@@ -162,49 +152,49 @@ forge test -vvv
 
 ---
 
-## 🎮 Gameplay Controls
+## Controls & Shortcuts
 
-| Action | Hotkey / Mouse | Description |
+| Action | Control | Description |
 | :--- | :--- | :--- |
-| **Select / Inspect** | `V` | Click any building or road to view stats, inspect position, or relocate |
-| **Draw Roads** | `R` | Click bare terrain and drag path; automatically connects turns & intersections |
-| **Build Companies** | `B` | Browse the corporate catalogue and place company headquarters |
-| **Civic Services** | `S` | Place City Hall or Stock Exchange to unlock game features |
-| **Bulldoze** | `X` | Demolish tile structures (refunds simulated position value) |
-| **Camera Pan** | `Space + Drag` / Mouse Drag | Move the viewport across the island |
-| **Zoom In / Out** | `Wheel` / HUD Buttons | Adjust isometric camera distance |
+| **Select / Inspect** | `V` | Click any building or road segment to inspect metrics or demolish |
+| **Draw Roads** | `R` | Click and drag along bare ground to trace asphalt road networks |
+| **Build Companies** | `B` | Open the commercial catalogue to draft company headquarters |
+| **Civic Services** | `S` | Place the Stock Exchange or City Hall |
+| **Bulldoze** | `X` | Remove existing structures and recover simulated capital |
+| **Camera Pan** | `Space + Drag` / Mouse Drag | Move viewport across the terrain |
+| **Zoom** | `Mouse Wheel` / HUD Buttons | Adjust isometric camera distance |
 | **Undo / Redo** | `Ctrl + Z` / `Ctrl + Shift + Z` | Revert or repeat construction actions |
-| **Game Settings** | HUD Gear Icon | Adjust simulation speed (4s–10s), tier thresholds, and display mode |
+| **Settings** | HUD Gear Icon | Adjust simulation tick rate, tier thresholds, and display mode |
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 projects/stockcity/
-├── app/                  # Next.js App Router (pages, API routes, layout)
-│   ├── api/              # Route handlers (advisor, market, news, passport)
-│   ├── city/             # Main game simulation canvas & HUD
-│   ├── layout.tsx        # Root layout with unified Privy Providers
-│   └── page.tsx          # Cinematic video landing page
-├── components/           # Reusable UI components & game panels
-│   ├── city-advisor.tsx  # Interactive AI Mayor Companion
+├── app/                  # Next.js App Router (pages, layout, API routes)
+│   ├── api/              # Server endpoints (advisor, market, news, passport)
+│   ├── city/             # Main simulation canvas & HUD
+│   ├── layout.tsx        # Root layout with Web3 providers
+│   └── page.tsx          # Cinematic landing experience
+├── components/           # UI components, simulation engine, and game dialogs
+│   ├── city-advisor.tsx  # Interactive AI Mayor dialogue system
 │   ├── civic-panel.tsx   # Treasury, Exchange, and On-chain Vault ledger
-│   ├── landing-hero.tsx  # Hero landing presentation
+│   ├── landing-hero.tsx  # Landing page presentation
 │   ├── onchain-wallet.tsx# In-game Web3 wallet chip & modal
-│   └── stock-city.tsx    # Core isometric simulation engine
-├── contracts/            # Foundry smart contracts project
+│   └── stock-city.tsx    # Isometric canvas renderer & game loop
+├── contracts/            # Foundry smart contract suite
 │   ├── src/              # StockCityVault.sol & MockUSD.sol
 │   └── script/           # Deployment scripts for BSC Testnet
-├── lib/                  # Game state algorithms, math, and contracts ABI
-└── public/               # Static assets, sprites, audio, and logos
+├── lib/                  # Simulation algorithms, city state, and contract ABI
+└── public/               # Static assets, sprites, audio, and corporate logos
 ```
 
 ---
 
-## 🛡️ Security & Disclaimer
+## Disclaimer
 
-Stockva is created as a demonstration sandbox for the **BNB Chain Hackathon**. Real-World Asset (RWA) tokens and company equities referenced within the city builder utilize public quote data and testnet smart contracts (`MockUSD` on BSC Testnet 97). Positions held in the simulation sandbox do not represent real-world securities ownership or financial advice.
+Stockva is a technology demonstration developed for the **BNB Chain Hackathon**. Asset quotes and company references are utilized for educational simulation on the **BNB Smart Chain Testnet (Chain ID: 97)**. Virtual positions and balances inside the sandbox do not constitute financial instruments or investment advice.
 
 ---
 

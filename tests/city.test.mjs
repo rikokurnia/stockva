@@ -432,3 +432,42 @@ test("regular-session estimate handles DST, weekends and closing boundary", () =
   assert.equal(marketClock(new Date("2026-07-07T20:00:00Z")).open, false);
   assert.equal(marketClock(new Date("2026-07-05T15:00:00Z")).open, false);
 });
+test("position-only buys track without buildings and sell by fraction", async () => {
+  const { buyPaper, sellPaper } = await import("../lib/city.ts");
+  const prices = { AAPL: 200 };
+  let city = newCity();
+  const bought = buyPaper(city, "AAPL", 1000, prices.AAPL);
+  assert.equal(bought.error, "");
+  assert.equal(bought.state.cash, 9000);
+  assert.equal(bought.state.paper.length, 1);
+  assert.equal(bought.state.paper[0].quantity, 5);
+  assert.ok(isSavedCity(bought.state));
+  const sold = sellPaper(bought.state, "AAPL", 0.5, { AAPL: 220 });
+  assert.equal(sold.error, "");
+  assert.equal(sold.state.paper.length, 1);
+  assert.equal(sold.state.paper[0].quantity, 2.5);
+  assert.equal(sold.state.cash, 9000 + 550);
+  const all = sellPaper(sold.state, "AAPL", 1, { AAPL: 220 });
+  assert.equal(all.state.paper.length, 0);
+});
+test("locked draft buildings persist and validate as saved cities", async () => {
+  const locked = {
+    ...newCity(),
+    buildings: [
+      {
+        r: 1,
+        c: 1,
+        id: "draft-1",
+        kind: "nvidia",
+        quantity: 1,
+        entry: 100,
+        cost: 100,
+        builtAt: Date.now(),
+        locked: true,
+      },
+    ],
+  };
+  assert.ok(isSavedCity(locked));
+  assert.ok(isSavedCity({ ...newCity(), paper: [] }));
+  assert.ok(!isSavedCity({ ...newCity(), paper: [{ id: 1 }] }));
+});

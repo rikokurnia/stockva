@@ -19,6 +19,7 @@ import {
   catalogue,
   defFor,
   healthOf,
+  isHeroTicker,
   marketClock,
   money,
   pct,
