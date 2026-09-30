@@ -510,7 +510,7 @@ input {
   border-left: 1px solid #4b6270;
   padding-left: 14px;
   margin-left: 4px;
-  height: 44px;
+  height: 50px;
 }
 
 .onchain-wallet-img-btn {
@@ -524,7 +524,7 @@ input {
   justify-content: center;
   position: relative;
   line-height: 0;
-  height: 44px;
+  height: 50px;
   transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s ease;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
 }
@@ -561,9 +561,9 @@ input {
 .header-resources .onchain-wallet-img,
 .onchain-wallet-img {
   display: block;
-  height: 44px !important;
+  height: 50px !important;
   width: auto !important;
-  max-width: 220px !important;
+  max-width: 240px !important;
   object-fit: contain;
   pointer-events: none;
   user-select: none;
