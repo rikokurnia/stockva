@@ -151,6 +151,20 @@ export default function StockCity() {
     string,
     number
   > | null>(null);
+  const [confirmingBuildings, setConfirmingBuildings] = useState<
+    Record<
+      string,
+      { confirming: boolean; confirmed: boolean; startedAt?: number }
+    >
+  >({});
+  const handleConstructionComplete = useCallback((id: string) => {
+    setConfirmingBuildings((prev) => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
   const intelBuilding = city.buildings.find(
     (b) => b.id === intelId && defFor(b.kind).ticker,
   );
@@ -618,6 +632,10 @@ export default function StockCity() {
         // Build-menu flow: one building, one signature, immediately.
         const account = wallet;
         const buildingId = placed.id;
+        setConfirmingBuildings((prev) => ({
+          ...prev,
+          [buildingId]: { confirming: true, confirmed: false, startedAt: Date.now() },
+        }));
         notify(
           `${defFor(kind).name} drafted. Confirm the purchase popup in your wallet…`,
         );
@@ -643,11 +661,20 @@ export default function StockCity() {
                   : b,
               ),
             });
+            setConfirmingBuildings((prev) => ({
+              ...prev,
+              [buildingId]: { confirming: false, confirmed: true, startedAt: prev[buildingId]?.startedAt },
+            }));
             notify(
               `${defFor(kind).name} unlocked and permanent. Receipt in City Hall.`,
             );
           })
           .catch((err: unknown) => {
+            setConfirmingBuildings((prev) => {
+              const next = { ...prev };
+              delete next[buildingId];
+              return next;
+            });
             notify(
               `Kept locked: on-chain payment failed (${err instanceof Error ? err.message : "wallet rejected"}). Retry in City Hall.`,
               true,
@@ -895,6 +922,8 @@ export default function StockCity() {
         }
         now={now}
         upgrades={upgrades}
+        confirmingBuildings={confirmingBuildings}
+        onConstructionComplete={handleConstructionComplete}
         onZoom={changeZoom}
         onSelect={(id) => {
           setSelected(id);
@@ -1722,6 +1751,13 @@ export default function StockCity() {
                   ? { ...b, locked: false, vaultTx: r.hash, vaultId: r.vaultId }
                   : b;
               }),
+            });
+            setConfirmingBuildings((prev) => {
+              const copy = { ...prev };
+              for (const r of receipts) {
+                copy[r.buildingId] = { confirming: false, confirmed: true, startedAt: Date.now() };
+              }
+              return copy;
             });
             notify("Buildings unlocked and permanent. Receipts in City Hall.");
           }}

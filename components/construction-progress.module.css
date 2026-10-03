@@ -1,0 +1,141 @@
+.container {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -50px;
+  width: 154px;
+  padding: 6px 8px;
+  background: rgba(18, 32, 41, 0.96);
+  border: 1px solid rgba(240, 185, 11, 0.6);
+  border-radius: 4px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.55),
+    0 0 10px rgba(240, 185, 11, 0.2);
+  backdrop-filter: blur(8px);
+  z-index: 99;
+  pointer-events: none;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  opacity: 1;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  animation: progressPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes progressPop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.containerCompleted {
+  border-color: rgba(16, 185, 129, 0.85);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.55),
+    0 0 14px rgba(16, 185, 129, 0.35);
+}
+
+.containerFading {
+  opacity: 0;
+  transform: translate(-50%, -8px) scale(0.95);
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  line-height: 1;
+}
+
+.stateWrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f0b90b;
+  box-shadow: 0 0 6px #f0b90b;
+  flex-shrink: 0;
+  animation: pulseDot 1.4s ease-in-out infinite alternate;
+}
+
+.dotCompleted {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: none;
+}
+
+@keyframes pulseDot {
+  from {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.stateText {
+  font-family: var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #f0b90b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stateTextCompleted {
+  color: #10b981;
+}
+
+.bscBadge {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 4px;
+  background: rgba(240, 185, 11, 0.16);
+  border: 1px solid rgba(240, 185, 11, 0.4);
+  color: #f0b90b;
+  border-radius: 2px;
+  letter-spacing: 0.4px;
+}
+
+.barTrack {
+  width: 100%;
+  height: 6px;
+  margin: 1px 0;
+  overflow: hidden;
+  border-radius: 1px;
+}
+
+.formatRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--mono, ui-monospace, "SF Mono", "Cascadia Code", monospace);
+  font-size: 8.5px;
+  font-weight: 600;
+  color: #e7eef2;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.formatRowCompleted {
+  color: #a7f3d0;
+}

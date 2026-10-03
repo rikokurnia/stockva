@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types tests/city.test.mjs && node --experimental-strip-types tests/logos.test.mjs && node --experimental-strip-types tests/portfolio-view.test.mjs && node --test tests/company-news.test.cjs && node --experimental-strip-types tests/contracts.test.mjs && node --experimental-strip-types tests/advisor.test.mjs",
+    "test": "node --experimental-strip-types tests/city.test.mjs && node --experimental-strip-types tests/logos.test.mjs && node --experimental-strip-types tests/portfolio-view.test.mjs && node --test tests/company-news.test.cjs && node --experimental-strip-types tests/contracts.test.mjs && node --experimental-strip-types tests/advisor.test.mjs && node --test tests/construction-progress.test.mjs",
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test -vvv",
     "contracts:deploy": "cd contracts && forge script script/DeployStockCity.s.sol --rpc-url https://data-seed-prebsc-1-s1.binance.org:8545/ --broadcast",
@@ -15,10 +15,13 @@
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.46.0",
+    "@types/canvas-confetti": "^1.9.0",
+    "canvas-confetti": "^1.9.4",
     "fast-xml-parser": "^5.11.2",
     "lightweight-charts": "^5.2.1",
     "lucide-react": "^0.468.0",
     "next": "^15.5.0",
+    "rc-progress": "^4.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "viem": "^2.56.0"

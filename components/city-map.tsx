@@ -35,6 +35,7 @@ import PortfolioOverlay from "./portfolio-overlay";
 import portfolioStyles from "./portfolio-view.module.css";
 import RoadNetwork from "./road-network";
 import { cameraBounds } from "../lib/map-geometry";
+import ConstructionProgressBar from "./construction-progress";
 
 type Props = {
   city: CityState;
@@ -59,6 +60,11 @@ type Props = {
   simulationReturns: Record<string, number> | null;
   now: number;
   upgrades: Record<string, number>;
+  confirmingBuildings?: Record<
+    string,
+    { confirming: boolean; confirmed: boolean; startedAt?: number }
+  >;
+  onConstructionComplete?: (buildingId: string) => void;
   onZoom: (delta: number) => void;
   onSelect: (id: string | null) => void;
   onPlace: (cell: Cell) => void;
@@ -425,7 +431,12 @@ export default function CityMap(props: Props) {
               const ret = def.ticker
                 ? (props.simulationReturns?.[b.id] ?? returnOf(b, prices))
                 : 0;
-              const fresh = now - b.builtAt < 2200;
+              const confirmation = props.confirmingBuildings?.[b.id];
+              const isUnderConstruction =
+                now - b.builtAt < 8850 ||
+                Boolean(confirmation?.confirming) ||
+                Boolean(confirmation?.confirmed);
+              const fresh = now - b.builtAt < 7000;
               const upgraded = upgrades[b.id] && now - upgrades[b.id] < 2200;
               return (
                 <button
@@ -437,7 +448,7 @@ export default function CityMap(props: Props) {
                     left: p.x,
                     top: p.y + 36,
                     zIndex: Math.round(p.y + 36),
-                    opacity: b.locked ? 0.55 : undefined,
+                    opacity: b.locked && !isUnderConstruction ? 0.55 : undefined,
                   }}
                   onPointerEnter={() => {
                     if (props.scanMode) props.onScanTarget?.(b.id);
@@ -458,6 +469,15 @@ export default function CityMap(props: Props) {
                   aria-label={`${def.name} building${b.locked ? ", locked unpaid" : ""}`}
                   tabIndex={tool === "inspect" ? 0 : -1}
                 >
+                  {isUnderConstruction && (
+                    <ConstructionProgressBar
+                      buildingId={b.id}
+                      builtAt={confirmation?.startedAt ?? b.builtAt}
+                      isConfirmingOnchain={confirmation?.confirming}
+                      isConfirmedOnchain={confirmation?.confirmed}
+                      onComplete={props.onConstructionComplete}
+                    />
+                  )}
                   {props.scanMode &&
                     props.scanTarget === b.id &&
                     def.ticker && (
