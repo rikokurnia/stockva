@@ -242,6 +242,93 @@ input {
 .city-building.selected .building-name {
   opacity: 1;
 }
+
+.building-stock-badge {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2.5px 7px;
+  background: rgba(18, 32, 41, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  font-family: var(--mono, ui-monospace, "SF Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  z-index: 25;
+  opacity: 1;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.city-building:hover .building-stock-badge,
+.city-building.selected .building-stock-badge {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.65), 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.building-stock-badge.gain {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(12, 33, 26, 0.94);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.building-stock-badge.gain .stock-badge-pct {
+  color: #34d399;
+}
+
+.building-stock-badge.loss {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(36, 18, 20, 0.94);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+.building-stock-badge.loss .stock-badge-pct {
+  color: #f87171;
+}
+
+.building-stock-badge.flat {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(18, 32, 41, 0.94);
+}
+
+.building-stock-badge.flat .stock-badge-pct {
+  color: #cbd5e1;
+}
+
+.building-stock-badge.locked {
+  border-color: rgba(240, 185, 11, 0.65);
+  background: rgba(33, 28, 14, 0.94);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 8px rgba(240, 185, 11, 0.25);
+}
+
+.building-stock-badge.locked .stock-badge-pct {
+  color: #f0b90b;
+}
+
+.stock-badge-ticker {
+  color: #e2e8f0;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.stock-badge-pct {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.stock-badge-arrow {
+  font-size: 8px;
+  line-height: 1;
+}
 .selected-effect {
   position: absolute;
   width: 150px;

@@ -448,7 +448,6 @@ export default function CityMap(props: Props) {
                     left: p.x,
                     top: p.y + 36,
                     zIndex: Math.round(p.y + 36),
-                    opacity: b.locked && !isUnderConstruction ? 0.55 : undefined,
                   }}
                   onPointerEnter={() => {
                     if (props.scanMode) props.onScanTarget?.(b.id);
@@ -515,6 +514,7 @@ export default function CityMap(props: Props) {
                     )}
                   <img
                     className="building-sprite"
+                    style={{ opacity: b.locked ? 0.65 : undefined }}
                     src={sprite(
                       buildingImage(
                         b,
@@ -532,13 +532,35 @@ export default function CityMap(props: Props) {
                     }}
                     draggable={false}
                   />
-                  <span className="building-name">
-                    {b.locked && def.ticker
-                      ? `${def.ticker} 🔒 UNPAID`
-                      : def.ticker
-                        ? `${def.ticker} ${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%`
-                        : def.name}
-                  </span>
+                  {def.ticker && (
+                    <div
+                      className={`building-stock-badge ${
+                        b.locked
+                          ? "locked"
+                          : ret > 0.01
+                            ? "gain"
+                            : ret < -0.01
+                              ? "loss"
+                              : "flat"
+                      }`}
+                      aria-label={`${def.ticker} ${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%`}
+                    >
+                      <span className="stock-badge-ticker">{def.ticker}</span>
+                      <span className="stock-badge-pct">
+                        {b.locked && <span style={{ marginRight: 2 }}>🔒</span>}
+                        {!b.locked && ret > 0.01 && (
+                          <span className="stock-badge-arrow">▲</span>
+                        )}
+                        {!b.locked && ret < -0.01 && (
+                          <span className="stock-badge-arrow">▼</span>
+                        )}
+                        {ret >= 0 ? `+${ret.toFixed(1)}%` : `${ret.toFixed(1)}%`}
+                      </span>
+                    </div>
+                  )}
+                  {!def.ticker && (
+                    <span className="building-name">{def.name}</span>
+                  )}
                   {b.locked && def.ticker && (
                     <span
                       className="no-road"
