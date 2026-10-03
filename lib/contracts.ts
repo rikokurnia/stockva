@@ -143,6 +143,24 @@ export async function claimFaucetOnchain(
   });
 }
 
+/** Read current $mUSD token balance for a wallet address from BSC Testnet. */
+export async function getMusdBalance(
+  account: `0x${string}`,
+): Promise<number> {
+  try {
+    const client = getBscClient();
+    const balance = (await client.readContract({
+      address: MOCK_USD_ADDRESS,
+      abi: MOCK_USD_ABI,
+      functionName: "balanceOf",
+      args: [account],
+    })) as bigint;
+    return Number(formatUnits(balance, 18));
+  } catch {
+    return 0;
+  }
+}
+
 /** Read live on-chain vault positions for a wallet. */
 export async function getOnchainPositions(
   user: `0x${string}`,

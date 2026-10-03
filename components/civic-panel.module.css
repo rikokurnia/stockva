@@ -907,4 +907,349 @@
   transform: translateY(0);
 }
 
+/* Revamped Order Form & Bundle Builder Styles */
+.tradePresets {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.presetChip {
+  background: var(--civic-deep);
+  border: 1px solid var(--civic-line);
+  color: var(--civic-text);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.presetChip:hover {
+  border-color: var(--civic-accent);
+  background: rgba(244, 205, 96, 0.1);
+}
+
+.presetChipActive {
+  border-color: var(--civic-accent);
+  color: var(--civic-accent);
+  background: rgba(244, 205, 96, 0.15);
+}
+
+.bundleTabsNav {
+  display: flex;
+  background: var(--civic-deep);
+  border: 1px solid var(--civic-line);
+  border-radius: 8px;
+  padding: 3px;
+  margin: 14px 0 12px;
+  gap: 4px;
+}
+
+.bundleNavBtn {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--civic-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.bundleNavBtnActive {
+  background: var(--civic-bg);
+  color: var(--civic-text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.bundleNavBadge {
+  background: rgba(240, 185, 11, 0.2);
+  color: #f0b90b;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.bundleContainer {
+  background: rgba(16, 33, 42, 0.6);
+  border: 1px solid var(--civic-line);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 12px 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bundleFlowHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bundleFlowStep {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--civic-accent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bundlePresetsRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bundlePresetQuickBtn {
+  background: var(--civic-deep);
+  border: 1px solid var(--civic-line);
+  color: var(--civic-muted);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.bundlePresetQuickBtn:hover {
+  color: var(--civic-text);
+  border-color: var(--civic-accent);
+}
+
+/* Visual Building Picker Grid */
+.bundleBuildingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--civic-line) transparent;
+}
+
+.bundleCard {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--civic-deep);
+  border: 1.5px solid var(--civic-line);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.bundleCard:hover {
+  border-color: #78bddb;
+  background: #142a37;
+}
+
+.bundleCardActive {
+  border-color: var(--civic-accent);
+  background: rgba(244, 205, 96, 0.08);
+}
+
+.bundleCardSprite {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+}
+
+.bundleCardInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.bundleCardTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--civic-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bundleCardPrice {
+  font-size: 10px;
+  color: #2bd88a;
+  font-family: monospace;
+}
+
+.bundleCardCheck {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--civic-accent);
+  color: var(--civic-deep);
+  display: grid;
+  place-items: center;
+}
+
+/* Step 2: Add Nominal List */
+.bundleNominalList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bundleNominalItem {
+  display: flex;
+  flex-direction: column;
+  background: var(--civic-deep);
+  border: 1px solid var(--civic-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  gap: 6px;
+}
+
+.bundleNominalItemTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bundleItemTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.bundleItemSpriteSmall {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.bundleItemRemove {
+  background: transparent;
+  border: 0;
+  color: var(--civic-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: grid;
+  place-items: center;
+}
+
+.bundleItemRemove:hover {
+  color: #f87171;
+}
+
+.bundleNominalItemBottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bundleNominalInputWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #09131a;
+  border: 1px solid var(--civic-line);
+  border-radius: 5px;
+  padding: 0 8px;
+  height: 32px;
+}
+
+.bundleNominalInputWrap:focus-within {
+  border-color: var(--civic-accent);
+}
+
+.bundleNominalPrefix {
+  font-size: 12px;
+  color: var(--civic-muted);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.bundleNominalInput {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--civic-text);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: monospace;
+  outline: none;
+}
+
+.bundleItemChipGroup {
+  display: flex;
+  gap: 4px;
+}
+
+.bundleItemChip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--civic-line);
+  color: var(--civic-muted);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.bundleItemChip:hover {
+  border-color: var(--civic-accent);
+  color: var(--civic-text);
+}
+
+.bundleItemUnits {
+  font-size: 10px;
+  color: #78bddb;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+/* Step 3: Bundle Summary Card & Pay Form */
+.bundleSummary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #09131a;
+  border: 1px solid var(--civic-line);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.bundleSummaryLabel {
+  font-size: 11px;
+  color: var(--civic-muted);
+}
+
+.bundleSummaryValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2bd88a;
+  font-family: monospace;
+}
+
+
 

@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Building2,
+  Check,
   ChevronRight,
   Coins,
   Crosshair,
@@ -12,6 +13,7 @@ import {
   Radio,
   Search,
   ShieldCheck,
+  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -24,6 +26,7 @@ import {
   money,
   pct,
   priceOf,
+  sprite,
   valueOf,
   type Building,
   type BuildingKind,
@@ -53,6 +56,7 @@ import {
 } from "../lib/contracts";
 import StockLogo from "./stock-logo";
 import TradingChart from "./trading-chart";
+import { OrderPreflight } from "./order-preflight";
 import styles from "./civic-panel.module.css";
 export type CivicMode = "portfolio" | "market" | "data";
 type Props = {
@@ -123,7 +127,17 @@ export default function CivicPanel({
   const [faucetTxns, setFaucetTxns] = useState<`0x${string}`[]>([]);
   const [batchConfirming, setBatchConfirming] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
-  const [bundleAmounts, setBundleAmounts] = useState<Record<string, string>>({});
+  const [marketTab, setMarketTab] = useState<"single" | "bundle">("single");
+  const [selectedBundleTickers, setSelectedBundleTickers] = useState<string[]>([
+    "NVDA",
+    "TSLA",
+    "AAPL",
+  ]);
+  const [bundleAmounts, setBundleAmounts] = useState<Record<string, string>>({
+    NVDA: "500",
+    TSLA: "500",
+    AAPL: "500",
+  });
   const [bundleMsg, setBundleMsg] = useState("");
   const [history, setHistory] = useState<HistoryFeed | null>(null);
   const [passport, setPassport] = useState<Passport | null>(null);
@@ -995,91 +1009,351 @@ export default function CivicPanel({
                 </div>
                 {feed.error && <p className={styles.warning}>{feed.error}</p>}
                 {mode === "market" && (
-                  <section className={styles.trade}>
-                    <SectionTitle
-                      title="Bundle builder"
-                      detail="TOP 10 · 1 SIGNATURE"
-                    />
-                    <p className={styles.caption}>
-                      Set amounts, place each building on the island, then pay
-                      for all of them together in City Hall.
-                    </p>
-                    {assets
-                      .filter((a) => isHeroTicker(a.ticker))
-                      .map((a) => (
-                        <div
-                          key={a.ticker}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            marginTop: 6,
-                          }}
-                        >
-                          <StockLogo
-                            ticker={a.ticker}
-                            name={a.name}
-                            size={28}
-                            color={a.color}
-                            type="stock"
-                          />
-                          <span style={{ flex: 1, fontSize: 12 }}>
-                            <strong>{a.ticker}</strong>
-                            <small style={{ color: "var(--civic-muted)" }}>
-                              {" "}
-                              · {money(priceOf(a.ticker, prices))}
-                            </small>
+                  <>
+                    <div className={styles.bundleTabsNav}>
+                      <button
+                        type="button"
+                        className={`${styles.bundleNavBtn} ${
+                          marketTab === "single" ? styles.bundleNavBtnActive : ""
+                        }`}
+                        onClick={() => setMarketTab("single")}
+                      >
+                        <Building2 size={13} />
+                        <span>Single Stocks</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.bundleNavBtn} ${
+                          marketTab === "bundle" ? styles.bundleNavBtnActive : ""
+                        }`}
+                        onClick={() => setMarketTab("bundle")}
+                      >
+                        <Landmark size={13} />
+                        <span>Bundle Builder</span>
+                        <span className={styles.bundleNavBadge}>1 Signature</span>
+                      </button>
+                    </div>
+
+                    {marketTab === "bundle" && (
+                      <section className={styles.bundleContainer}>
+                        <SectionTitle
+                          title="Bundle Order & Batch Placement"
+                          detail="TOP 10 · 1 SIGNATURE"
+                        />
+                        <p className={styles.caption}>
+                          Select buildings to include, set custom nominals, and sign once to place and unlock all buildings.
+                        </p>
+
+                        {/* FLOW STEP 1: Pick several buildings or bundle presets */}
+                        <div className={styles.bundleFlowHeader}>
+                          <span className={styles.bundleFlowStep}>
+                            1. PICK BUILDINGS
                           </span>
-                          <span style={{ fontSize: 11 }}>USD</span>
-                          <input
-                            aria-label={`${a.ticker} bundle amount`}
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            inputMode="decimal"
-                            placeholder="0"
-                            value={bundleAmounts[a.ticker] ?? ""}
-                            onChange={(e) =>
-                              setBundleAmounts((prev) => ({
-                                ...prev,
-                                [a.ticker]: e.target.value,
-                              }))
-                            }
-                            style={{
-                              width: 90,
-                              padding: "4px 6px",
-                              borderRadius: 4,
-                            }}
-                          />
+                          <div className={styles.bundlePresetsRow}>
+                            <button
+                              type="button"
+                              className={styles.bundlePresetQuickBtn}
+                              onClick={() => {
+                                const tech = ["NVDA", "TSLA", "AAPL", "MSFT"];
+                                setSelectedBundleTickers(tech);
+                                setBundleAmounts((prev) => {
+                                  const next = { ...prev };
+                                  for (const t of tech) if (!next[t]) next[t] = "500";
+                                  return next;
+                                });
+                              }}
+                            >
+                              Big Tech
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.bundlePresetQuickBtn}
+                              onClick={() => {
+                                const top5 = ["NVDA", "TSLA", "AAPL", "MSFT", "AMZN"];
+                                setSelectedBundleTickers(top5);
+                                setBundleAmounts((prev) => {
+                                  const next = { ...prev };
+                                  for (const t of top5) if (!next[t]) next[t] = "500";
+                                  return next;
+                                });
+                              }}
+                            >
+                              Top 5
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.bundlePresetQuickBtn}
+                              onClick={() => {
+                                const allHero = assets
+                                  .filter((a) => isHeroTicker(a.ticker))
+                                  .map((a) => a.ticker);
+                                setSelectedBundleTickers(allHero);
+                                setBundleAmounts((prev) => {
+                                  const next = { ...prev };
+                                  for (const t of allHero) if (!next[t]) next[t] = "500";
+                                  return next;
+                                });
+                              }}
+                            >
+                              All 10
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.bundlePresetQuickBtn}
+                              onClick={() => setSelectedBundleTickers([])}
+                            >
+                              Clear
+                            </button>
+                          </div>
                         </div>
-                      ))}
-                    <button
-                      className={styles.primary}
-                      disabled={!hasExchange}
-                      onClick={() => {
-                        const items = assets
-                          .filter((a) => isHeroTicker(a.ticker))
-                          .flatMap((a) => {
-                            const v = Number(bundleAmounts[a.ticker]);
-                            if (!Number.isFinite(v) || v < 1) return [];
-                            const def = catalogue.find(
-                              (d) => d.ticker === a.ticker,
-                            );
-                            return def ? [{ kind: def.kind, amount: v }] : [];
-                          });
-                        setBundleMsg(onBuyBundle(items));
-                      }}
-                      style={{ marginTop: 10 }}
-                    >
-                      Place bundle
-                      <ArrowUpRight size={17} />
-                    </button>
-                    {bundleMsg && (
-                      <p role="status" className={styles.notice}>
-                        {bundleMsg}
-                      </p>
+
+                        {/* Building Selector Grid with Sprites */}
+                        <div className={styles.bundleBuildingGrid}>
+                          {assets
+                            .filter((a) => isHeroTicker(a.ticker))
+                            .map((a) => {
+                              const def = catalogue.find((d) => d.ticker === a.ticker);
+                              const isSelected = selectedBundleTickers.includes(a.ticker);
+                              const p = priceOf(a.ticker, prices);
+                              return (
+                                <button
+                                  key={a.ticker}
+                                  type="button"
+                                  className={`${styles.bundleCard} ${
+                                    isSelected ? styles.bundleCardActive : ""
+                                  }`}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedBundleTickers((prev) =>
+                                        prev.filter((t) => t !== a.ticker),
+                                      );
+                                    } else {
+                                      setSelectedBundleTickers((prev) => [
+                                        ...prev,
+                                        a.ticker,
+                                      ]);
+                                      if (!bundleAmounts[a.ticker]) {
+                                        setBundleAmounts((prev) => ({
+                                          ...prev,
+                                          [a.ticker]: "500",
+                                        }));
+                                      }
+                                    }
+                                  }}
+                                >
+                                  {def && (
+                                    <img
+                                      src={sprite(def.image)}
+                                      alt={a.name}
+                                      className={styles.bundleCardSprite}
+                                    />
+                                  )}
+                                  <div className={styles.bundleCardInfo}>
+                                    <span className={styles.bundleCardTitle}>
+                                      {a.ticker} · {a.name}
+                                    </span>
+                                    <span className={styles.bundleCardPrice}>
+                                      {money(p)}
+                                    </span>
+                                  </div>
+                                  {isSelected && (
+                                    <div className={styles.bundleCardCheck}>
+                                      <Check size={11} />
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                        </div>
+
+                        {/* FLOW STEP 2: Add nominal not just quick fill */}
+                        {selectedBundleTickers.length > 0 && (
+                          <>
+                            <div className={styles.bundleFlowHeader} style={{ marginTop: 6 }}>
+                              <span className={styles.bundleFlowStep}>
+                                2. SET NOMINALS ({selectedBundleTickers.length} SELECTED)
+                              </span>
+                              <div className={styles.bundlePresetsRow}>
+                                <button
+                                  type="button"
+                                  className={styles.bundlePresetQuickBtn}
+                                  onClick={() => {
+                                    setBundleAmounts((prev) => {
+                                      const next = { ...prev };
+                                      for (const t of selectedBundleTickers) next[t] = "100";
+                                      return next;
+                                    });
+                                  }}
+                                >
+                                  All $100
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.bundlePresetQuickBtn}
+                                  onClick={() => {
+                                    setBundleAmounts((prev) => {
+                                      const next = { ...prev };
+                                      for (const t of selectedBundleTickers) next[t] = "500";
+                                      return next;
+                                    });
+                                  }}
+                                >
+                                  All $500
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.bundlePresetQuickBtn}
+                                  onClick={() => {
+                                    setBundleAmounts((prev) => {
+                                      const next = { ...prev };
+                                      for (const t of selectedBundleTickers) next[t] = "1000";
+                                      return next;
+                                    });
+                                  }}
+                                >
+                                  All $1,000
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className={styles.bundleNominalList}>
+                              {selectedBundleTickers.map((t) => {
+                                const def = catalogue.find((d) => d.ticker === t);
+                                const curVal = Number(bundleAmounts[t] ?? "0");
+                                const p = priceOf(t, prices);
+                                const shares = p > 0 && Number.isFinite(curVal) ? curVal / p : 0;
+                                return (
+                                  <div key={t} className={styles.bundleNominalItem}>
+                                    <div className={styles.bundleNominalItemTop}>
+                                      <div className={styles.bundleItemTitle}>
+                                        {def && (
+                                          <img
+                                            src={sprite(def.image)}
+                                            alt={t}
+                                            className={styles.bundleItemSpriteSmall}
+                                          />
+                                        )}
+                                        <strong>{t}</strong>
+                                        <small style={{ color: "var(--civic-muted)" }}>
+                                          · {money(p)}
+                                        </small>
+                                      </div>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                        <span className={styles.bundleItemUnits}>
+                                          ≈ {shares.toFixed(3)} shares
+                                        </span>
+                                        <button
+                                          type="button"
+                                          className={styles.bundleItemRemove}
+                                          onClick={() =>
+                                            setSelectedBundleTickers((prev) =>
+                                              prev.filter((x) => x !== t),
+                                            )
+                                          }
+                                          title={`Remove ${t}`}
+                                        >
+                                          <X size={13} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <div className={styles.bundleNominalItemBottom}>
+                                      <div className={styles.bundleNominalInputWrap}>
+                                        <span className={styles.bundleNominalPrefix}>$</span>
+                                        <input
+                                          aria-label={`${t} nominal amount`}
+                                          type="number"
+                                          min="1"
+                                          step="10"
+                                          placeholder="0"
+                                          value={bundleAmounts[t] ?? ""}
+                                          onChange={(e) =>
+                                            setBundleAmounts((prev) => ({
+                                              ...prev,
+                                              [t]: e.target.value,
+                                            }))
+                                          }
+                                          className={styles.bundleNominalInput}
+                                        />
+                                      </div>
+                                      <div className={styles.bundleItemChipGroup}>
+                                        {[100, 500, 1000].map((chip) => (
+                                          <button
+                                            key={chip}
+                                            type="button"
+                                            className={styles.bundleItemChip}
+                                            onClick={() =>
+                                              setBundleAmounts((prev) => ({
+                                                ...prev,
+                                                [t]: String(chip),
+                                              }))
+                                            }
+                                          >
+                                            ${chip}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* FLOW STEP 3: Pay it (New Form & Pre-Flight Checks) */}
+                            {(() => {
+                              const validItems = selectedBundleTickers.flatMap((t) => {
+                                const v = Number(bundleAmounts[t]);
+                                if (!Number.isFinite(v) || v < 1) return [];
+                                const def = catalogue.find((d) => d.ticker === t);
+                                return def ? [{ kind: def.kind, amount: v }] : [];
+                              });
+                              const totalCost = validItems.reduce((acc, i) => acc + i.amount, 0);
+                              const canAfford = totalCost <= city.cash && validItems.length > 0;
+
+                              return (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+                                  <div className={styles.bundleSummary}>
+                                    <div className={styles.bundleSummaryLabel}>
+                                      Total Bundle Investment ({validItems.length} buildings)
+                                    </div>
+                                    <div className={styles.bundleSummaryValue}>
+                                      {money(totalCost)}
+                                    </div>
+                                  </div>
+
+                                  <OrderPreflight
+                                    amount={totalCost}
+                                    itemCount={validItems.length}
+                                    walletAddress={walletAddress}
+                                    onFaucetClaimed={handleClaimFaucet}
+                                    compact
+                                  />
+
+                                  <button
+                                    type="button"
+                                    className={styles.primary}
+                                    disabled={!hasExchange || !canAfford}
+                                    onClick={() => {
+                                      setBundleMsg(onBuyBundle(validItems));
+                                    }}
+                                  >
+                                    <span>
+                                      Place Bundle on Island ({validItems.length} Buildings · 1 Sig)
+                                    </span>
+                                    <ArrowUpRight size={17} />
+                                  </button>
+                                  {bundleMsg && (
+                                    <p role="status" className={styles.notice}>
+                                      {bundleMsg}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </>
+                        )}
+                      </section>
                     )}
-                  </section>
+                  </>
                 )}
                 <label className={styles.search}>
                   <Search size={16} />
@@ -1266,7 +1540,32 @@ export default function CivicPanel({
                         title="Make it part of your city"
                         detail="ORDER"
                       />
-                      <label htmlFor="investment">Investment amount</label>
+                      <label htmlFor="investment">Investment nominal amount</label>
+                      <div className={styles.tradePresets}>
+                        {[100, 500, 1000].map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            className={`${styles.presetChip} ${
+                              Number(amount) === amt ? styles.presetChipActive : ""
+                            }`}
+                            onClick={() => setAmount(String(amt))}
+                          >
+                            ${amt}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className={`${styles.presetChip} ${
+                            Number(amount) === Math.floor(city.cash)
+                              ? styles.presetChipActive
+                              : ""
+                          }`}
+                          onClick={() => setAmount(String(Math.max(1, Math.floor(city.cash))))}
+                        >
+                          Max ({money(city.cash)})
+                        </button>
+                      </div>
                       <div className={styles.amount}>
                         <span>USD</span>
                         <input
@@ -1281,39 +1580,20 @@ export default function CivicPanel({
                           aria-describedby="amount-hint"
                         />
                       </div>
-                      <div id="amount-hint" className={styles.caption} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div id="amount-hint" className={styles.caption}>
                         <span>
                           {validAmount
                             ? `≈ ${(input / priceOf(selected.ticker, prices)).toFixed(4)} units · ${money(city.cash)} available`
                             : `Enter $1–${money(city.cash)} in available funds.`}
                         </span>
-                        <button
-                          type="button"
-                          onClick={handleClaimFaucet}
-                          disabled={faucetClaiming}
-                          style={{
-                            background: "rgba(240, 185, 11, 0.15)",
-                            border: "1px solid rgba(240, 185, 11, 0.4)",
-                            color: "#f0b90b",
-                            borderRadius: "4px",
-                            fontSize: "10px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            padding: "2px 7px",
-                          }}
-                          title={
-                            walletAddress
-                              ? "Claim 10,000 $mUSD from BSC Testnet Faucet"
-                              : "Connect wallet to claim 10,000 $mUSD on BSC Testnet"
-                          }
-                        >
-                          <Coins size={11} />
-                          {faucetClaiming ? "Claiming…" : "+10k Faucet"}
-                        </button>
                       </div>
+                      <OrderPreflight
+                        amount={validAmount ? input : 0}
+                        itemCount={1}
+                        walletAddress={walletAddress}
+                        onFaucetClaimed={handleClaimFaucet}
+                        compact
+                      />
                       {catalogue.find((d) => d.ticker === selected.ticker) ? (
                         <>
                           <button

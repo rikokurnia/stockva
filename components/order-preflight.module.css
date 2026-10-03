@@ -1,0 +1,261 @@
+.preflight {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(13, 27, 36, 0.7);
+  border: 1px solid rgba(53, 80, 95, 0.5);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  backdrop-filter: blur(8px);
+}
+
+.preflight.compact {
+  padding: 10px 12px;
+  margin: 8px 0;
+  gap: 8px;
+}
+
+.preflightHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preflightTitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #8da4b0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pulseIcon {
+  color: #f0b90b;
+}
+
+.networkBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  background: rgba(240, 185, 11, 0.12);
+  border: 1px solid rgba(240, 185, 11, 0.35);
+  color: #f0b90b;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: rgba(19, 39, 51, 0.6);
+  border: 1px solid rgba(48, 77, 94, 0.45);
+  border-radius: 7px;
+  padding: 8px 10px;
+  min-height: 72px;
+  transition: border-color 0.2s;
+}
+
+.cardOk {
+  border-color: rgba(43, 216, 138, 0.3);
+}
+
+.cardWarning {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(35, 27, 20, 0.6);
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.cardLabel {
+  font-size: 10px;
+  color: #9cb5c2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.badgeSuccess {
+  font-size: 9px;
+  font-weight: 700;
+  color: #2bd88a;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(43, 216, 138, 0.15);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.badgeAlert {
+  font-size: 9px;
+  font-weight: 700;
+  color: #f59e0b;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(245, 158, 11, 0.18);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.badgeNeutral {
+  font-size: 9px;
+  font-weight: 600;
+  color: #78bddb;
+  background: rgba(120, 189, 219, 0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.badgeMuted {
+  font-size: 9px;
+  color: #6d8491;
+}
+
+.cardValue {
+  font-size: 13px;
+  font-weight: 700;
+  color: #edf2f3;
+  font-family: ui-monospace, monospace;
+  margin: 4px 0 2px;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+}
+
+.cardSub {
+  font-size: 9px;
+  color: #7994a3;
+  line-height: 1.2;
+}
+
+.loadingPulse {
+  animation: pulse 1s infinite alternate;
+  color: #8da4b0;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+.faucetBtn {
+  background: rgba(240, 185, 11, 0.15);
+  border: 1px solid rgba(240, 185, 11, 0.4);
+  color: #f0b90b;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  transition: all 0.15s;
+}
+
+.faucetBtn:hover:not(:disabled) {
+  background: rgba(240, 185, 11, 0.3);
+  border-color: #f0b90b;
+}
+
+.faucetBtn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.warningBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 7px;
+  padding: 9px 12px;
+  color: #f59e0b;
+}
+
+.warningContent {
+  flex: 1;
+  font-size: 11px;
+}
+
+.warningContent strong {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: #fbbf24;
+}
+
+.warningContent p {
+  margin: 0;
+  color: #d1b89d;
+  line-height: 1.35;
+}
+
+.bannerFaucetBtn {
+  background: #f0b90b;
+  color: #0c1820;
+  border: 0;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.bannerFaucetBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.bannerFaucetBtn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 10px;
+}

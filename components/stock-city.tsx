@@ -38,6 +38,7 @@ import {
   recordBuildingOnchain,
 } from "../lib/contracts";
 import BundleModal from "./bundle-modal";
+import { BuildingCatalogueModal } from "./building-catalogue-modal";
 import CityAdvisor from "./city-advisor";
 import StockLogo from "./stock-logo";
 import CompanyIntel from "./company-intel";
@@ -540,10 +541,8 @@ export default function StockCity() {
       setTool("road");
       setKind(null);
     } else {
-      const firstInCat = catalogue.find((d) => d.category === next);
-      if (firstInCat && (!kind || defFor(kind).category !== next)) {
-        setKind(firstInCat.kind);
-        setTool("build");
+      if (kind && defFor(kind).category !== next) {
+        setKind(null);
       }
     }
   };
@@ -1241,284 +1240,29 @@ export default function StockCity() {
             </button>
           </div>
         )}
-      {category && (
-        <section
-          className="construction-tray"
-          aria-label="Construction catalogue"
-        >
-          <header className="build-tray-header">
-            <div className="build-tray-nav">
-              <span className="build-title-badge">BUILDS</span>
-              <div
-                className="build-category-tabs"
-                role="tablist"
-                aria-label="Build categories"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={category === "roads"}
-                  className={`build-cat-tab ${category === "roads" ? "active" : ""}`}
-                  onClick={() => chooseCategory("roads")}
-                >
-                  <GameArt index={1} />
-                  <span>Roads</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={category === "companies"}
-                  className={`build-cat-tab ${category === "companies" ? "active" : ""}`}
-                  onClick={() => chooseCategory("companies")}
-                >
-                  <GameArt index={2} />
-                  <span>Companies{!hasExchange ? " · Locked" : ""}</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={category === "services"}
-                  className={`build-cat-tab ${category === "services" ? "active" : ""}`}
-                  onClick={() => chooseCategory("services")}
-                >
-                  <GameArt index={3} />
-                  <span>Services</span>
-                </button>
-              </div>
-            </div>
-            <button
-              className="build-tray-close"
-              onClick={() => setCategory(null)}
-              aria-label="Close construction catalogue"
-              title="Close (Esc)"
-            >
-              <X size={15} />
-            </button>
-          </header>
-          <div className="tray-content">
-            {category === "companies" && !hasExchange ? (
-              <div className="companies-locked">
-                <Landmark size={26} />
-                <div>
-                  <strong>Open the market first</strong>
-                  <p>Build the Stock Exchange to unlock company buildings.</p>
-                </div>
-                <button onClick={() => chooseCategory("services")}>
-                  Build services <ChevronRight size={15} />
-                </button>
-              </div>
-            ) : category === "roads" ? (
-              <>
-                <button
-                  className={`build-card road-card ${tool === "road" ? "chosen" : ""}`}
-                  onClick={() => {
-                    setTool("road");
-                    setKind(null);
-                    setCategory(null);
-                    notify(
-                      "Drawing roads ($10/tile). Drag a route on island, release to build. Esc to finish.",
-                    );
-                  }}
-                  title="Click to start drawing roads"
-                >
-                  <div className="card-image">
-                    <img
-                      src={sprite("roads/straight_ul_lr")}
-                      alt="Two-lane road"
-                    />
-                  </div>
-                  <strong>Two-lane road</strong>
-                  <span>{wholeMoney(ROAD_COST)} / tile</span>
-                  <kbd>R</kbd>
-                </button>
-                <div className="road-instructions">
-                  <div
-                    className="fleet-preview"
-                    aria-label="Your city vehicles"
-                  >
-                    {[
-                      "electric_bus",
-                      "construction_truck",
-                      "maintenance_van",
-                    ].map((v) => (
-                      <img
-                        key={v}
-                        src={sprite(`vehicles/${v}/lower_right`)}
-                        alt={v.replaceAll("_", " ")}
-                      />
-                    ))}
-                  </div>
-                  <div>
-                    <strong>Draw your road network</strong>
-                    <p>
-                      Click a starting point, drag a route, then release.
-                      <br />
-                      Corners and intersections connect automatically.
-                    </p>
-                    <button
-                      className="place-on-island road-start-btn"
-                      onClick={() => {
-                        setTool("road");
-                        setKind(null);
-                        setCategory(null);
-                        notify(
-                          "Drawing roads ($10/tile). Drag a route on island, release to build. Esc to finish.",
-                        );
-                      }}
-                    >
-                      <span>Start Drawing Roads ($10/tile)</span>
-                      <ArrowUpRight size={14} />
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {catalogue
-                  .filter((d) => d.category === category)
-                  .map((d) => (
-                    <button
-                      key={d.kind}
-                      className={`build-card ${kind === d.kind ? "chosen" : ""} ${d.category === "companies" ? "company-card" : "service-card"}`}
-                      onClick={() => chooseBuilding(d.kind)}
-                      onDoubleClick={() => chooseBuilding(d.kind, true)}
-                      disabled={!ready || city.cash < (d.ticker ? 1 : d.cost)}
-                    >
-                      <div className="card-image">
-                        <img src={sprite(d.image)} alt={d.name} />
-                        {d.ticker && (
-                          <StockLogo
-                            ticker={d.ticker}
-                            name={d.name}
-                            size={20}
-                            className="card-logo-chip"
-                          />
-                        )}
-                      </div>
-                      <strong>{d.name}</strong>
-                      <span>{d.ticker ?? wholeMoney(d.cost)}</span>
-                      {kind === d.kind && (
-                        <Check className="card-selected" size={12} />
-                      )}
-                    </button>
-                  ))}
-                <div className="build-options">
-                  {buildDef && defFor(kind!).category === category ? (
-                    <>
-                      <div className="build-def-header">
-                        {buildDef.ticker && (
-                          <StockLogo
-                            ticker={buildDef.ticker}
-                            name={buildDef.name}
-                            size={26}
-                          />
-                        )}
-                        <strong>{buildDef.name}</strong>
-                      </div>
-                      <span className="footprint-label">2 × 2 footprint</span>
-                      {buildDef.ticker ? (
-                        <>
-                          <div className="investment-header">
-                            <label htmlFor="build-amount">Investment</label>
-                            <div className="quick-amount-chips">
-                              {[50, 100, 200, 500].map((amt) => (
-                                <button
-                                  key={amt}
-                                  type="button"
-                                  className={`quick-amount-btn ${amount === amt ? "active" : ""}`}
-                                  onClick={() => setAmount(amt)}
-                                >
-                                  ${amt}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="investment-input">
-                            <span>$</span>
-                            <input
-                              id="build-amount"
-                              type="number"
-                              min="1"
-                              step="50"
-                              value={Number.isNaN(amount) ? "" : amount}
-                              onChange={(e) =>
-                                setAmount(
-                                  e.target.value === ""
-                                    ? NaN
-                                    : Number(e.target.value),
-                                )
-                              }
-                            />
-                          </div>
-                          <small>
-                            {Number.isFinite(amount)
-                              ? (
-                                  amount / priceOf(buildDef.ticker, prices)
-                                ).toFixed(3)
-                              : "0"}{" "}
-                            shares · {money(priceOf(buildDef.ticker, prices))} /
-                            share · {PROVIDER_TAG}
-                          </small>
-                          <button
-                            className="place-on-island"
-                            onClick={() => {
-                              setCategory(null);
-                              notify(
-                                `Placing ${buildDef.name} ($${amount}). Click island plot to build, Esc to cancel.`,
-                              );
-                            }}
-                            disabled={
-                              !Number.isFinite(amount) ||
-                              amount < 1 ||
-                              amount > city.cash
-                            }
-                          >
-                            <span>
-                              Pay ${Number.isFinite(amount) ? amount : 0} &
-                              Place
-                            </span>
-                            <ArrowUpRight size={14} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <span className="service-cost">
-                            {wholeMoney(buildDef.cost)}
-                          </span>
-                          <small>{buildDef.description}</small>
-                          <button
-                            className="place-on-island"
-                            onClick={() => {
-                              setCategory(null);
-                              notify(
-                                `Placing ${buildDef.name} (${wholeMoney(buildDef.cost)}). Click island plot to build, Esc to cancel.`,
-                              );
-                            }}
-                            disabled={city.cash < buildDef.cost}
-                          >
-                            <span>Pay {wholeMoney(buildDef.cost)} & Place</span>
-                            <ArrowUpRight size={14} />
-                          </button>
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <MousePointer2 size={20} />
-                      <strong>Select a building</strong>
-                      <small>
-                        {category === "companies"
-                          ? "Select a company above, then click Pay & Place."
-                          : "Choose a service, then click Pay & Place."}
-                      </small>
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </section>
-      )}
+      <BuildingCatalogueModal
+        open={Boolean(category)}
+        category={category}
+        onSelectCategory={chooseCategory}
+        onClose={() => setCategory(null)}
+        hasExchange={hasExchange}
+        cityCash={city.cash}
+        prices={prices}
+        walletAddress={wallet}
+        initialKind={kind}
+        onStartDrawRoad={() => {
+          setTool("road");
+          setKind(null);
+          setCategory(null);
+          notify(
+            "Drawing roads ($10/tile). Drag a route on island, release to build. Esc to finish.",
+          );
+        }}
+        onPayAndPlace={(k, amt) => {
+          setAmount(amt);
+          chooseBuilding(k, true, "tray");
+        }}
+      />
       {current &&
         definition &&
         tool === "inspect" &&

@@ -1,0 +1,705 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 11, 16, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modalCard {
+  width: 880px;
+  max-width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: #0d1b24;
+  border: 1.5px solid #233b4b;
+  border-radius: 14px;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  color: #edf2f3;
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(18px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Header */
+.header {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #11232e;
+  border-bottom: 1.5px solid #233b4b;
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.titleBadge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #f0b90b;
+  background: rgba(240, 185, 11, 0.12);
+  border: 1px solid rgba(240, 185, 11, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.categoryTabs {
+  display: flex;
+  gap: 6px;
+  background: rgba(8, 16, 22, 0.5);
+  padding: 3px;
+  border-radius: 7px;
+  border: 1px solid #1a2d39;
+}
+
+.catTab {
+  background: transparent;
+  border: 0;
+  color: #8fa6b4;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.catTab:hover {
+  color: #edf2f3;
+}
+
+.catTabActive {
+  background: #1e3646;
+  color: #edf2f3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.closeBtn {
+  background: transparent;
+  border: 0;
+  color: #8fa6b4;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+/* Body */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: #233b4b transparent;
+}
+
+/* Locked view */
+.companiesLocked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 50px 20px;
+  gap: 14px;
+}
+
+.lockIconBox {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(240, 185, 11, 0.1);
+  border: 1px solid rgba(240, 185, 11, 0.3);
+  display: grid;
+  place-items: center;
+  color: #f0b90b;
+}
+
+.lockText h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.lockText p {
+  margin: 0;
+  color: #9cb5c2;
+  font-size: 13px;
+  max-width: 400px;
+}
+
+.primaryActionBtn {
+  background: #f0b90b;
+  color: #0c1820;
+  border: 0;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.primaryActionBtn:hover {
+  opacity: 0.9;
+}
+
+/* Roads View */
+.roadsView {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.roadCardLarge {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  background: #11232e;
+  border: 1px solid #233b4b;
+  border-radius: 10px;
+  padding: 20px;
+  max-width: 580px;
+}
+
+.roadImgBox {
+  width: 90px;
+  height: 90px;
+  background: #081219;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #1a2d39;
+}
+
+.roadImgBox img {
+  width: 64px;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.roadDetails h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.roadCost {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2bd88a;
+  margin-bottom: 8px;
+}
+
+.roadDetails p {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: #9cb5c2;
+  line-height: 1.4;
+}
+
+/* Catalogue Vertical Grid */
+.catalogueView {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.searchBarRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #11232e;
+  border: 1px solid #233b4b;
+  border-radius: 7px;
+  padding: 0 12px;
+  width: 320px;
+  height: 36px;
+}
+
+.searchIcon {
+  color: #6e8694;
+}
+
+.searchInput {
+  background: transparent;
+  border: 0;
+  color: #edf2f3;
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+}
+
+.clearSearchBtn {
+  background: transparent;
+  border: 0;
+  color: #6e8694;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.catalogueStats {
+  font-size: 11px;
+  color: #8da4b0;
+}
+
+/* Grid: Flows up to down, scrolls down */
+.verticalGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  padding-bottom: 10px;
+}
+
+.buildingCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: #11232e;
+  border: 1.5px solid #233b4b;
+  border-radius: 9px;
+  padding: 10px 8px 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  color: inherit;
+}
+
+.buildingCard:hover:not(:disabled) {
+  border-color: #f0b90b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  background: #142a37;
+}
+
+.buildingCardDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cardSpriteBox {
+  position: relative;
+  width: 90px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+}
+
+.cardSprite {
+  max-width: 85px;
+  max-height: 75px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+
+.cardLogoFloating {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: rgba(13, 27, 36, 0.85);
+  border-radius: 50%;
+  padding: 2px;
+  border: 1px solid #233b4b;
+}
+
+.cardInfo {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cardName {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardPriceRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.cardPrice {
+  font-size: 10px;
+  font-weight: 700;
+  color: #2bd88a;
+  font-family: ui-monospace, monospace;
+}
+
+.cardTickerBadge {
+  font-size: 9px;
+  font-weight: 700;
+  color: #8da4b0;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* REVAMPED ORDER FORM VIEW */
+.orderFormView {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.orderFormHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #1e3646;
+  padding-bottom: 10px;
+}
+
+.backBtn {
+  background: transparent;
+  border: 1px solid #233b4b;
+  color: #9cb5c2;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.backBtn:hover {
+  background: #172c3a;
+  color: #edf2f3;
+  border-color: #355368;
+}
+
+.treasuryChip {
+  font-size: 11px;
+  color: #8da4b0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.treasuryChip strong {
+  color: #2bd88a;
+  font-family: ui-monospace, monospace;
+}
+
+.orderFormLayout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .orderFormLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Showcase */
+.buildingShowcase {
+  background: #11232e;
+  border: 1px solid #233b4b;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.spritePodium {
+  width: 100%;
+  height: 140px;
+  background: radial-gradient(circle at 50% 60%, rgba(240, 185, 11, 0.08), transparent 70%);
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px dashed rgba(53, 83, 104, 0.4);
+}
+
+.largeBuildingSprite {
+  max-width: 130px;
+  max-height: 120px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.6));
+}
+
+.showcaseMeta {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.showcaseTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.showcaseTitleRow h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.subMeta {
+  font-size: 10px;
+  color: #8da4b0;
+}
+
+.serviceIconPill {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #1a3240;
+  border: 1px solid #2b495d;
+  display: grid;
+  place-items: center;
+  color: #f0b90b;
+}
+
+.priceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #081219;
+  border: 1px solid #1a2d39;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.priceLabel {
+  color: #8da4b0;
+}
+
+.priceValue {
+  font-weight: 700;
+  color: #2bd88a;
+  font-family: ui-monospace, monospace;
+}
+
+.buildingDesc {
+  margin: 0;
+  font-size: 11px;
+  color: #9cb5c2;
+  line-height: 1.4;
+  text-align: left;
+}
+
+/* Order Form Inputs */
+.orderFormInputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formLabelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.formLabelRow label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9cb5c2;
+}
+
+.unitsBadge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #78bddb;
+  font-family: ui-monospace, monospace;
+}
+
+.presetChips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.presetBtn {
+  flex: 1;
+  min-width: 60px;
+  background: #132733;
+  border: 1px solid #233b4b;
+  color: #edf2f3;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.presetBtn:hover {
+  background: #1a3546;
+  border-color: #355368;
+}
+
+.presetBtnActive {
+  background: rgba(240, 185, 11, 0.18);
+  border-color: #f0b90b;
+  color: #f0b90b;
+}
+
+.nominalInputWrap {
+  display: flex;
+  align-items: center;
+  background: #081219;
+  border: 1.5px solid #233b4b;
+  border-radius: 8px;
+  padding: 0 14px;
+  height: 48px;
+  transition: border-color 0.15s;
+}
+
+.nominalInputWrap:focus-within {
+  border-color: #f0b90b;
+}
+
+.currencyPrefix {
+  font-size: 18px;
+  font-weight: 700;
+  color: #8da4b0;
+  margin-right: 8px;
+}
+
+.nominalInput {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: #edf2f3;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  outline: none;
+}
+
+.currencySuffix {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6e8694;
+}
+
+.commitBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #f0b90b;
+  color: #0c1820;
+  border: 0;
+  border-radius: 8px;
+  padding: 13px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 4px 14px rgba(240, 185, 11, 0.25);
+}
+
+.commitBtn:hover:not(:disabled) {
+  background: #ffc820;
+  box-shadow: 0 6px 18px rgba(240, 185, 11, 0.35);
+  transform: translateY(-1px);
+}
+
+.commitBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.signatureNote {
+  font-size: 10px;
+  color: #8da4b0;
+  text-align: center;
+  line-height: 1.35;
+}
+
+/* Service Box */
+.servicePriceBox {
+  background: #11232e;
+  border: 1px solid #233b4b;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.serviceCostBig {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2bd88a;
+  font-family: ui-monospace, monospace;
+  margin: 4px 0;
+}
