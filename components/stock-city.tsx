@@ -34,8 +34,10 @@ import { fallbackFeed, type MarketFeed } from "../lib/market";
 import {
   VAULT_ADDRESS,
   bscAddressLink,
+  connectInjectedWallet,
   recordBuildingOnchain,
 } from "../lib/contracts";
+import BundleModal from "./bundle-modal";
 import CityAdvisor from "./city-advisor";
 import StockLogo from "./stock-logo";
 import CompanyIntel from "./company-intel";
@@ -129,6 +131,11 @@ export default function StockCity() {
   const [bundleQueue, setBundleQueue] = useState<
     { kind: BuildingKind; amount: number }[]
   >([]);
+  const [bundleBuildingIds, setBundleBuildingIds] = useState<string[]>([]);
+  const [showBundleModal, setShowBundleModal] = useState(false);
+  const [bundleModalBuildings, setBundleModalBuildings] = useState<Building[]>(
+    [],
+  );
   const [assetTicker, setAssetTicker] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState(false);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
@@ -628,30 +635,54 @@ export default function StockCity() {
       const entryPrice = priceOf(ticker, prices);
       const fromTray = placeSource !== "exchange";
       setPlaceSource(null);
-      if (fromTray && wallet) {
-        // Build-menu flow: one building, one signature, immediately.
-        const account = wallet;
+      if (fromTray) {
+        // 2.1 Single Building Direct Placement:
+        // When a building is placed on the grid from the tray, immediately pop up the wallet signature request.
+        // The rectangular 7-second construction bar runs during block confirmation. Once mined, the building unlocks permanently on the canvas.
         const buildingId = placed.id;
         setConfirmingBuildings((prev) => ({
           ...prev,
           [buildingId]: { confirming: true, confirmed: false, startedAt: Date.now() },
         }));
-        notify(
-          `${defFor(kind).name} drafted. Confirm the purchase popup in your wallet…`,
-        );
-        void recordBuildingOnchain(
-          account,
-          { ticker, usdAmount: amount, entryPrice, initialTier: 1 },
-          (step, hash) => {
-            if (step === "approve" && !hash)
-              notify("Confirm the mUSD approval popup in your wallet…");
-            else if (step === "approve" && hash)
-              notify(`Approval sent. Now confirm the building purchase…`);
-            else if (step === "buy" && hash)
-              notify(`Purchase sent. Waiting for BSC confirmation…`);
-          },
-        )
-          .then(({ hash, positionId }) => {
+
+        (async () => {
+          let account = wallet;
+          if (!account) {
+            try {
+              notify("Connecting wallet for on-chain placement…");
+              account = await connectInjectedWallet();
+              setWallet(account);
+            } catch (err: unknown) {
+              setConfirmingBuildings((prev) => {
+                const next = { ...prev };
+                delete next[buildingId];
+                return next;
+              });
+              notify(
+                `Kept as draft: connect wallet to confirm on BSC (${err instanceof Error ? err.message : "wallet connection cancelled"}).`,
+                true,
+              );
+              return;
+            }
+          }
+
+          notify(
+            `${defFor(kind).name} drafted. Confirm the purchase popup in your wallet…`,
+          );
+          try {
+            const { hash, positionId } = await recordBuildingOnchain(
+              account,
+              { ticker, usdAmount: amount, entryPrice, initialTier: 1 },
+              (step, hash) => {
+                if (step === "approve" && !hash)
+                  notify("Confirm the mUSD approval popup in your wallet…");
+                else if (step === "approve" && hash)
+                  notify(`Approval sent. Now confirm the building purchase…`);
+                else if (step === "buy" && hash)
+                  notify(`Purchase sent. Waiting for BSC confirmation…`);
+              },
+            );
+
             const latest = simulationLatest.current.city;
             commit({
               ...latest,
@@ -666,10 +697,9 @@ export default function StockCity() {
               [buildingId]: { confirming: false, confirmed: true, startedAt: prev[buildingId]?.startedAt },
             }));
             notify(
-              `${defFor(kind).name} unlocked and permanent. Receipt in City Hall.`,
+              `${defFor(kind).name} unlocked and permanently recorded on BSC!`,
             );
-          })
-          .catch((err: unknown) => {
+          } catch (err: unknown) {
             setConfirmingBuildings((prev) => {
               const next = { ...prev };
               delete next[buildingId];
@@ -679,12 +709,15 @@ export default function StockCity() {
               `Kept locked: on-chain payment failed (${err instanceof Error ? err.message : "wallet rejected"}). Retry in City Hall.`,
               true,
             );
-          });
+          }
+        })();
+        return;
       } else if (!fromTray && bundleQueue.length > 1) {
         // Bundle flow: advance to the next queued stock.
         const rest = bundleQueue.slice(1);
         const done = bundleQueue.length - rest.length;
         const total = bundleQueue.length;
+        setBundleBuildingIds((prev) => [...prev, placed.id]);
         setBundleQueue(rest);
         setAmount(rest[0].amount);
         setTool("inspect");
@@ -695,13 +728,24 @@ export default function StockCity() {
           `${defFor(kind).name} drafted locked (${done}/${total}). Now place ${defFor(rest[0].kind).name} — Esc stops the bundle.`,
         );
       } else {
-        const wasBundle = bundleQueue.length >= 1;
-        setBundleQueue([]);
-        notify(
-          wasBundle
-            ? `${defFor(kind).name} drafted locked. Bundle complete — pay once in City Hall to unlock everything permanently.`
-            : `${defFor(kind).name} drafted as locked at ${money(entryPrice)} per share. Pay in City Hall to unlock it permanently.`,
+        // 2.2 Bundle Direct Floating Batch Confirmation Modal:
+        // After placing the final building of a bundle queue, trigger a streamlined "Confirm Bundle Purchase"
+        // floating modal directly on the canvas to sign and unlock all buildings in a single transaction.
+        const currentBundleIds = [...bundleBuildingIds, placed.id];
+        const allBundleBuildings = lockedState.buildings.filter((b) =>
+          currentBundleIds.includes(b.id),
         );
+        setBundleQueue([]);
+        setBundleBuildingIds([]);
+        if (allBundleBuildings.length > 0) {
+          setBundleModalBuildings(allBundleBuildings);
+          setShowBundleModal(true);
+          notify("All bundle buildings placed! Confirm your purchase directly on the canvas.");
+        } else {
+          notify(
+            `${defFor(kind).name} drafted as locked at ${money(entryPrice)} per share.`,
+          );
+        }
       }
       return;
     }
@@ -948,6 +992,50 @@ export default function StockCity() {
         onBulldoze={onBulldoze}
         onCancel={cancel}
         onHover={setHover}
+      />
+      <BundleModal
+        open={showBundleModal}
+        buildings={bundleModalBuildings}
+        prices={prices}
+        walletAddress={wallet}
+        onClose={() => setShowBundleModal(false)}
+        onConnectWallet={async () => {
+          const acc = await connectInjectedWallet();
+          setWallet(acc);
+          return acc;
+        }}
+        onStartConfirmation={(buildingIds) => {
+          setConfirmingBuildings((prev) => {
+            const copy = { ...prev };
+            for (const id of buildingIds) {
+              copy[id] = { confirming: true, confirmed: false, startedAt: Date.now() };
+            }
+            return copy;
+          });
+        }}
+        onConfirmSuccess={(receipts) => {
+          const latest = simulationLatest.current.city;
+          const byId = new Map(receipts.map((r) => [r.buildingId, r]));
+          commit({
+            ...latest,
+            buildings: latest.buildings.map((b) => {
+              const r = byId.get(b.id);
+              return r
+                ? { ...b, locked: false, vaultTx: r.hash, vaultId: r.vaultId }
+                : b;
+            }),
+          });
+          setConfirmingBuildings((prev) => {
+            const copy = { ...prev };
+            for (const r of receipts) {
+              copy[r.buildingId] = { confirming: false, confirmed: true, startedAt: Date.now() };
+            }
+            return copy;
+          });
+          notify(
+            `🎉 Bundle confirmed on BSC! All ${receipts.length} buildings unlocked and permanently constructed.`,
+          );
+        }}
       />
       {intelBuilding && (
         <CompanyIntel
@@ -1771,10 +1859,11 @@ export default function StockCity() {
             if (totalCost > city.cash)
               return `Bundle costs ${money(totalCost)} but you have ${money(city.cash)}. Lower some amounts.`;
             setBundleQueue(items);
+            setBundleBuildingIds([]);
             setAmount(items[0].amount);
             chooseBuilding(items[0].kind, true, "exchange");
             notify(
-              `Bundle: place ${items.map((i) => defFor(i.kind).ticker).join(", ")} one by one, then pay once in City Hall.`,
+              `Bundle: place ${items.map((i) => defFor(i.kind).ticker).join(", ")} one by one, then confirm directly on the canvas.`,
             );
             return "";
           }}
