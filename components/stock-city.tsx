@@ -79,6 +79,7 @@ import {
   sprite,
   basePrices,
   tier,
+  tierName,
   valueOf,
   wholeMoney,
   DEFAULT_THRESHOLDS,
@@ -87,6 +88,11 @@ import {
   validThresholds,
   type TierThresholds,
 } from "../lib/city";
+import {
+  portfolioLevel,
+  portfolioPercent,
+  portfolioStatus,
+} from "../lib/portfolio-view";
 type Panel =
   "portfolio" | "market" | "settings" | "help" | "data" | null;
 const titles: Record<string, string> = {
@@ -1341,11 +1347,16 @@ export default function StockCity() {
             </div>
             {definition.ticker ? (
               (() => {
-                const ret = returnOf(current, prices);
+                const ret =
+                  simulationReturns?.[current.id] ?? returnOf(current, prices);
                 const val = valueOf(current, prices);
                 const myAlloc =
                   alloc.find((a) => a.id === current.id)?.pct ?? 0;
                 const live = priceOf(definition.ticker, prices);
+                const currentTier = tier(ret, thresholds);
+                const level =
+                  currentTier === "minus" ? 0 : portfolioLevel(currentTier);
+                const status = portfolioStatus(ret);
                 return (
                   <>
                     <div className="inspection-stats">
@@ -1367,13 +1378,50 @@ export default function StockCity() {
                       </span>
                       <span>
                         Return
-                        <b className={ret >= 0 ? "positive" : "negative"}>
-                          {pct(ret)}
+                        <b
+                          className={
+                            status === "gain"
+                              ? "positive"
+                              : status === "loss"
+                                ? "negative"
+                                : "flat"
+                          }
+                        >
+                          {portfolioPercent(ret)}
+                        </b>
+                      </span>
+                      <span>
+                        Tier Level
+                        <b
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                          }}
+                        >
+                          {tierName(currentTier)}
+                          <span
+                            className="stock-badge-pips"
+                            aria-hidden="true"
+                          >
+                            {[1, 2, 3].map((n) => (
+                              <i
+                                key={n}
+                                className={`pip ${n <= level ? "filled" : ""}`}
+                              />
+                            ))}
+                          </span>
                         </b>
                       </span>
                       <span>
                         Allocation<b>{myAlloc.toFixed(1)}% of stocks</b>
                       </span>
+                      {current.locked && (
+                        <span>
+                          Status
+                          <b style={{ color: "#f0b90b" }}>🔒 Locked (Unpaid)</b>
+                        </span>
+                      )}
                       <small>
                         {PROVIDER_TAG} ·{" "}
                         {feed.quotes[definition.ticker!]?.source} ·{" "}

@@ -4,6 +4,10 @@ export const portfolioPercent = (value: number) => {
   const rounded = Math.round(value * 10) / 10;
   return `${rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded).toFixed(1)}%`;
 };
+export const portfolioStatus = (value: number): "gain" | "loss" | "flat" => {
+  const rounded = Math.round(value * 10) / 10;
+  return rounded > 0 ? "gain" : rounded < 0 ? "loss" : "flat";
+};
 type Anchor = { id: string; x: number; y: number };
 export const LABEL_WIDTH = 124;
 export const LABEL_HEIGHT = 60;

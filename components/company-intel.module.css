@@ -185,6 +185,9 @@
 .loss {
   color: var(--red);
 }
+.flat {
+  color: var(--muted);
+}
 .quoteStrip {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -26,6 +26,7 @@ import {
 } from "../lib/city";
 import { companyProfiles, type CompanyNews } from "../lib/company-intel";
 import type { Quote } from "../lib/market";
+import { portfolioPercent, portfolioStatus } from "../lib/portfolio-view";
 import StockLogo from "./stock-logo";
 import styles from "./company-intel.module.css";
 
@@ -54,7 +55,8 @@ export default function CompanyIntel(p: Props) {
   const root = useRef<HTMLDivElement>(null),
     id = useId();
   const gain = p.simulatedReturn ?? returnOf(p.building, p.prices),
-    level = tier(gain, p.thresholds);
+    level = tier(gain, p.thresholds),
+    status = portfolioStatus(gain);
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement;
     root.current?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -175,8 +177,16 @@ export default function CompanyIntel(p: Props) {
                 )}
                 alt={`${asset.name} ${tierName(level)} building`}
               />
-              <strong className={gain >= 0 ? styles.gain : styles.loss}>
-                {pct(gain)}
+              <strong
+                className={
+                  status === "gain"
+                    ? styles.gain
+                    : status === "loss"
+                      ? styles.loss
+                      : styles.flat
+                }
+              >
+                {portfolioPercent(gain)}
               </strong>
               <small>
                 {p.simulatedReturn !== undefined ? (

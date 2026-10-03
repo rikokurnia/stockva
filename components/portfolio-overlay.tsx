@@ -16,6 +16,7 @@ import {
   layoutPortfolioLabels,
   portfolioLevel,
   portfolioPercent,
+  portfolioStatus,
 } from "../lib/portfolio-view";
 import styles from "./portfolio-view.module.css";
 export default function PortfolioOverlay({
@@ -23,12 +24,14 @@ export default function PortfolioOverlay({
   prices,
   thresholds,
   simulationReturns,
+  selected,
   onInspect,
 }: {
   buildings: Building[];
   prices: PriceMap;
   thresholds: TierThresholds;
   simulationReturns: Record<string, number> | null;
+  selected?: string | null;
   onInspect: (id: string) => void;
 }) {
   const labels = useMemo(
@@ -78,12 +81,20 @@ export default function PortfolioOverlay({
         return (
           <div
             key={b.id}
-            className={`city-building ${company ? "company" : "service"} ${styles.shadow}`}
+            className={`city-building ${company ? "company" : "service"} ${styles.shadow} ${selected === b.id ? "selected" : ""} ${b.locked ? "locked" : ""}`}
             style={{ left: p.x, top: p.y + 36 }}
             aria-hidden="true"
           >
+            {selected === b.id && (
+              <img
+                className="selected-effect"
+                src={sprite("effects/selection")}
+                alt=""
+              />
+            )}
             <img
               className="building-sprite"
+              style={{ opacity: b.locked ? 0.65 : undefined }}
               src={sprite(
                 buildingImage(b, prices, thresholds, simulationReturns?.[b.id]),
               )}
@@ -98,14 +109,16 @@ export default function PortfolioOverlay({
           def = defFor(b.kind),
           gain = simulationReturns?.[b.id] ?? returnOf(b, prices),
           currentTier = tier(gain, thresholds),
-          level = currentTier === "minus" ? 0 : portfolioLevel(currentTier);
+          level = currentTier === "minus" ? 0 : portfolioLevel(currentTier),
+          status = portfolioStatus(gain),
+          isSelected = selected === b.id;
         return (
           <button
             type="button"
             key={b.id}
-            className={styles.plaque}
+            className={`${styles.plaque} ${styles[status]} ${isSelected ? styles.selectedPlaque : ""} ${b.locked ? styles.lockedPlaque : ""}`}
             style={{ left: p.left, top: p.top }}
-            aria-label={`${def.name}, ${portfolioPercent(gain)} ${simulationReturns !== null ? "projected" : "unrealized"} return, ${tierName(currentTier)}`}
+            aria-label={`${def.name} (${def.ticker}), ${portfolioPercent(gain)} ${simulationReturns !== null ? "projected" : "unrealized"} return, ${tierName(currentTier)}${b.locked ? ", locked unpaid" : ""}`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
@@ -113,20 +126,38 @@ export default function PortfolioOverlay({
             }}
             data-building-id={b.id}
           >
-            <h3>{def.name}</h3>
+            <div className={styles.plaqueHeader}>
+              <h3 title={`${def.name} (${def.ticker})`}>
+                <span className={styles.plaqueName}>{def.name}</span>
+                {def.ticker && (
+                  <span className={styles.tickerBadge}>{def.ticker}</span>
+                )}
+              </h3>
+              {b.locked && (
+                <span
+                  className={styles.lockedBadge}
+                  title="Locked unpaid building"
+                  aria-label="Locked unpaid"
+                >
+                  🔒
+                </span>
+              )}
+            </div>
             <div className={styles.stats}>
               <strong
                 className={
-                  gain < -0.05
-                    ? styles.loss
-                    : gain >= 0.05
-                      ? styles.gain
+                  status === "gain"
+                    ? styles.gain
+                    : status === "loss"
+                      ? styles.loss
                       : styles.flat
                 }
               >
+                {status === "gain" && <span className={styles.arrow}>▲</span>}
+                {status === "loss" && <span className={styles.arrow}>▼</span>}
                 {portfolioPercent(gain)}
               </strong>
-              <span>{tierName(currentTier)}</span>
+              <span className={styles.tierName}>{tierName(currentTier)}</span>
             </div>
             <div className={styles.level} aria-hidden="true">
               {[1, 2, 3].map((n) => (

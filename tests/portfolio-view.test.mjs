@@ -4,6 +4,7 @@ import {
   layoutPortfolioLabels,
   portfolioLevel,
   portfolioPercent,
+  portfolioStatus,
   LABEL_WIDTH,
   LABEL_HEIGHT,
 } from "../lib/portfolio-view.ts";
@@ -25,6 +26,16 @@ test("returns have explicit gain/loss signs without negative zero", () => {
   assert.equal(portfolioPercent(8.44), "+8.4%");
   assert.equal(portfolioPercent(-2.1), "−2.1%");
   assert.equal(portfolioPercent(-0.01), "0.0%");
+});
+test("portfolio status aligns with portfolioPercent rounded value", () => {
+  assert.equal(portfolioStatus(8.44), "gain");
+  assert.equal(portfolioStatus(-2.1), "loss");
+  assert.equal(portfolioStatus(-0.01), "flat");
+  assert.equal(portfolioStatus(0), "flat");
+  assert.equal(portfolioStatus(0.04), "flat");
+  assert.equal(portfolioStatus(0.05), "gain");
+  assert.equal(portfolioStatus(-0.05), "flat");
+  assert.equal(portfolioStatus(-0.06), "loss");
 });
 test("adjacent holdings keep separate plaques and stable anchors", () => {
   const anchors = Array.from({ length: 12 }, (_, i) => ({

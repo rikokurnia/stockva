@@ -245,14 +245,15 @@ input {
 
 .building-stock-badge {
   position: absolute;
-  top: -16px;
+  top: -20px;
   left: 50%;
   transform: translateX(-50%);
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 2.5px 7px;
-  background: rgba(18, 32, 41, 0.94);
+  gap: 1.5px;
+  padding: 2.5px 6.5px;
+  background: rgba(14, 26, 33, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
@@ -267,6 +268,68 @@ input {
   z-index: 25;
   opacity: 1;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.stock-badge-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 4.5px;
+}
+
+.stock-badge-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 8px;
+  opacity: 0.88;
+}
+
+.stock-badge-level-tag {
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.stock-badge-pips {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.stock-badge-pips .pip {
+  width: 5px;
+  height: 3.5px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  display: inline-block;
+}
+
+.building-stock-badge.gain .stock-badge-pips .pip.filled {
+  background: #34d399;
+  border-color: #059669;
+}
+
+.building-stock-badge.loss .stock-badge-pips .pip.filled {
+  background: #f87171;
+  border-color: #dc2626;
+}
+
+.building-stock-badge.flat .stock-badge-pips .pip.filled {
+  background: #94a3b8;
+  border-color: #64748b;
+}
+
+.building-stock-badge.locked .stock-badge-pips .pip.filled {
+  background: #f0b90b;
+  border-color: #d97706;
+}
+
+.stock-badge-lock {
+  font-size: 8px;
+  margin-right: 2px;
+  line-height: 1;
 }
 
 .city-building:hover .building-stock-badge,
@@ -3734,6 +3797,9 @@ input {
 :is(.inspection-panel, .utility-panel) .negative,
 :is(.inspection-panel, .utility-panel) .danger {
   color: var(--red) !important;
+}
+:is(.inspection-panel, .utility-panel) .flat {
+  color: #cbd5e1 !important;
 }
 @media (max-width: 760px) {
   .inspection-panel {

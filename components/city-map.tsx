@@ -27,8 +27,14 @@ import {
   sprite,
   wholeMoney,
   tier,
+  tierName,
 } from "../lib/city";
 import type { PriceMap } from "../lib/city";
+import {
+  portfolioLevel,
+  portfolioPercent,
+  portfolioStatus,
+} from "../lib/portfolio-view";
 
 import Traffic from "./traffic";
 import PortfolioOverlay from "./portfolio-overlay";
@@ -419,6 +425,7 @@ export default function CityMap(props: Props) {
             prices={prices}
             thresholds={props.thresholds}
             simulationReturns={props.simulationReturns}
+            selected={selected}
             onInspect={onSelect}
           />
         )}
@@ -431,6 +438,10 @@ export default function CityMap(props: Props) {
               const ret = def.ticker
                 ? (props.simulationReturns?.[b.id] ?? returnOf(b, prices))
                 : 0;
+              const currentTier = tier(ret, props.thresholds);
+              const level =
+                currentTier === "minus" ? 0 : portfolioLevel(currentTier);
+              const status = portfolioStatus(ret);
               const confirmation = props.confirmingBuildings?.[b.id];
               const isUnderConstruction =
                 now - b.builtAt < 8850 ||
@@ -534,28 +545,36 @@ export default function CityMap(props: Props) {
                   />
                   {def.ticker && (
                     <div
-                      className={`building-stock-badge ${
-                        b.locked
-                          ? "locked"
-                          : ret > 0.01
-                            ? "gain"
-                            : ret < -0.01
-                              ? "loss"
-                              : "flat"
-                      }`}
-                      aria-label={`${def.ticker} ${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%`}
+                      className={`building-stock-badge ${b.locked ? "locked" : status}`}
+                      title={`${def.name} (${def.ticker}) · ${portfolioPercent(ret)} · ${tierName(currentTier)}${b.locked ? " · Locked unpaid" : ""}`}
+                      aria-label={`${def.name} (${def.ticker}) ${portfolioPercent(ret)} ${tierName(currentTier)}${b.locked ? ", locked unpaid" : ""}`}
                     >
-                      <span className="stock-badge-ticker">{def.ticker}</span>
-                      <span className="stock-badge-pct">
-                        {b.locked && <span style={{ marginRight: 2 }}>🔒</span>}
-                        {!b.locked && ret > 0.01 && (
-                          <span className="stock-badge-arrow">▲</span>
-                        )}
-                        {!b.locked && ret < -0.01 && (
-                          <span className="stock-badge-arrow">▼</span>
-                        )}
-                        {ret >= 0 ? `+${ret.toFixed(1)}%` : `${ret.toFixed(1)}%`}
-                      </span>
+                      <div className="stock-badge-main">
+                        <span className="stock-badge-ticker">{def.ticker}</span>
+                        <span className="stock-badge-pct">
+                          {b.locked && <span className="stock-badge-lock">🔒</span>}
+                          {!b.locked && status === "gain" && (
+                            <span className="stock-badge-arrow">▲</span>
+                          )}
+                          {!b.locked && status === "loss" && (
+                            <span className="stock-badge-arrow">▼</span>
+                          )}
+                          {portfolioPercent(ret)}
+                        </span>
+                      </div>
+                      <div className="stock-badge-sub">
+                        <span className="stock-badge-level-tag">
+                          {tierName(currentTier)}
+                        </span>
+                        <span className="stock-badge-pips" aria-hidden="true">
+                          {[1, 2, 3].map((n) => (
+                            <i
+                              key={n}
+                              className={`pip ${n <= level ? "filled" : ""}`}
+                            />
+                          ))}
+                        </span>
+                      </div>
                     </div>
                   )}
                   {!def.ticker && (
