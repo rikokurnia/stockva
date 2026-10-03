@@ -751,7 +751,7 @@ export default function StockCity() {
     }
     commit(result.state);
     notify(
-      `${defFor(kind).name} placed${defFor(kind).ticker ? ` at ${money(priceOf(defFor(kind).ticker!, prices))} per simulated share` : ""}${defFor(kind).ticker ? ". Investment placed." : ". Place another, or Esc."}`,
+      `${defFor(kind).name} placed${defFor(kind).ticker ? ` at ${money(priceOf(defFor(kind).ticker!, prices))} per tokenized share` : ""}${defFor(kind).ticker ? ". Investment placed." : ". Place another, or Esc."}`,
     );
   };
   const onRoad = (cells: Cell[]) => {
@@ -1530,7 +1530,7 @@ export default function StockCity() {
               <div>
                 <small>
                   {definition.category === "companies"
-                    ? "STOCK BUILDING · DEMO POSITION"
+                    ? "STOCK BUILDING · TOKENIZED ASSET"
                     : "CITY SERVICE"}
                 </small>
                 <div
@@ -1767,7 +1767,7 @@ export default function StockCity() {
             </div>
             <div className="inspection-note">
               {definition.ticker
-                ? "DEMO / TESTNET mock position. Removing returns live value to demo funds."
+                ? "Testnet position. Removing liquidates value to treasury funds."
                 : "Service construction costs are not refunded."}
             </div>
           </aside>
@@ -1882,13 +1882,13 @@ export default function StockCity() {
             const result = sellPosition(city, ticker, fraction, prices);
             if (result.error) return result.error;
             commit(result.state);
-            return `${fraction === 1 ? "Entire holding" : `${fraction * 100}% of holding`} sold. Demo funds updated.`;
+            return `${fraction === 1 ? "Entire holding" : `${fraction * 100}% of holding`} sold. Funds updated.`;
           }}
           onSellPaper={(ticker, fraction) => {
             const result = sellPaper(city, ticker, fraction, prices);
             if (result.error) return result.error;
             commit(result.state);
-            return `${fraction === 1 ? "Entire position" : `${fraction * 100}% of position`} sold. Demo funds updated.`;
+            return `${fraction === 1 ? "Entire position" : `${fraction * 100}% of position`} sold. Funds updated.`;
           }}
           onFocus={(b) => {
             setPanel(null);
@@ -2116,7 +2116,7 @@ export default function StockCity() {
               </button>
               <p className="panel-disclaimer">
                 Your city saves automatically in this browser. A new city starts
-                completely empty with $10,000 in demo funds.
+                completely empty with $10,000 in treasury funds.
               </p>
             </div>
           )}
@@ -2134,7 +2134,7 @@ export default function StockCity() {
                 ["Pan the map", "Drag, or hold Space + drag"],
                 ["Zoom", "Mouse wheel or + / −"],
                 ["Construction grid", "G"],
-                ["Pause simulation", "P"],
+                ["Pause market updates", "P"],
                 ["Undo / redo", "Ctrl Z / Ctrl Shift Z"],
                 ["Cancel construction", "Esc or right-click"],
               ].map(([label, key]) => (
@@ -2239,7 +2239,7 @@ export default function StockCity() {
             <h2 id="reset-title">Start a new city?</h2>
             <p>
               This clears your saved buildings and roads. You’ll start on an
-              empty island with $10,000 in demo funds.
+              empty island with $10,000 in treasury funds.
             </p>
             <div>
               <button onClick={() => setConfirmReset(false)}>

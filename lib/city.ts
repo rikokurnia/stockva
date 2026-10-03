@@ -215,7 +215,7 @@ export const catalogue: BuildingDef[] = [
     image: "nvidia/level_1",
     cost: 500,
     description:
-      "Semiconductors & AI. Place a building to create a simulated NVIDIA stock position.",
+      "Semiconductors & AI. Place a building to create an NVIDIA tokenized stock position.",
   },
   {
     kind: "tesla",
@@ -225,7 +225,7 @@ export const catalogue: BuildingDef[] = [
     image: "tesla/level_1",
     cost: 500,
     description:
-      "Electric vehicles & energy. Place a building to create a simulated Tesla stock position.",
+      "Electric vehicles & energy. Place a building to create a Tesla tokenized stock position.",
   },
   {
     kind: "amazon",
@@ -235,7 +235,7 @@ export const catalogue: BuildingDef[] = [
     image: "amazon/level_1",
     cost: 500,
     description:
-      "Commerce & cloud computing. Place a building to create a simulated Amazon stock position.",
+      "Commerce & cloud computing. Place a building to create an Amazon tokenized stock position.",
   },
   {
     kind: "blackrock",
@@ -245,7 +245,7 @@ export const catalogue: BuildingDef[] = [
     image: "blackrock/level_1",
     cost: 500,
     description:
-      "Asset management. Place a building to create a simulated BlackRock stock position.",
+      "Asset management. Place a building to create a BlackRock tokenized stock position.",
   },
   {
     kind: "microsoft",
@@ -255,7 +255,7 @@ export const catalogue: BuildingDef[] = [
     image: "microsoft/level_1",
     cost: 500,
     description:
-      "Software & cloud infrastructure. Place a building to create a simulated Microsoft stock position.",
+      "Software & cloud infrastructure. Place a building to create a Microsoft tokenized stock position.",
   },
   {
     kind: "jpmorgan",
@@ -265,7 +265,7 @@ export const catalogue: BuildingDef[] = [
     image: "jpmorgan/level_1",
     cost: 500,
     description:
-      "Global banking & financial services. Place a building to create a simulated JPMorgan stock position.",
+      "Global banking & financial services. Place a building to create a JPMorgan tokenized stock position.",
   },
   {
     kind: "walmart",
@@ -275,7 +275,7 @@ export const catalogue: BuildingDef[] = [
     image: "walmart/level_1",
     cost: 500,
     description:
-      "Retail & supply chain networks. Place a building to create a simulated Walmart stock position.",
+      "Retail & supply chain networks. Place a building to create a Walmart tokenized stock position.",
   },
   {
     kind: "coca_cola",
@@ -285,7 +285,7 @@ export const catalogue: BuildingDef[] = [
     image: "coca_cola/level_1",
     cost: 500,
     description:
-      "Global beverages & consumer goods. Place a building to create a simulated Coca-Cola stock position.",
+      "Global beverages & consumer goods. Place a building to create a Coca-Cola tokenized stock position.",
   },
   {
     kind: "exxonmobil",
@@ -295,7 +295,7 @@ export const catalogue: BuildingDef[] = [
     image: "exxonmobil/level_1",
     cost: 500,
     description:
-      "Energy & petrochemical infrastructure. Place a building to create a simulated ExxonMobil stock position.",
+      "Energy & petrochemical infrastructure. Place a building to create an ExxonMobil tokenized stock position.",
   },
   {
     kind: "unitedhealth",
@@ -305,7 +305,7 @@ export const catalogue: BuildingDef[] = [
     image: "unitedhealth/level_1",
     cost: 500,
     description:
-      "Healthcare & medical services. Place a building to create a simulated UnitedHealth stock position.",
+      "Healthcare & medical services. Place a building to create a UnitedHealth tokenized stock position.",
   },
   {
     kind: "hall",
@@ -332,7 +332,7 @@ export const catalogue: BuildingDef[] = [
     image: "functional/oracle_data_center",
     cost: 300,
     description:
-      "Your city’s information hub. Select it to inspect the status of the demo data.",
+      "Your city’s information hub. Select it to inspect on-chain city data.",
   },
   {
     kind: "monument",
@@ -420,8 +420,8 @@ export const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 export type PriceMap = Record<string, number>;
 export const basePrices = (): PriceMap =>
   Object.fromEntries(assets.map((a) => [a.ticker, a.price]));
-export const MARKET_SOURCE = "Local price simulation";
-export const PROVIDER_TAG = "Simulated stock position";
+export const MARKET_SOURCE = "Live market pricing";
+export const PROVIDER_TAG = "Tokenized stock position";
 export function tickMarket(prev: PriceMap, rand: () => number = Math.random) {
   const next: PriceMap = { ...prev };
   for (const a of assets) {
@@ -532,7 +532,7 @@ export function healthOf(buildings: Building[], prices?: PriceMap) {
       detail: `Largest holding ${max.toFixed(0)}% · ${sectors.size} sector${sectors.size === 1 ? "" : "s"}.`,
     };
   return {
-    label: "Diversified (demo)",
+    label: "Diversified",
     detail: `${stocks.length} holdings · ${sectors.size} sectors · largest ${max.toFixed(0)}%.`,
   };
 }
@@ -708,7 +708,7 @@ export function roadError(cells: Cell[], state: CityState) {
   const count = cells.filter(
     (c) => !state.roads.some((r) => sameCell(c, r)),
   ).length;
-  return count * ROAD_COST > state.cash ? "Not enough demo funds" : "";
+  return count * ROAD_COST > state.cash ? "Not enough funds" : "";
 }
 export function constructRoad(cells: Cell[], state: CityState) {
   const error = roadError(cells, state);
@@ -748,7 +748,7 @@ export function constructBuilding(
     cost = def.ticker ? amount : def.cost;
   if (!Number.isFinite(cost) || cost < 1)
     return { state, error: "Enter a position amount of at least $1" };
-  if (cost > state.cash) return { state, error: "Not enough demo funds" };
+  if (cost > state.cash) return { state, error: "Not enough funds" };
   const price = def.ticker ? priceOf(def.ticker, prices) : 0;
   return {
     state: {
@@ -785,7 +785,7 @@ export function bulldoze(cell: Cell, state: CityState, prices?: PriceMap) {
         buildings: state.buildings.filter((p) => p.id !== b.id),
       },
       message: defFor(b.kind).ticker
-        ? `${defFor(b.kind).name} removed. ${money(valueOf(b, prices))} returned to demo funds.`
+        ? `${defFor(b.kind).name} removed. ${money(valueOf(b, prices))} returned to treasury funds.`
         : `${defFor(b.kind).name} removed.`,
     };
   if (state.roads.some((r) => sameCell(r, cell)))
@@ -868,7 +868,7 @@ export function buyPaper(
 ) {
   if (!Number.isFinite(amount) || amount < 1)
     return { state, error: "Enter a position amount of at least $1" };
-  if (amount > state.cash) return { state, error: "Not enough demo funds" };
+  if (amount > state.cash) return { state, error: "Not enough funds" };
   if (!Number.isFinite(price) || price <= 0)
     return { state, error: "No live price for this asset right now" };
   const holding: PaperHolding = {

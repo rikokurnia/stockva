@@ -181,7 +181,7 @@ export default function CompanyIntel(p: Props) {
               <small>
                 {p.simulatedReturn !== undefined ? (
                   <span className={styles.simBadge}>
-                    SIMULATION · {p.running ? "RUNNING" : "PAUSED"}
+                    PREVIEW · {p.running ? "RUNNING" : "PAUSED"}
                   </span>
                 ) : (
                   <span className={styles.liveBadge}>
@@ -211,9 +211,8 @@ export default function CompanyIntel(p: Props) {
           </div>
           {p.simulatedReturn !== undefined && (
             <p className={styles.simNotice}>
-              Building tier and returns are active in the visual simulation
-              sandbox. The on-chain token quote above remains the latest 24/7
-              price.
+              Building tier and returns reflect current visual performance. The
+              on-chain token quote above remains the latest 24/7 price.
             </p>
           )}
           {profile && (

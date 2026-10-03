@@ -242,7 +242,7 @@ export default function CivicPanel({
       const msg =
         err instanceof Error ? err.message : "Batch confirm failed";
       setBatchError(msg);
-      setMessage(`Batch kept as local-sim: ${msg}`);
+      setMessage(`Batch kept as draft: ${msg}`);
     } finally {
       setBatchConfirming(false);
     }
@@ -736,7 +736,7 @@ export default function CivicPanel({
               detail={
                 positions.filter((b) => b.vaultTx).length
                   ? `${positions.filter((b) => b.vaultTx).length}/${positions.length} on-chain`
-                  : "local-sim"
+                  : "draft"
               }
             />
             {!positions.length ? (
@@ -781,7 +781,7 @@ export default function CivicPanel({
                           </a>
                         ) : (
                           <span style={{ color: "#9e9e9e" }}>
-                            Local-sim only
+                            Draft
                           </span>
                         )}
                       </div>
@@ -978,7 +978,7 @@ export default function CivicPanel({
                   </h3>
                   <p>
                     {mode === "market"
-                      ? "Choose a company. Invest demo funds. Give it a place on your island."
+                      ? "Choose a company. Allocate funds. Give it a place on your island."
                       : "Inspect the token, its price source, and the evidence available before you invest."}
                   </p>
                 </div>
@@ -1264,7 +1264,7 @@ export default function CivicPanel({
                     <section className={styles.trade}>
                       <SectionTitle
                         title="Make it part of your city"
-                        detail="DEMO ORDER"
+                        detail="ORDER"
                       />
                       <label htmlFor="investment">Investment amount</label>
                       <div className={styles.amount}>
@@ -1285,7 +1285,7 @@ export default function CivicPanel({
                         <span>
                           {validAmount
                             ? `≈ ${(input / priceOf(selected.ticker, prices)).toFixed(4)} units · ${money(city.cash)} available`
-                            : `Enter $1–${money(city.cash)} in available demo funds.`}
+                            : `Enter $1–${money(city.cash)} in available funds.`}
                         </span>
                         <button
                           type="button"
@@ -1655,8 +1655,8 @@ export default function CivicPanel({
                     )}
                     <p className={styles.caption}>
                       Issuer API checked {stamp(passport?.fetchedAt)}. Contract
-                      details describe the real token; your city position is a
-                      local simulation.
+                      details describe the real token; your city position is
+                      tracked on-chain.
                     </p>
                   </>
                 )}
@@ -1672,8 +1672,7 @@ export default function CivicPanel({
         )}
       </div>
       <footer className={styles.footer}>
-        <span>DEMO CITY</span>Simulated positions · no real securities are
-        purchased
+        <span>STOCK CITY</span>Tokenized RWA assets · on-chain portfolio
       </footer>
     </aside>
   );

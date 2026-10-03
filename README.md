@@ -30,7 +30,7 @@ Every corporate headquarters dynamically evolves across architectural tiers base
 ## Architecture & Key Features
 
 ### 1. Living Isometric Simulation Engine
-- **Unconstrained Creative Freedom:** Start on a clean island canvas with full layout autonomy and demo treasury reserves.
+- **Unconstrained Creative Freedom:** Start on a clean island canvas with full layout autonomy and starting treasury reserves.
 - **Autonomous Road & Traffic Mechanics:** Construct custom road networks with continuous curves and automatic intersection joins. The pathfinding system coordinates multi-directional vehicles (maintenance vans, transit buses, utility haulers) navigating lane offsets and turn tangents.
 - **Civic Progression Hierarchy:** Founding the **Stock Exchange** unlocks active market trading, while establishing **City Hall** enables treasury budgeting, portfolio telemetry, and on-chain settlement.
 
@@ -41,11 +41,11 @@ Every corporate headquarters dynamically evolves across architectural tiers base
   - **Level 1 (Foundation):** Standard entry-level commercial operations.
   - **Level 2 (Growth):** Expanded commercial facilities with increased civic activity.
   - **Level 3 (Skyscraper):** Modern high-rise pinnacle for top-performing holdings.
-- **Simulation Control:** Adjustable cycle frequencies (4s–10s), pause/resume execution, and user-configurable tier threshold parameters.
+- **Market Control:** Adjustable cycle frequencies (4s–10s), pause/resume updates, and user-configurable tier threshold parameters.
 
 ### 3. BNB Smart Chain (Testnet) Integration
-- **On-Chain Settlement (`StockCityVault`):** Record placed building positions and paper allocations directly to the BSC Testnet smart contract.
-- **Faucet Distribution:** Built-in one-click distribution of 10,000 **$mUSD** (Stockva Demo USD) via the verified `claimFaucet()` interface.
+- **On-Chain Settlement (`StockCityVault`):** Record placed building positions and tokenized allocations directly to the BSC Testnet smart contract.
+- **Faucet Distribution:** Built-in one-click distribution of 10,000 **$mUSD** (Stockva Testnet USD) via the verified `claimFaucet()` interface.
 - **Position Transparency:** Live querying of user position IDs, entry prices, quantities, and cost bases directly from the blockchain with automated BscScan explorer linking.
 
 ### 4. Unified Web3 Wallet Experience
@@ -194,7 +194,7 @@ projects/stockcity/
 
 ## Disclaimer
 
-Stockva is a technology demonstration developed for the **Indonesia Web3 Hackathon**. Asset quotes and company references are utilized for educational simulation on the **BNB Smart Chain Testnet (Chain ID: 97)**. Virtual positions and balances inside the sandbox do not constitute financial instruments or investment advice.
+Stockva is a decentralized Web3 application on the **BNB Smart Chain Testnet (Chain ID: 97)**. Asset quotes and corporate profiles are utilized for interactive tokenized asset visualization. On-chain positions and balances inside the application do not constitute financial advice.
 
 ---
 

@@ -215,7 +215,7 @@ export default function CityMap(props: Props) {
     footprintError ||
     (tool === "build" &&
     (cost > city.cash || !Number.isFinite(cost) || cost < 1)
-      ? "Not enough demo funds"
+      ? "Not enough funds"
       : "");
   const drawCells = preview.length ? preview : hover ? [hover] : [];
   const plannedRoads = [

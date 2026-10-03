@@ -5,7 +5,7 @@ import Providers from "../components/providers";
 export const metadata: Metadata = {
   title: "Stockva — Build your portfolio. Shape your city.",
   description:
-    "Turn your stock portfolio into a living city. Explore real-world stocks, build your island, and learn by playing in Stockva's city-building demo.",
+    "Turn your stock portfolio into a living city. Explore real-world stocks, build your island, and master on-chain portfolio strategy in Stockva.",
   icons: {
     icon: "/assets/ai_logo.png",
     shortcut: "/assets/ai_logo.png",

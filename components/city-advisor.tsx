@@ -66,13 +66,13 @@ export default function CityAdvisor({ city, prices, walletAddress }: Props) {
     if (/buy|sell|rotate|trade|rebalance|defensive|transaction/.test(q))
       return "I can help you explore your city here. Trading commands aren’t connected in this preview. Select a company building to review its position and available actions; this chat won’t move your funds.";
     if (/allocation|portfolio|stock|holding/.test(q)) {
-      if (!holdings.length && !onchain.filter((p) => p.active).length) return `Your portfolio is still empty, with ${wholeMoney(city.cash)} in demo funds. Open Build to choose your first company, then place it beside a road. Portfolio will reveal each building’s return and level.`;
+      if (!holdings.length && !onchain.filter((p) => p.active).length) return `Your portfolio is still empty, with ${wholeMoney(city.cash)} in available funds. Open Build to choose your first company, then place it beside a road. Portfolio will reveal each building’s return and level.`;
       const groups = new Map<string, number>();
       holdings.forEach((b) => { const name = defFor(b.kind).name; groups.set(name, (groups.get(name) ?? 0) + valueOf(b, prices)); });
-      return `${wholeMoney(total)} in simulated stock positions. ${Array.from(groups).sort((a, b) => b[1] - a[1]).map(([name, value]) => `${name}: ${total > 0 ? (value / total * 100).toFixed(1) : "0"}%`).join(" · ")}. Open Portfolio to see returns and building levels across your island.`;
+      return `${wholeMoney(total)} in tokenized stock positions. ${Array.from(groups).sort((a, b) => b[1] - a[1]).map(([name, value]) => `${name}: ${total > 0 ? (value / total * 100).toFixed(1) : "0"}%`).join(" · ")}. Open Portfolio to see returns and building levels across your island.`;
     }
     if (/expand|next|build|road|review|city/.test(q))
-      return `${briefing} You have ${wholeMoney(city.cash)} in demo funds. ${!city.roads.length ? "Open Build and choose Roads, then draw a small connected route on the island." : disconnected ? "Extend a road to the disconnected buildings before adding a new block." : "Open Build to choose a company and place it alongside your road network. Select a finished building to explore its position."}`;
+      return `${briefing} You have ${wholeMoney(city.cash)} in available funds. ${!city.roads.length ? "Open Build and choose Roads, then draw a small connected route on the island." : disconnected ? "Extend a road to the disconnected buildings before adding a new block." : "Open Build to choose a company and place it alongside your road network. Select a finished building to explore its position."}`;
     return "Try asking for a city review, your portfolio allocation, or what to build next. This preview guide uses your current city and available market prices (including labeled fallbacks).";
   }
 
@@ -175,7 +175,7 @@ export default function CityAdvisor({ city, prices, walletAddress }: Props) {
           <input ref={input} value={draft} maxLength={500} onChange={(event) => setDraft(event.target.value)} aria-label="Ask cokoo" placeholder="Ask cokoo anything…" autoComplete="off" />
           <button type="submit" disabled={!draft.trim() || thinking} aria-label="Send message">Send</button>
         </form>
-        <p className={styles.note}>Live insights · Simulated assets</p>
+        <p className={styles.note}>Live insights · Tokenized assets</p>
       </section>}
       <button ref={toggle} className={styles.capsule} aria-expanded={open} aria-controls="city-advisor-content" onClick={() => setOpen((value) => !value)}>
         <img src="/assets/ai_logo.png" alt="" width="64" height="64" draggable={false} />

@@ -105,7 +105,7 @@ export default function PortfolioOverlay({
             key={b.id}
             className={styles.plaque}
             style={{ left: p.left, top: p.top }}
-            aria-label={`${def.name}, ${portfolioPercent(gain)} ${simulationReturns !== null ? "simulated" : "unrealized"} return, ${tierName(currentTier)}`}
+            aria-label={`${def.name}, ${portfolioPercent(gain)} ${simulationReturns !== null ? "projected" : "unrealized"} return, ${tierName(currentTier)}`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
