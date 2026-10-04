@@ -29,6 +29,7 @@ import {
   wholeMoney,
   tier,
   tierName,
+  isHeroTicker,
 } from "../lib/city";
 import type { PriceMap } from "../lib/city";
 import {
@@ -544,45 +545,25 @@ export default function CityMap(props: Props) {
                     }}
                     draggable={false}
                   />
-                  {def.ticker && (
+                  {def.ticker && !isHeroTicker(def.ticker) && (
                     <div
-                      className={`building-stock-badge ${b.locked ? "locked" : status}`}
-                      title={`${def.name} (${def.ticker}) · ${portfolioPercent(ret)} · ${tierName(currentTier)}${b.locked ? " · Locked unpaid" : ""}`}
-                      aria-label={`${def.name} (${def.ticker}) ${portfolioPercent(ret)} ${tierName(currentTier)}${b.locked ? ", locked unpaid" : ""}`}
+                      className={`sector-building-badge ${b.locked ? "locked" : ""}`}
+                      title={`${def.name} (${def.ticker})${b.locked ? " · Locked unpaid" : ""}`}
+                      aria-label={`${def.name} (${def.ticker})${b.locked ? ", locked unpaid" : ""}`}
                     >
-                      <div className="stock-badge-main">
-                        <StockLogo
-                          ticker={def.ticker}
-                          name={def.name}
-                          size={13}
-                          shape="circle"
-                          className="stock-badge-logo"
-                        />
-                        <span className="stock-badge-ticker">{def.ticker}</span>
-                        <span className="stock-badge-pct">
-                          {b.locked && <span className="stock-badge-lock">🔒</span>}
-                          {!b.locked && status === "gain" && (
-                            <span className="stock-badge-arrow">▲</span>
-                          )}
-                          {!b.locked && status === "loss" && (
-                            <span className="stock-badge-arrow">▼</span>
-                          )}
-                          {portfolioPercent(ret)}
+                      <StockLogo
+                        ticker={def.ticker}
+                        name={def.name}
+                        size={14}
+                        shape="circle"
+                        className="sector-badge-logo"
+                      />
+                      <span className="sector-badge-label">{def.ticker}</span>
+                      {b.locked && (
+                        <span className="sector-badge-lock" aria-hidden="true">
+                          🔒
                         </span>
-                      </div>
-                      <div className="stock-badge-sub">
-                        <span className="stock-badge-level-tag">
-                          {tierName(currentTier)}
-                        </span>
-                        <span className="stock-badge-pips" aria-hidden="true">
-                          {[1, 2, 3].map((n) => (
-                            <i
-                              key={n}
-                              className={`pip ${n <= level ? "filled" : ""}`}
-                            />
-                          ))}
-                        </span>
-                      </div>
+                      )}
                     </div>
                   )}
                   {!def.ticker && (

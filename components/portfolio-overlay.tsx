@@ -12,6 +12,7 @@ import {
   type TierThresholds,
   tierName,
 } from "../lib/city";
+import StockLogo from "./stock-logo";
 import {
   layoutPortfolioLabels,
   portfolioLevel,
@@ -127,6 +128,15 @@ export default function PortfolioOverlay({
             data-building-id={b.id}
           >
             <div className={styles.plaqueHeader}>
+              {def.ticker && (
+                <StockLogo
+                  ticker={def.ticker}
+                  name={def.name}
+                  size={16}
+                  shape="circle"
+                  className={styles.plaqueLogo}
+                />
+              )}
               <h3 title={`${def.name} (${def.ticker})`}>
                 <span className={styles.plaqueName}>{def.name}</span>
                 {def.ticker && (
