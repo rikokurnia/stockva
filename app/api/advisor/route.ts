@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   asHistory,
+  asHallAnalysis,
   asSnapshot,
   buildSystemPrompt,
   buildUserPrompt,
@@ -14,6 +15,7 @@ type AdvisorBody = {
   message?: unknown;
   history?: unknown;
   snapshot?: unknown;
+  hallAnalysis?: unknown;
 };
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
@@ -22,9 +24,12 @@ const MUSESPARK_BASE_URL =
   process.env.MUSESPARK_BASE_URL ?? "https://api.musespark.ai/v1";
 const MUSESPARK_MODEL = process.env.MUSESPARK_MODEL ?? "muse-spark-1.3";
 
-async function tryGemini(prompt: string): Promise<string | null> {
+async function tryGemini(
+  prompt: string,
+  signal: AbortSignal,
+): Promise<string | null> {
   const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
+  if (!key || signal.aborted) return null;
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`,
@@ -35,7 +40,7 @@ async function tryGemini(prompt: string): Promise<string | null> {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
         }),
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]),
       },
     );
     if (!res.ok) return null;
@@ -59,8 +64,9 @@ async function tryOpenAICompatible(
   system: string,
   history: ChatMsg[],
   message: string,
+  signal: AbortSignal,
 ): Promise<string | null> {
-  if (!apiKey) return null;
+  if (!apiKey || signal.aborted) return null;
   try {
     const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
@@ -81,7 +87,7 @@ async function tryOpenAICompatible(
         max_tokens: 300,
         temperature: 0.7,
       }),
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(25000)]),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {
@@ -101,20 +107,26 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
   const message =
     typeof body.message === "string" ? body.message.trim().slice(0, 500) : "";
   if (!message) {
     return NextResponse.json({ error: "Empty message" }, { status: 400 });
   }
   const history = asHistory(body.history);
-  const snapshot = asSnapshot(body.snapshot);
-  const system = buildSystemPrompt(snapshot);
+  const hall = asHallAnalysis(body.hallAnalysis);
+  const snapshot = asSnapshot(body.snapshot, hall ? 40 : 20);
+  const system = buildSystemPrompt(snapshot, hall);
   const prompt = buildUserPrompt(system, history, message);
 
   // Fallback order: primary -> second -> third. Provider names are
   // never exposed in the response; the UI stays model-agnostic.
+  // Fit the full provider fallback chain within the route/client timeout.
+  const signal = AbortSignal.any([req.signal, AbortSignal.timeout(52000)]);
   const reply =
-    (await tryGemini(prompt)) ??
+    (await tryGemini(prompt, signal)) ??
     (await tryOpenAICompatible(
       "https://api.deepseek.com",
       process.env.DEEPSEEK_API_KEY,
@@ -122,6 +134,7 @@ export async function POST(req: Request) {
       system,
       history,
       message,
+      signal,
     )) ??
     (await tryOpenAICompatible(
       MUSESPARK_BASE_URL,
@@ -130,6 +143,7 @@ export async function POST(req: Request) {
       system,
       history,
       message,
+      signal,
     ));
 
   if (!reply) {

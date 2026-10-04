@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   ArrowDownUp,
   ArrowUpRight,
@@ -93,14 +94,17 @@ import {
   portfolioPercent,
   portfolioStatus,
 } from "../lib/portfolio-view";
+const AgentHall = dynamic(() => import("./agent-hall"), { ssr: false });
+
 type Panel =
-  "portfolio" | "market" | "settings" | "help" | "data" | null;
+  "portfolio" | "market" | "settings" | "help" | "data" | "agent" | null;
 const titles: Record<string, string> = {
   portfolio: "City finances",
   market: "Stock market",
   settings: "Game settings",
   help: "Controls",
   data: "Data status",
+  agent: "Agent Hall",
 };
 export default function StockCity() {
   const [city, setCity] = useState<CityState>(newCity),
@@ -195,6 +199,7 @@ export default function StockCity() {
   const hasHall = city.buildings.some((b) => b.kind === "hall");
   const hasExchange = city.buildings.some((b) => b.kind === "exchange");
   const hasData = city.buildings.some((b) => b.kind === "oracle");
+  const hasAgentHall = city.buildings.some((b) => b.kind === "agent_hall");
   const scanBuilding = city.buildings.find((b) => b.id === scanTarget);
   const scanTicker = scanBuilding
     ? defFor(scanBuilding.kind).ticker
@@ -441,11 +446,12 @@ export default function StockCity() {
       if (panel === "portfolio") setPanel(null);
     }
     if (!hasExchange && panel === "market") setPanel(null);
+    if (!hasAgentHall && panel === "agent") setPanel(null);
     if (!hasData) {
       setScanMode(false);
       if (panel === "data") setPanel(null);
     }
-  }, [hasHall, hasExchange, hasData, panel]);
+  }, [hasHall, hasExchange, hasData, hasAgentHall, panel]);
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 800);
     return () => clearInterval(interval);
@@ -582,10 +588,11 @@ export default function StockCity() {
     if (
       (value === "portfolio" && !hasHall) ||
       (value === "market" && !hasExchange) ||
-      (value === "data" && !hasData)
+      (value === "data" && !hasData) ||
+      (value === "agent" && !hasAgentHall)
     ) {
       notify(
-        `Build ${value === "portfolio" ? "City Hall" : value === "market" ? "the Stock Exchange" : "the Data Center"} first.`,
+        `Build ${value === "portfolio" ? "City Hall" : value === "market" ? "the Stock Exchange" : value === "agent" ? "Agent Hall" : "the Data Center"} first.`,
         true,
       );
       return;
@@ -979,7 +986,9 @@ export default function StockCity() {
           const b = city.buildings.find((b) => b.id === id);
           if (b && !defFor(b.kind).ticker) {
             openPanel(
-              b.kind === "hall"
+              b.kind === "agent_hall"
+                ? "agent"
+                : b.kind === "hall"
                 ? "portfolio"
                 : b.kind === "exchange"
                   ? "market"
@@ -1462,7 +1471,9 @@ export default function StockCity() {
                 className="panel-action"
                 onClick={() =>
                   openPanel(
-                    current.kind === "hall"
+                    current.kind === "agent_hall"
+                      ? "agent"
+                      : current.kind === "hall"
                       ? "portfolio"
                       : current.kind === "exchange"
                         ? "market"
@@ -1471,7 +1482,9 @@ export default function StockCity() {
                 }
               >
                 Open{" "}
-                {current.kind === "hall"
+                {current.kind === "agent_hall"
+                  ? "Agent Hall"
+                  : current.kind === "hall"
                   ? "finances"
                   : current.kind === "exchange"
                     ? "market"
@@ -1699,7 +1712,21 @@ export default function StockCity() {
           }}
         />
       )}
-      {panel && !["portfolio", "market", "data"].includes(panel) && (
+      {panel === "agent" && (
+        <AgentHall
+          city={city}
+          prices={prices}
+          feed={feed}
+          walletConnected={!!wallet}
+          onClose={() => setPanel(null)}
+          onMarket={(ticker) => {
+            if (!hasExchange) return;
+            openPanel("market");
+            setAssetTicker(ticker);
+          }}
+        />
+      )}
+      {panel && !["portfolio", "market", "data", "agent"].includes(panel) && (
         <aside
           ref={panelRef}
           className="utility-panel"
