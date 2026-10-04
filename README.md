@@ -81,13 +81,16 @@ The core game logic and ledger contracts are deployed and verified on **BNB Smar
 
 ### Civic services & research data
 
+- **Agent Hall rebalance:** Cokoo uses the configured server AI keys to propose target allocations from verified, mapped BNB Testnet vault positions. Review the building blueprint and before/after weights, then sign each removal and construction in your injected wallet. Changed positions close before rebuilding; each building maps to one vault position. The camera follows the worksite, and City Hall retains buy/sell receipts even after demolition. Rejected requests pause the sequence; reloading preserves submitted hashes for receipt recovery. Prices are quoted city estimates, and local, draft and unmapped wallet holdings remain outside the rebalance.
 - **City Hall:** one saved-city holdings ledger, separate unpaid drafts, testnet funding and confirmation, and a collapsible transaction history deduplicated by hash. Wallet positions are matched by position ID; unmatched wallet records are excluded from city valuation. Local position management does not close an on-chain vault record.
 - **Stock Exchange:** read-only asset research plus bundle placement. Individual purchases remain in the left-side building menu. Bundles require an Exchange on the island and are staged for placement before any wallet transaction.
 - **Data Center:** issuer identity, network contracts, reserve evidence, independent price histories and product-rights limitations. Real token contracts are distinct from the city’s testnet vault.
 - `/api/history` returns actual Kraken hourly token closes and Yahoo Finance underlying observations, independently. It never synthesizes a missing token series. Quotes/history are checked around once a minute; underlying data may be delayed.
 - `/api/research` combines underlying market statistics with SEC EDGAR company facts. Annual figures and latest balance-sheet values retain reporting and filing dates. Results cache for five minutes; normalized SEC figures cache server-side for one hour. The large raw company-facts payload is never sent to the browser. Funds and unsupported filers show unavailable company metrics rather than made-up values.
 - Public research sources need no paid API key. For deployment, set optional server-only `SEC_USER_AGENT` to an identifying application name and contact address in accordance with SEC fair-access guidance. Provider outages/rate limits are displayed explicitly; prior company filings are marked stale.
-- All civic panels are lazy-loaded, share Agent Hall’s cream/green theme, and support keyboard trapping, Escape and mobile layouts. No additional UI dependency was installed.
+- Civic panels support keyboard trapping, Escape and mobile layouts. Agent Hall follows the navy, steel and construction-yellow city theme. No additional UI dependency was installed.
+
+To validate a production build while the dev server remains open, use `STOCKCITY_NEXT_DIST_DIR=.next-production npm run build`, then `STOCKCITY_NEXT_DIST_DIR=.next-production npm run start -- --port 3001`. The separate output directory avoids concurrent writes to `.next`.
 
 ---
 

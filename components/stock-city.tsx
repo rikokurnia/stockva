@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { formatUnits } from "viem";
 import {
   ArrowDownUp,
   ArrowUpRight,
@@ -28,7 +29,14 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import CityMap from "./city-map";
+import CityMap, { type AgentMapActivity } from "./city-map";
+import { rebalanceFingerprint, type RebalancePlan } from "../lib/rebalance";
+import {
+  applyRebalanceReceipt,
+  recoverRebalanceExecution,
+  REBALANCE_STORAGE,
+  type RebalanceExecution,
+} from "../lib/rebalance-execution";
 import OnchainWallet from "./onchain-wallet";
 import { fallbackFeed, type MarketFeed } from "../lib/market";
 import {
@@ -36,10 +44,17 @@ import {
   bscAddressLink,
   connectInjectedWallet,
   recordBuildingOnchain,
+  sellBuildingOnchain,
+  confirmedRebalanceReceipt,
+  getOnchainPositions,
+  getBscClient,
+  MOCK_USD_ADDRESS,
+  MOCK_USD_ABI,
 } from "../lib/contracts";
 import BundleModal from "./bundle-modal";
 import { BuildingCatalogueModal } from "./building-catalogue-modal";
 import CityAdvisor from "./city-advisor";
+import { AgentExecutionDock } from "./agent-rebalance";
 import StockLogo from "./stock-logo";
 import CompanyIntel from "./company-intel";
 import portfolioStyles from "./portfolio-view.module.css";
@@ -138,7 +153,23 @@ export default function StockCity() {
   const [feedLoading, setFeedLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [wallet, setWallet] = useState<`0x${string}` | null>(null);
-  const [placeSource, setPlaceSource] = useState<"tray" | "exchange" | null>(null);
+  const [agentExecution, setAgentExecution] =
+    useState<RebalanceExecution | null>(null);
+  const executionRef = useRef<RebalanceExecution | null>(null);
+  const agentRunning = useRef(false);
+  const [agentActivity, setAgentActivity] = useState<AgentMapActivity | null>(
+    null,
+  );
+  const cityMutationLocked =
+    agentExecution?.status === "running" ||
+    Boolean(
+      agentExecution?.steps.some(
+        (step) => step.hash && !step.reverted && step.status !== "confirmed",
+      ),
+    );
+  const [placeSource, setPlaceSource] = useState<"tray" | "exchange" | null>(
+    null,
+  );
   const [bundleQueue, setBundleQueue] = useState<
     { kind: BuildingKind; amount: number }[]
   >([]);
@@ -373,6 +404,26 @@ export default function StockCity() {
           setNoticeError(true);
         }
       }
+      const execution = recoverRebalanceExecution(
+        JSON.parse(localStorage.getItem(REBALANCE_STORAGE) ?? "null"),
+        catalogue.map((definition) => definition.kind),
+      );
+      if (
+        execution?.plan?.id &&
+        Array.isArray(execution.steps) &&
+        execution.plan.steps?.length
+      ) {
+        const recovered: RebalanceExecution = {
+          ...execution,
+          status: execution.status === "completed" ? "completed" : "paused",
+          error:
+            execution.status === "completed"
+              ? undefined
+              : "Execution paused after reload. Reconnect the same wallet to check saved receipts and continue.",
+        };
+        executionRef.current = recovered;
+        setAgentExecution(recovered);
+      }
     } catch {
       setNotice(
         "Could not load the saved city. Starting with an empty island.",
@@ -492,12 +543,20 @@ export default function StockCity() {
     setNoticeError(error);
   };
   const commit = (next: CityState) => {
+    if (cityMutationLocked) {
+      notify(
+        "The agent is settling a signed plan. Finish or resolve its pending transaction before editing the city.",
+        true,
+      );
+      return;
+    }
     if (next === city) return;
     history.current = [...history.current.slice(-29), city];
     future.current = [];
     setCity(next);
   };
   const undo = () => {
+    if (cityMutationLocked) return;
     const last = history.current.pop();
     if (!last) return;
     future.current.push(city);
@@ -506,13 +565,353 @@ export default function StockCity() {
     notify("Last construction action undone.");
   };
   const redo = () => {
+    if (cityMutationLocked) return;
     const next = future.current.pop();
     if (!next) return;
     history.current.push(city);
     setCity(next);
     notify("Construction action restored.");
   };
+  const saveAgentExecution = (execution: RebalanceExecution) => {
+    executionRef.current = execution;
+    setAgentExecution(execution);
+    localStorage.setItem(REBALANCE_STORAGE, JSON.stringify(execution));
+  };
+  const saveConfirmedCity = (next: CityState) => {
+    localStorage.setItem(STORAGE, JSON.stringify(next));
+    simulationLatest.current = { ...simulationLatest.current, city: next };
+    history.current = [];
+    future.current = [];
+    setCity(next);
+  };
+  const executeRebalance = async (plan: RebalancePlan) => {
+    if (agentRunning.current) return;
+    if (
+      executionRef.current &&
+      executionRef.current.plan.id !== plan.id &&
+      executionRef.current.steps.some(
+        (step) => step.hash && !step.reverted && step.status !== "confirmed",
+      )
+    ) {
+      notify(
+        "Resolve the saved transaction in Agent Hall before starting another plan.",
+        true,
+      );
+      return;
+    }
+    agentRunning.current = true;
+    let run: RebalanceExecution =
+      executionRef.current?.plan.id === plan.id
+        ? { ...executionRef.current, status: "running", error: undefined }
+        : {
+            plan,
+            status: "running",
+            steps: plan.steps.map((step) => ({
+              stepId: step.id,
+              status: "queued",
+            })),
+            fingerprint: plan.fingerprint,
+          };
+    let currentStepId: string | undefined;
+    const updateStep = (
+      stepId: string,
+      patch: Partial<RebalanceExecution["steps"][number]>,
+    ) => {
+      run = {
+        ...run,
+        steps: run.steps.map((progress) =>
+          progress.stepId === stepId ? { ...progress, ...patch } : progress,
+        ),
+      };
+      saveAgentExecution(run);
+    };
+    const readCash = async () =>
+      Number(
+        formatUnits(
+          await getBscClient().readContract({
+            address: MOCK_USD_ADDRESS,
+            abi: MOCK_USD_ABI,
+            functionName: "balanceOf",
+            args: [plan.walletAddress],
+          }),
+          18,
+        ),
+      );
+    try {
+      if (!wallet || wallet.toLowerCase() !== plan.walletAddress.toLowerCase())
+        throw new Error(
+          "Connect the same wallet that reviewed this plan before signing.",
+        );
+      if (!run.steps.some((step) => step.hash) && Date.now() > plan.expiresAt)
+        throw new Error(
+          "This quote expired. Ask the agent for a fresh plan before signing.",
+        );
+      const latest = simulationLatest.current.city;
+      const alreadyApplied = latest.agentReceipts?.some(
+        (receipt) =>
+          receipt.planId === plan.id &&
+          run.steps.some(
+            (step) =>
+              step.stepId === receipt.stepId && step.status !== "confirmed",
+          ),
+      );
+      if (
+        !alreadyApplied &&
+        rebalanceFingerprint(latest) !== (run.fingerprint ?? plan.fingerprint)
+      )
+        throw new Error(
+          "Your city changed since this plan was reviewed. Generate a fresh plan.",
+        );
+      if (
+        Object.keys(confirmingBuildings).length ||
+        latest.buildings.some((building) => building.locked)
+      )
+        throw new Error(
+          "Finish pending building purchases before rebalancing.",
+        );
+      saveAgentExecution(run);
+      setSimulationRunning(false);
+      setSimulationReturns(null);
+      setGameMode("live");
+      setActiveTool("inspect");
+      setKind(null);
+      for (const step of plan.steps) {
+        currentStepId = step.id;
+        const progress = run.steps.find((item) => item.stepId === step.id)!;
+        const savedReceipt = simulationLatest.current.city.agentReceipts?.find(
+          (receipt) => receipt.stepId === step.id && receipt.planId === plan.id,
+        );
+        if (progress.status === "confirmed" || savedReceipt) {
+          run = {
+            ...run,
+            fingerprint: rebalanceFingerprint(simulationLatest.current.city),
+          };
+          updateStep(step.id, {
+            status: "confirmed",
+            hash: savedReceipt?.hash ?? progress.hash,
+            error: undefined,
+          });
+          continue;
+        }
+        let hash = progress.reverted ? undefined : progress.hash;
+        const activity = {
+          buildingId: step.buildingId,
+          ...step.cell,
+          ticker: step.ticker,
+          kind: step.action,
+        };
+        setFocusTarget({ ...step.cell, nonce: Date.now() });
+        setZoom(1.7);
+        setSelected(step.action === "sell" ? step.buildingId : null);
+        if (!hash) {
+          const positions = await getOnchainPositions(plan.walletAddress);
+          const state = simulationLatest.current.city;
+          if (step.action === "sell") {
+            const position = positions.find(
+              (position) =>
+                position.id.toLowerCase() === step.positionId.toLowerCase(),
+            );
+            if (
+              !position?.active ||
+              position.quantity.toString() !== step.positionQuantity ||
+              position.ticker !== step.ticker
+            )
+              throw new Error(
+                "The on-chain position changed. Request a new plan from the current city.",
+              );
+          } else {
+            const error = placementError(step.cell, state);
+            if (
+              error ||
+              !hasRoad(step.cell, state.roads) ||
+              state.buildings.some(
+                (building) => defFor(building.kind).ticker === step.ticker,
+              )
+            )
+              throw new Error(
+                error || "This construction site changed. Request a new plan.",
+              );
+            if ((await readCash()) + 0.000001 < step.amount)
+              throw new Error(
+                "Confirmed mUSD proceeds are below this purchase amount. The agent paused; confirmed sales remain recorded.",
+              );
+          }
+          updateStep(step.id, {
+            status: "wallet",
+            hash: undefined,
+            reverted: false,
+            error: undefined,
+          });
+          setAgentActivity({
+            ...activity,
+            phase: "wallet",
+            detail: "Confirm this change in your wallet",
+          });
+          notify(
+            `Agent: sign ${step.action === "sell" ? "removal of" : "construction of"} ${step.ticker} in your wallet.`,
+          );
+          if (step.action === "sell") {
+            hash = await sellBuildingOnchain(
+              plan.walletAddress,
+              step.positionId,
+              step.price,
+              step.fractionBps,
+              (submitted) => {
+                if (!submitted) return;
+                updateStep(step.id, { status: "submitted", hash: submitted });
+                setAgentActivity({
+                  ...activity,
+                  phase: "submitted",
+                  hash: submitted,
+                  detail: "Signed · awaiting BNB confirmation",
+                });
+              },
+            );
+          } else {
+            const result = await recordBuildingOnchain(
+              plan.walletAddress,
+              {
+                ticker: step.ticker,
+                usdAmount: step.amount,
+                entryPrice: step.price,
+                initialTier: 1,
+              },
+              (stage, submitted) => {
+                if (stage === "approve") {
+                  updateStep(step.id, {
+                    approvalHash:
+                      submitted ??
+                      run.steps.find((item) => item.stepId === step.id)
+                        ?.approvalHash,
+                  });
+                  setAgentActivity({
+                    ...activity,
+                    phase: "wallet",
+                    detail: submitted
+                      ? "mUSD approval submitted · purchase signature follows"
+                      : "Approve mUSD spending in your wallet",
+                  });
+                } else if (submitted) {
+                  updateStep(step.id, { status: "submitted", hash: submitted });
+                  setAgentActivity({
+                    ...activity,
+                    phase: "submitted",
+                    hash: submitted,
+                    detail: "Signed · awaiting BNB confirmation",
+                  });
+                } else {
+                  setAgentActivity({
+                    ...activity,
+                    phase: "wallet",
+                    detail: "Confirm the building purchase in your wallet",
+                  });
+                }
+              },
+            );
+            hash = result.hash;
+          }
+        }
+        updateStep(step.id, { status: "submitted", hash });
+        setAgentActivity({
+          ...activity,
+          phase: "submitted",
+          hash,
+          detail: "Checking the saved on-chain receipt",
+        });
+        const receipt = await confirmedRebalanceReceipt(
+          plan.walletAddress,
+          hash,
+          step.action,
+          (canonicalHash) => updateStep(step.id, { hash: canonicalHash }),
+        );
+        hash = receipt.hash;
+        const next = applyRebalanceReceipt(
+          simulationLatest.current.city,
+          plan,
+          step,
+          receipt,
+        );
+        // Persist receipt + city before marking complete so a reload cannot replay a mined step.
+        saveConfirmedCity(next);
+        run = { ...run, fingerprint: rebalanceFingerprint(next) };
+        updateStep(step.id, { status: "confirmed", hash, error: undefined });
+        setAgentActivity({
+          ...activity,
+          phase: "confirmed",
+          hash,
+          detail:
+            step.action === "sell"
+              ? "Building removed · receipt confirmed"
+              : "Building constructed · receipt confirmed",
+        });
+        setUpgrades((previous) => ({
+          ...previous,
+          [step.buildingId]: Date.now(),
+        }));
+        notify(
+          `Agent: ${step.ticker} ${step.action === "sell" ? "removed" : "built"}. Confirmed receipt saved in City Hall.`,
+        );
+        // Let the receipt-driven reveal finish before focusing the next worksite.
+        await new Promise<void>((resolve) =>
+          motion && !paused
+            ? setTimeout(resolve, 500)
+            : requestAnimationFrame(() => resolve()),
+        );
+      }
+      run = { ...run, status: "completed", error: undefined };
+      saveAgentExecution(run);
+      notify(
+        "Agent rebalance complete. Every city change has a confirmed receipt in City Hall.",
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "The wallet request could not finish. Confirmed changes remain saved.";
+      if (currentStepId) {
+        try {
+          updateStep(currentStepId, {
+            status: "error",
+            error: message,
+            reverted:
+              /transaction reverted|replaced or cancelled on-chain/i.test(
+                message,
+              ),
+          });
+        } catch {
+          /* The submitted hash remains in executionRef for receipt recovery. */
+        }
+        setAgentActivity((activity) =>
+          activity
+            ? {
+                ...activity,
+                phase: "error",
+                detail: "Agent paused · confirmed changes are saved",
+              }
+            : null,
+        );
+      }
+      run = { ...run, status: "paused", error: message };
+      try {
+        saveAgentExecution(run);
+      } catch {
+        run = {
+          ...run,
+          error: `${message} Browser saving is unavailable. Keep this page open and save the displayed transaction hash before retrying.`,
+        };
+        executionRef.current = run;
+        setAgentExecution(run);
+      }
+      notify(`Agent paused: ${message}`, true);
+    } finally {
+      agentRunning.current = false;
+    }
+  };
   const setTool = (next: Tool) => {
+    if (cityMutationLocked && next !== "inspect") {
+      notify("The agent is settling a signed plan. You can move the camera while its transactions finish.", true);
+      return;
+    }
     setPortfolioView(false);
     setActiveTool(next);
   };
@@ -633,6 +1032,7 @@ export default function StockCity() {
     setSelected(null);
   };
   const onPlace = (cell: Cell) => {
+    if (cityMutationLocked) return;
     if (!kind || !ready) return;
     const def = defFor(kind);
     const alreadyBuilt = city.buildings.some(
@@ -683,8 +1083,7 @@ export default function StockCity() {
         ),
       };
       commit(lockedState);
-      const placed =
-        lockedState.buildings[lockedState.buildings.length - 1];
+      const placed = lockedState.buildings[lockedState.buildings.length - 1];
       const ticker = defFor(kind).ticker!;
       const entryPrice = priceOf(ticker, prices);
       const fromTray = placeSource !== "exchange";
@@ -696,7 +1095,11 @@ export default function StockCity() {
         const buildingId = placed.id;
         setConfirmingBuildings((prev) => ({
           ...prev,
-          [buildingId]: { confirming: true, confirmed: false, startedAt: Date.now() },
+          [buildingId]: {
+            confirming: true,
+            confirmed: false,
+            startedAt: Date.now(),
+          },
         }));
 
         (async () => {
@@ -748,7 +1151,11 @@ export default function StockCity() {
             });
             setConfirmingBuildings((prev) => ({
               ...prev,
-              [buildingId]: { confirming: false, confirmed: true, startedAt: prev[buildingId]?.startedAt },
+              [buildingId]: {
+                confirming: false,
+                confirmed: true,
+                startedAt: prev[buildingId]?.startedAt,
+              },
             }));
             notify(
               `${defFor(kind).name} unlocked and permanently recorded on BSC!`,
@@ -794,7 +1201,9 @@ export default function StockCity() {
         if (allBundleBuildings.length > 0) {
           setBundleModalBuildings(allBundleBuildings);
           setShowBundleModal(true);
-          notify("All bundle buildings placed! Confirm your purchase directly on the canvas.");
+          notify(
+            "All bundle buildings placed! Confirm your purchase directly on the canvas.",
+          );
         } else {
           notify(
             `${defFor(kind).name} drafted as locked at ${money(entryPrice)} per share.`,
@@ -809,6 +1218,7 @@ export default function StockCity() {
     );
   };
   const onRoad = (cells: Cell[]) => {
+    if (cityMutationLocked) return;
     if (!ready) return;
     const result = constructRoad(cells, city);
     if (result.error) {
@@ -823,6 +1233,24 @@ export default function StockCity() {
     );
   };
   const onBulldoze = (cell: Cell) => {
+    if (cityMutationLocked) return;
+    if (
+      city.buildings.some(
+        (building) =>
+          building.vaultId &&
+          defFor(building.kind).ticker &&
+          cell.r >= building.r &&
+          cell.r <= building.r + 1 &&
+          cell.c >= building.c &&
+          cell.c <= building.c + 1,
+      )
+    ) {
+      notify(
+        "This building holds an on-chain stock position. Review and sign its removal through Agent Hall.",
+        true,
+      );
+      return;
+    }
     const result = bulldoze(cell, city, prices);
     if (result.state === city) return;
     commit(result.state);
@@ -860,14 +1288,16 @@ export default function StockCity() {
   const realizedPnl = city.realizedPnl ?? 0;
   const unrealizedPnl = portfolio - stockCostBasis;
   const totalPnl = unrealizedPnl + realizedPnl;
-  const totalReturnPct = stockCostBasis > 0
-    ? (totalPnl / stockCostBasis) * 100
-    : (realizedPnl !== 0 ? (realizedPnl > 0 ? 100 : -100) : 0);
+  const totalReturnPct =
+    stockCostBasis > 0
+      ? (totalPnl / stockCostBasis) * 100
+      : realizedPnl !== 0
+        ? realizedPnl > 0
+          ? 100
+          : -100
+        : 0;
   const hasPositions = stockPositions.length > 0 || realizedPnl !== 0;
-  const alloc = allocationOf(
-    stockPositions,
-    prices,
-  );
+  const alloc = allocationOf(stockPositions, prices);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (confirmReset) {
@@ -1015,12 +1445,11 @@ export default function StockCity() {
         speed={speed}
         prices={prices}
         thresholds={thresholds}
-        simulationReturns={
-          gameMode === "simulation" ? simulationReturns : null
-        }
+        simulationReturns={gameMode === "simulation" ? simulationReturns : null}
         now={now}
         upgrades={upgrades}
         confirmingBuildings={confirmingBuildings}
+        agentActivity={agentActivity ?? undefined}
         onConstructionComplete={handleConstructionComplete}
         onZoom={changeZoom}
         onSelect={(id) => {
@@ -1031,10 +1460,10 @@ export default function StockCity() {
               b.kind === "agent_hall"
                 ? "agent"
                 : b.kind === "hall"
-                ? "portfolio"
-                : b.kind === "exchange"
-                  ? "market"
-                  : "data",
+                  ? "portfolio"
+                  : b.kind === "exchange"
+                    ? "market"
+                    : "data",
             );
           } else if (b && scanMode) {
             setScanTarget(id);
@@ -1064,7 +1493,11 @@ export default function StockCity() {
           setConfirmingBuildings((prev) => {
             const copy = { ...prev };
             for (const id of buildingIds) {
-              copy[id] = { confirming: true, confirmed: false, startedAt: Date.now() };
+              copy[id] = {
+                confirming: true,
+                confirmed: false,
+                startedAt: Date.now(),
+              };
             }
             return copy;
           });
@@ -1084,7 +1517,11 @@ export default function StockCity() {
           setConfirmingBuildings((prev) => {
             const copy = { ...prev };
             for (const r of receipts) {
-              copy[r.buildingId] = { confirming: false, confirmed: true, startedAt: Date.now() };
+              copy[r.buildingId] = {
+                confirming: false,
+                confirmed: true,
+                startedAt: Date.now(),
+              };
             }
             return copy;
           });
@@ -1162,7 +1599,11 @@ export default function StockCity() {
               onClick={() => openPanel("portfolio")}
               title="City Hall · Treasury & Balances"
             >
-              <img src={sprite("buttons/portfolio")} alt="" aria-hidden="true" />
+              <img
+                src={sprite("buttons/portfolio")}
+                alt=""
+                aria-hidden="true"
+              />
               <b>{wholeMoney(city.cash)}</b>
             </button>
             <button
@@ -1453,10 +1894,7 @@ export default function StockCity() {
                           }}
                         >
                           {tierName(currentTier)}
-                          <span
-                            className="stock-badge-pips"
-                            aria-hidden="true"
-                          >
+                          <span className="stock-badge-pips" aria-hidden="true">
                             {[1, 2, 3].map((n) => (
                               <i
                                 key={n}
@@ -1481,7 +1919,14 @@ export default function StockCity() {
                         {feed.quotes[definition.ticker!]?.status}
                       </small>
                     </div>
-                    <div className="chain-link" style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                    <div
+                      className="chain-link"
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "3px",
+                      }}
+                    >
                       <a
                         href={bscAddressLink(VAULT_ADDRESS)}
                         target="_blank"
@@ -1497,7 +1942,10 @@ export default function StockCity() {
                         }}
                       >
                         <ShieldCheck size={13} />
-                        <span>BNB Chain Vault: {VAULT_ADDRESS.slice(0, 6)}…{VAULT_ADDRESS.slice(-4)}</span>
+                        <span>
+                          BNB Chain Vault: {VAULT_ADDRESS.slice(0, 6)}…
+                          {VAULT_ADDRESS.slice(-4)}
+                        </span>
                         <ExternalLink size={11} />
                       </a>
                       <small style={{ color: "#8b9ea7", fontSize: "10px" }}>
@@ -1518,10 +1966,10 @@ export default function StockCity() {
                     current.kind === "agent_hall"
                       ? "agent"
                       : current.kind === "hall"
-                      ? "portfolio"
-                      : current.kind === "exchange"
-                        ? "market"
-                        : "data",
+                        ? "portfolio"
+                        : current.kind === "exchange"
+                          ? "market"
+                          : "data",
                   )
                 }
               >
@@ -1529,10 +1977,10 @@ export default function StockCity() {
                 {current.kind === "agent_hall"
                   ? "Agent Hall"
                   : current.kind === "hall"
-                  ? "finances"
-                  : current.kind === "exchange"
-                    ? "market"
-                    : "data status"}
+                    ? "finances"
+                    : current.kind === "exchange"
+                      ? "market"
+                      : "data status"}
                 <ChevronRight size={14} />
               </button>
             )}
@@ -1682,6 +2130,17 @@ export default function StockCity() {
             setWallet(account);
             return account;
           }}
+          onAddDemoCash={(amt = 10000) => {
+            const next = {
+              ...simulationLatest.current.city,
+              cash: simulationLatest.current.city.cash + amt,
+            };
+            commit(next);
+            notify(`Added +${money(amt)} Demo USD to Treasury!`);
+          }}
+          onClaimFaucet={() => {
+            notify("Claimed 10,000 testnet mUSD! Confirmed on BNB Chain.");
+          }}
           onConfirmBatch={(receipts) => {
             const latest = simulationLatest.current.city;
             const byId = new Map(receipts.map((r) => [r.buildingId, r]));
@@ -1697,7 +2156,11 @@ export default function StockCity() {
             setConfirmingBuildings((prev) => {
               const copy = { ...prev };
               for (const r of receipts) {
-                copy[r.buildingId] = { confirming: false, confirmed: true, startedAt: Date.now() };
+                copy[r.buildingId] = {
+                  confirming: false,
+                  confirmed: true,
+                  startedAt: Date.now(),
+                };
               }
               return copy;
             });
@@ -1709,7 +2172,8 @@ export default function StockCity() {
           }}
           onBuyBundle={(items) => {
             if (!items.length) return "Pick at least one stock for the bundle.";
-            if (!hasExchange) return "Build the Stock Exchange on your island before placing a bundle.";
+            if (!hasExchange)
+              return "Build the Stock Exchange on your island before placing a bundle.";
             const alreadyBuiltItem = items.find((i) => {
               const def = defFor(i.kind);
               return city.buildings.some(
@@ -1745,6 +2209,15 @@ export default function StockCity() {
             return `${ticker} position opened (no building). Visible in City Hall.`;
           }}
           onSell={(ticker, fraction) => {
+            if (cityMutationLocked)
+              return "Finish the agent's pending transaction before selling.";
+            if (
+              city.buildings.some(
+                (building) =>
+                  defFor(building.kind).ticker === ticker && building.vaultId,
+              )
+            )
+              return "This holding is on-chain. Open Agent Hall to review and sign its restructuring plan.";
             const result = sellPosition(city, ticker, fraction, prices);
             if (result.error) return result.error;
             commit(result.state);
@@ -1758,6 +2231,7 @@ export default function StockCity() {
           }}
           onFocus={(b) => {
             setPanel(null);
+            setIntelId(null);
             setSelected(b.id);
             setTool("inspect");
             setZoom(1.7);
@@ -1779,12 +2253,40 @@ export default function StockCity() {
           prices={prices}
           feed={feed}
           walletConnected={!!wallet}
+          walletAddress={wallet}
+          execution={agentExecution}
+          onExecute={executeRebalance}
+          onClearExecution={() => {
+            if (
+              agentRunning.current ||
+              executionRef.current?.steps.some(
+                (step) =>
+                  step.hash && !step.reverted && step.status !== "confirmed",
+              )
+            )
+              return;
+            localStorage.removeItem(REBALANCE_STORAGE);
+            executionRef.current = null;
+            setAgentExecution(null);
+            setAgentActivity(null);
+          }}
+          onConnectWallet={async () => {
+            const account = await connectInjectedWallet();
+            setWallet(account);
+          }}
+          onWatchCity={() => setPanel(null)}
           onClose={() => setPanel(null)}
           onMarket={(ticker) => {
             if (!hasExchange) return;
             openPanel("market");
             setAssetTicker(ticker);
           }}
+        />
+      )}
+      {agentExecution && panel !== "agent" && (
+        <AgentExecutionDock
+          execution={agentExecution}
+          onOpen={() => setPanel("agent")}
         />
       )}
       {panel && !["portfolio", "market", "data", "agent"].includes(panel) && (
@@ -1804,7 +2306,9 @@ export default function StockCity() {
           {panel === "settings" && (
             <div className="panel-body">
               <div className="settings-mode-container">
-                <span className="settings-mode-label">Market Operating Mode</span>
+                <span className="settings-mode-label">
+                  Market Operating Mode
+                </span>
                 <div
                   className="mode-toggle-group"
                   role="radiogroup"
@@ -1866,13 +2370,17 @@ export default function StockCity() {
                       className={`settings-sim-toggle-btn ${simulationRunning ? "running" : "paused"}`}
                       onClick={() => setSimulationRunning((r) => !r)}
                     >
-                      {simulationRunning ? "Pause Simulation" : "Resume Simulation"}
+                      {simulationRunning
+                        ? "Pause Simulation"
+                        : "Resume Simulation"}
                     </button>
 
                     {/* Percentage Threshold Controls */}
                     <div className="settings-thresholds-wrapper">
                       <div className="settings-sim-row">
-                        <span className="settings-sim-sublabel">Tier Thresholds (%)</span>
+                        <span className="settings-sim-sublabel">
+                          Tier Thresholds (%)
+                        </span>
                         <button
                           type="button"
                           className="settings-threshold-reset-btn"
@@ -1894,7 +2402,9 @@ export default function StockCity() {
                               min="-98.5"
                               max="1000"
                               value={thresholdDraft.minus}
-                              onChange={(e) => handleThresholdChange("minus", e.target.value)}
+                              onChange={(e) =>
+                                handleThresholdChange("minus", e.target.value)
+                              }
                             />
                             <span className="threshold-unit">%</span>
                           </div>
@@ -1910,7 +2420,9 @@ export default function StockCity() {
                               min="-98.5"
                               max="1000"
                               value={thresholdDraft.level2}
-                              onChange={(e) => handleThresholdChange("level2", e.target.value)}
+                              onChange={(e) =>
+                                handleThresholdChange("level2", e.target.value)
+                              }
                             />
                             <span className="threshold-unit">%</span>
                           </div>
@@ -1926,7 +2438,9 @@ export default function StockCity() {
                               min="-98.5"
                               max="1000"
                               value={thresholdDraft.level3}
-                              onChange={(e) => handleThresholdChange("level3", e.target.value)}
+                              onChange={(e) =>
+                                handleThresholdChange("level3", e.target.value)
+                              }
                             />
                             <span className="threshold-unit">%</span>
                           </div>
@@ -1941,16 +2455,24 @@ export default function StockCity() {
 
                       <div className="settings-tier-preview">
                         <span className="tier-tag minus">
-                          Minus: &lt; {thresholds.minus > 0 ? "+" : ""}{thresholds.minus}%
+                          Minus: &lt; {thresholds.minus > 0 ? "+" : ""}
+                          {thresholds.minus}%
                         </span>
                         <span className="tier-tag level1">
-                          Tier 1: {thresholds.minus > 0 ? "+" : ""}{thresholds.minus}% to &lt; {thresholds.level2 > 0 ? "+" : ""}{thresholds.level2}%
+                          Tier 1: {thresholds.minus > 0 ? "+" : ""}
+                          {thresholds.minus}% to &lt;{" "}
+                          {thresholds.level2 > 0 ? "+" : ""}
+                          {thresholds.level2}%
                         </span>
                         <span className="tier-tag level2">
-                          Tier 2: {thresholds.level2 > 0 ? "+" : ""}{thresholds.level2}% to &lt; {thresholds.level3 > 0 ? "+" : ""}{thresholds.level3}%
+                          Tier 2: {thresholds.level2 > 0 ? "+" : ""}
+                          {thresholds.level2}% to &lt;{" "}
+                          {thresholds.level3 > 0 ? "+" : ""}
+                          {thresholds.level3}%
                         </span>
                         <span className="tier-tag level3">
-                          Tier 3: ≥ {thresholds.level3 > 0 ? "+" : ""}{thresholds.level3}%
+                          Tier 3: ≥ {thresholds.level3 > 0 ? "+" : ""}
+                          {thresholds.level3}%
                         </span>
                       </div>
                     </div>
@@ -1990,6 +2512,7 @@ export default function StockCity() {
               <button
                 className="menu-row danger"
                 onClick={() => setConfirmReset(true)}
+                disabled={cityMutationLocked}
               >
                 Start a new city
                 <Trash2 size={15} />
@@ -2128,6 +2651,7 @@ export default function StockCity() {
               <button
                 className="confirm-new"
                 onClick={() => {
+                  if (cityMutationLocked) return;
                   setCity(newCity());
                   setSimulationRunning(false);
                   setSimulationReturns(null);

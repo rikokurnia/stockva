@@ -1,0 +1,233 @@
+.targetBuilding {
+  filter: drop-shadow(0 0 10px rgba(240, 185, 11, 0.7));
+}
+
+.confirmedBuilding {
+  animation: pulseTarget 1.5s ease-in-out;
+}
+
+@keyframes pulseTarget {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 16px rgba(16, 185, 129, 0.9));
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.worksite {
+  position: absolute;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.worksite.sell {
+  filter: hue-rotate(180deg);
+}
+
+.noMotion * {
+  animation: none !important;
+  transition: none !important;
+}
+
+.plot {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.plotTile {
+  fill: rgba(240, 185, 11, 0.15);
+  stroke: rgba(240, 185, 11, 0.4);
+  stroke-width: 1.5;
+}
+
+.plotBorder {
+  fill: none;
+  stroke: #f0b90b;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -8;
+  }
+}
+
+.scaffolding {
+  stroke: #38bdf8;
+  stroke-width: 1.5;
+  fill: none;
+  opacity: 0.85;
+}
+
+.scaffoldRail {
+  stroke: #f0b90b;
+  stroke-width: 2;
+}
+
+.confirmationRing {
+  fill: none;
+  stroke: #10b981;
+  stroke-width: 3;
+  animation: expandRing 0.8s ease-out forwards;
+}
+
+@keyframes expandRing {
+  from {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+
+.removedBuilding {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  opacity: 0.5;
+  filter: grayscale(1) blur(1px);
+}
+
+.siteMarker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: #11232e;
+  border: 1px solid #f0b90b;
+  color: #edf2f3;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status {
+  position: absolute;
+  width: 240px;
+  background: #0d1b24;
+  border: 1.5px solid #233b4b;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  color: #edf2f3;
+  pointer-events: auto;
+  z-index: 1020;
+}
+
+.statusHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.statusHeading strong {
+  flex: 1;
+  font-size: 12px;
+  color: #edf2f3;
+}
+
+.signal {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f0b90b;
+  box-shadow: 0 0 8px #f0b90b;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+
+.agentLabel {
+  font-size: 9px;
+  font-weight: 800;
+  color: #f0b90b;
+  background: rgba(240, 185, 11, 0.15);
+  border: 1px solid rgba(240, 185, 11, 0.35);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.status p {
+  font-size: 11px;
+  color: #8fa6b4;
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.steps {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  gap: 6px;
+}
+
+.steps li {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #597080;
+}
+
+.stepDone {
+  color: #10b981 !important;
+  font-weight: 600;
+}
+
+.stepCurrent {
+  color: #f0b90b !important;
+  font-weight: 700;
+}
+
+.receipt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #38bdf8;
+  text-decoration: none;
+  margin-top: 4px;
+  min-height: 40px;
+}
+
+.receipt:hover {
+  text-decoration: underline;
+}
+
+.receipt:focus-visible {
+  outline: 2px solid #f4cd60;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .worksite *, .confirmedBuilding {
+    animation: none !important;
+    transition: none !important;
+  }
+}

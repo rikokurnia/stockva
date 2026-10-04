@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-async function cdp() {
+async function run() {
   const listRes = await fetch("http://127.0.0.1:9222/json/list");
   const targets = await listRes.json();
   const pageTarget = targets.find((t) => t.type === "page" && !t.url.startsWith("chrome://"));
@@ -19,7 +19,7 @@ async function cdp() {
     }
   };
 
-  await new Promise((res) => ws.onopen = res);
+  await new Promise((res) => (ws.onopen = res));
 
   function send(method, params = {}) {
     return new Promise((resolve, reject) => {
@@ -39,9 +39,6 @@ async function cdp() {
     mobile: false,
   });
 
-  console.log("Navigating to http://localhost:3000...");
-  await new Promise((r) => setTimeout(r, 2500));
-
   async function evaluate(expression) {
     const res = await send("Runtime.evaluate", {
       expression,
@@ -58,102 +55,153 @@ async function cdp() {
     console.log(`Saved screenshot: ${filename} (${buffer.length} bytes)`);
   }
 
-  // 1. Initial city map
-  await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/01_initial_city.png");
+  console.log("Seeding city with City Hall, Exchange, Data Center, Agent Hall, Tesla, Apple, and roads...");
+  await evaluate(`
+    (() => {
+      const demoCity = {
+        version: 2,
+        cash: 50000,
+        buildings: [
+          { id: "b_hall", kind: "hall", r: 0, c: 0, cost: 250, entry: 250, quantity: 1 },
+          { id: "b_exch", kind: "exchange", r: 2, c: 2, cost: 400, entry: 400, quantity: 1 },
+          { id: "b_data", kind: "oracle", r: -2, c: -2, cost: 300, entry: 300, quantity: 1 },
+          { id: "b_agent", kind: "agent_hall", r: 2, c: -2, cost: 350, entry: 350, quantity: 1 },
+          { id: "b_tsla", kind: "tesla", r: -2, c: 2, cost: 700, entry: 350, quantity: 2, vaultId: "0x1810e415" }
+        ],
+        roads: [
+          { r: 0, c: 1 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: -1, c: 0 },
+          { r: 1, c: 1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: -1, c: -1 },
+          { r: 0, c: 2 }, { r: 2, c: 0 }, { r: 0, c: -2 }, { r: -2, c: 0 }
+        ],
+        paper: []
+      };
+      localStorage.setItem("stockva.sandbox.v2", JSON.stringify(demoCity));
+    })()
+  `);
+
+  console.log("Navigating to city page with seeded data...");
+  await send("Page.navigate", { url: "http://localhost:3000/city" });
+  for (let i = 0; i < 30; i++) {
+    const ready = await evaluate(`Boolean(document.querySelector('.portfolio-resource'))`);
+    if (ready) break;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  await new Promise((r) => setTimeout(r, 800));
+
+  // 1. Initial city map screenshot
+  await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/01_island_with_services.png");
 
   // 2. Open City Hall
   console.log("Opening City Hall...");
   await evaluate(`
     (() => {
-      // Find City Hall button in bottom dock or building
-      const buttons = Array.from(document.querySelectorAll('button'));
-      const hallBtn = buttons.find(b => b.textContent && (b.textContent.includes('City Hall') || b.getAttribute('aria-label')?.includes('City Hall')));
-      if (hallBtn) { hallBtn.click(); return 'clicked button'; }
-      // Alternatively look for hall building or click bottom menu
-      const navButtons = Array.from(document.querySelectorAll('.dock-bar button, .island-actions button, button'));
-      const found = navButtons.find(b => b.title?.includes('City Hall') || b.textContent?.includes('Finances') || b.textContent?.includes('City Hall'));
-      if (found) { found.click(); return 'clicked found'; }
-      return 'not found';
+      const portfolioBtn = document.querySelector('.portfolio-resource') || document.querySelector('.cash-resource');
+      if (portfolioBtn) portfolioBtn.click();
     })()
   `);
-  await new Promise((r) => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 1200));
   await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/02_city_hall_dark.png");
 
-  // 3. Test "Manage portfolio" or Manage button
-  console.log("Testing Manage portfolio interaction...");
-  const manageResult = await evaluate(`
+  // 3. Test clicking "Manage portfolio" / "Manage" on holding row
+  console.log("Testing Manage portfolio interaction in City Hall...");
+  const manageClicked = await evaluate(`
     (() => {
-      const manageButtons = Array.from(document.querySelectorAll('button')).filter(b => b.textContent && (b.textContent.includes('Manage portfolio') || b.textContent.includes('Manage')));
+      const manageButtons = Array.from(document.querySelectorAll('button')).filter(b => 
+        b.textContent && (b.textContent.includes('Manage portfolio') || b.textContent.includes('Manage'))
+      );
       if (manageButtons.length > 0) {
+        const text = manageButtons[0].textContent.trim();
         manageButtons[0].click();
-        return 'clicked ' + manageButtons[0].textContent.trim();
+        return 'clicked ' + text;
       }
-      return 'no manage button found';
+      return 'none';
     })()
   `);
-  console.log("Manage action result:", manageResult);
-  await new Promise((r) => setTimeout(r, 1200));
+  console.log("Manage button clicked:", manageClicked);
+  await new Promise((r) => setTimeout(r, 1500));
   await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/03_inspector_card_beside_building.png");
 
-  // Check if start-note is hidden or overlapping
-  const overlapInfo = await evaluate(`
+  // Verify positioning and overlap
+  const layoutCheck = await evaluate(`
     (() => {
       const inspector = document.querySelector('.inspection-panel');
       const startNote = document.querySelector('.start-note');
+      const rect = inspector ? inspector.getBoundingClientRect() : null;
       return {
         inspectorFound: Boolean(inspector),
-        inspectorBox: inspector ? inspector.getBoundingClientRect() : null,
-        startNoteFound: Boolean(startNote),
-        startNoteBox: startNote ? startNote.getBoundingClientRect() : null,
-        viewportHeight: window.innerHeight,
+        inspectorBox: rect ? {
+          top: rect.top,
+          right: window.innerWidth - rect.right,
+          bottom: rect.bottom,
+          height: rect.height,
+          width: rect.width,
+          viewportHeight: window.innerHeight,
+          fitsWithinScreen: rect.bottom <= window.innerHeight,
+        } : null,
+        startNoteVisible: Boolean(startNote && window.getComputedStyle(startNote).display !== 'none'),
       };
     })()
   `);
-  console.log("Inspection Panel & Start Note layout:", JSON.stringify(overlapInfo, null, 2));
+  console.log("Layout inspection report:", JSON.stringify(layoutCheck, null, 2));
 
-  // 4. Open Stock Exchange & Test Chart
-  console.log("Opening Stock Exchange...");
+  // Close inspector before opening exchange
   await evaluate(`
     (() => {
-      const tradeBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent && b.textContent.includes('Trade position'));
-      if (tradeBtn) { tradeBtn.click(); return; }
-      const exchBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent && (b.textContent.includes('Stock Exchange') || b.title?.includes('Exchange')));
-      if (exchBtn) exchBtn.click();
-    })()
-  `);
-  await new Promise((r) => setTimeout(r, 1500));
-  await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/04_stock_exchange_chart_dark.png");
-
-  // Click 1W then ALL in chart controls
-  console.log("Testing chart controls...");
-  await evaluate(`
-    (() => {
-      const buttons = Array.from(document.querySelectorAll('button'));
-      const allBtn = buttons.find(b => b.textContent?.trim() === 'ALL');
-      if (allBtn) allBtn.click();
-    })()
-  `);
-  await new Promise((r) => setTimeout(r, 1000));
-  await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/05_stock_exchange_all_chart.png");
-
-  // 5. Open Data Center (RWA passport)
-  console.log("Opening Data Center...");
-  await evaluate(`
-    (() => {
-      const rwaTab = Array.from(document.querySelectorAll('button')).find(b => b.textContent && (b.textContent.includes('Data Center') || b.title?.includes('Data Center')));
-      if (rwaTab) { rwaTab.click(); return; }
-      const closeBtn = document.querySelector('button[aria-label*="Close"]');
+      const closeBtn = document.querySelector('.inspection-panel button[aria-label*="Close"]') || document.querySelector('.inspection-panel .close-btn') || Array.from(document.querySelectorAll('button')).find(b => b.ariaLabel?.includes('Close'));
       if (closeBtn) closeBtn.click();
     })()
   `);
   await new Promise((r) => setTimeout(r, 500));
+
+  // 4. Open Stock Exchange & Test Real-time Chart
+  console.log("Opening Stock Exchange...");
   await evaluate(`
     (() => {
-      const dataBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent && (b.textContent.includes('Data Center') || b.title?.includes('Data Center')));
-      if (dataBtn) dataBtn.click();
+      const marketBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent && b.textContent.includes('Market'));
+      if (marketBtn) marketBtn.click();
     })()
   `);
+  for (let i = 0; i < 25; i++) {
+    const hasCanvas = await evaluate(`Boolean(document.querySelector('canvas'))`);
+    if (hasCanvas) break;
+    await new Promise((r) => setTimeout(r, 300));
+  }
   await new Promise((r) => setTimeout(r, 1200));
+  await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/04_stock_exchange_chart_dark.png");
+
+  // Test Range Selector "ALL"
+  console.log("Clicking ALL in chart controls...");
+  await evaluate(`
+    (() => {
+      const allBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'ALL');
+      if (allBtn) allBtn.click();
+    })()
+  `);
+  await new Promise((r) => setTimeout(r, 1500));
+  await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/05_stock_exchange_all_chart.png");
+
+  // Close Stock Exchange
+  await evaluate(`
+    (() => {
+      const closeBtn = document.querySelector('button[aria-label*="Close"]') || Array.from(document.querySelectorAll('button')).find(b => b.title?.includes('Close'));
+      if (closeBtn) closeBtn.click();
+    })()
+  `);
+  await new Promise((r) => setTimeout(r, 600));
+
+  // 5. Open Data Center
+  console.log("Opening Data Center...");
+  await evaluate(`
+    (() => {
+      const dataBld = Array.from(document.querySelectorAll('.city-building')).find(b => b.getAttribute('aria-label')?.includes('Data') || b.getAttribute('aria-label')?.includes('Oracle'));
+      if (dataBld) dataBld.click();
+      else {
+        const anyBtn = Array.from(document.querySelectorAll('button')).find(b => b.getAttribute('aria-label')?.includes('Oracle'));
+        if (anyBtn) anyBtn.click();
+      }
+    })()
+  `);
+  await new Promise((r) => setTimeout(r, 1500));
   await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/06_datacenter_dark.png");
 
   // 6. Open Agent Hall
@@ -165,17 +213,19 @@ async function cdp() {
     })()
   `);
   await new Promise((r) => setTimeout(r, 500));
+  // Inspect agent hall building or open agent
   await evaluate(`
     (() => {
-      const agentBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent && (b.textContent.includes('Agent Hall') || b.title?.includes('Agent Hall') || b.textContent.includes('Agent')));
+      // Find building b_agent or open agent panel
+      const agentBtn = document.querySelector('button[title*="Agent Hall"]') || Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Agent Hall'));
       if (agentBtn) agentBtn.click();
     })()
   `);
-  await new Promise((r) => setTimeout(r, 1200));
+  await new Promise((r) => setTimeout(r, 1500));
   await screenshot("/home/cokoo/.gemini/antigravity-ide/brain/0a1d5099-7ee1-42b6-899e-93c5b6c0e045/07_agent_hall_dark.png");
 
   ws.close();
-  console.log("Done verifying!");
+  console.log("UI verification complete!");
 }
 
-cdp().catch(console.error);
+run().catch(console.error);

@@ -44,6 +44,19 @@ import portfolioStyles from "./portfolio-view.module.css";
 import RoadNetwork from "./road-network";
 import { cameraBounds } from "../lib/map-geometry";
 import ConstructionProgressBar from "./construction-progress";
+import { bscTxLink } from "../lib/contracts";
+import agentStyles from "./agent-worksite.module.css";
+
+export type AgentMapActivity = {
+  buildingId?: string;
+  r?: number;
+  c?: number;
+  ticker: string;
+  kind: "buy" | "sell";
+  phase: "wallet" | "submitted" | "confirmed" | "error";
+  detail: string;
+  hash?: string;
+};
 
 type Props = {
   city: CityState;
@@ -73,6 +86,7 @@ type Props = {
     { confirming: boolean; confirmed: boolean; startedAt?: number }
   >;
   onConstructionComplete?: (buildingId: string) => void;
+  agentActivity?: AgentMapActivity | null;
   onZoom: (delta: number) => void;
   onSelect: (id: string | null) => void;
   onPlace: (cell: Cell) => void;
@@ -118,6 +132,74 @@ export default function CityMap(props: Props) {
   const [hover, setHover] = useState<Cell | null>(null);
   const [cursor, setCursor] = useState({ x: 0, y: 0 });
   const [preview, setPreview] = useState<Cell[]>([]);
+  const [agentSite, setAgentSite] = useState<{
+    key: string;
+    cell: Cell;
+    existing: boolean;
+    image?: string;
+  } | null>(null);
+  const agentActivity = props.agentActivity;
+  const agentKey = agentActivity
+    ? `${agentActivity.kind}:${agentActivity.ticker}:${Number.isFinite(agentActivity.r) && Number.isFinite(agentActivity.c) ? `${agentActivity.r},${agentActivity.c}` : (agentActivity.buildingId ?? "new")}`
+    : "";
+  const agentBuilding = agentActivity
+    ? city.buildings.find((b) => b.id === agentActivity.buildingId)
+    : undefined;
+  const suppliedAgentCell =
+    agentActivity &&
+    Number.isFinite(agentActivity.r) &&
+    Number.isFinite(agentActivity.c)
+      ? { r: agentActivity.r!, c: agentActivity.c! }
+      : null;
+  const agentCell =
+    agentBuilding ??
+    suppliedAgentCell ??
+    (agentSite?.key === agentKey ? agentSite.cell : null);
+  const agentPoint = agentCell
+    ? point(agentCell.r + 0.5, agentCell.c + 0.5)
+    : null;
+  const agentResult =
+    agentActivity?.kind === "sell"
+      ? agentBuilding
+        ? "Position resized"
+        : "Building removed"
+      : agentSite?.key === agentKey && agentSite.existing
+        ? "Position resized"
+        : "Building added";
+  useEffect(() => {
+    if (!agentActivity) {
+      setAgentSite(null);
+      return;
+    }
+    const target = city.buildings.find(
+      (b) => b.id === agentActivity.buildingId,
+    );
+    const cell =
+      target ??
+      (Number.isFinite(agentActivity.r) && Number.isFinite(agentActivity.c)
+        ? { r: agentActivity.r!, c: agentActivity.c! }
+        : null);
+    if (!cell) return;
+    setAgentSite((current) => {
+      if (current?.key === agentKey && agentActivity.phase !== "wallet")
+        return current;
+      return {
+        key: agentKey,
+        cell: { r: cell.r, c: cell.c },
+        existing: Boolean(target),
+        image: target
+          ? sprite(
+              buildingImage(
+                target,
+                prices,
+                props.thresholds,
+                props.simulationReturns?.[target.id],
+              ),
+            )
+          : undefined,
+      };
+    });
+  }, [agentActivity, agentKey]);
   const drag = useRef<{
     x: number;
     y: number;
@@ -341,7 +423,8 @@ export default function CityMap(props: Props) {
               y: drag.current.panY + e.clientY - drag.current.y,
             }),
           );
-        } else if (tool === "road") setPreview(roadLine(drag.current.cell, cell));
+        } else if (tool === "road")
+          setPreview(roadLine(drag.current.cell, cell));
       }}
       onPointerUp={(e) => {
         const d = drag.current;
@@ -448,18 +531,22 @@ export default function CityMap(props: Props) {
                 currentTier === "minus" ? 0 : portfolioLevel(currentTier);
               const status = portfolioStatus(ret);
               const confirmation = props.confirmingBuildings?.[b.id];
+              const isConfirmedAgentBuilding = city.agentReceipts?.some(
+                (receipt) => receipt.action === "buy" && receipt.positionId === b.vaultId,
+              );
               const isUnderConstruction =
-                now - b.builtAt < 8850 ||
+                (!isConfirmedAgentBuilding && now - b.builtAt < 8850) ||
                 Boolean(confirmation?.confirming) ||
                 Boolean(confirmation?.confirmed);
-              const fresh = now - b.builtAt < 7000;
+              const fresh = !isConfirmedAgentBuilding && now - b.builtAt < 7000;
               const upgraded = upgrades[b.id] && now - upgrades[b.id] < 2200;
+              const isAgentTarget = agentActivity?.buildingId === b.id;
               return (
                 <button
                   key={b.id}
                   data-building-id={b.id}
                   data-locked={b.locked ? "true" : undefined}
-                  className={`city-building ${props.scanMode && hoveredBuilding?.id === b.id ? "scan-active" : ""} ${def.category === "companies" ? "company" : "service"} ${selected === b.id ? "selected" : ""} ${moving === b.id ? "being-moved" : ""} ${tool === "bulldoze" && hoveredBuilding?.id === b.id ? "demolish" : ""} ${b.locked ? "locked" : ""}`}
+                  className={`city-building ${props.scanMode && hoveredBuilding?.id === b.id ? "scan-active" : ""} ${def.category === "companies" ? "company" : "service"} ${selected === b.id ? "selected" : ""} ${moving === b.id ? "being-moved" : ""} ${tool === "bulldoze" && hoveredBuilding?.id === b.id ? "demolish" : ""} ${b.locked ? "locked" : ""} ${isAgentTarget ? agentStyles.targetBuilding : ""} ${isAgentTarget && agentActivity?.phase === "confirmed" && motion && !paused ? agentStyles.confirmedBuilding : ""}`}
                   style={{
                     left: p.x,
                     top: p.y + 36,
@@ -484,7 +571,7 @@ export default function CityMap(props: Props) {
                   aria-label={`${def.name} building${b.locked ? ", locked unpaid" : ""}`}
                   tabIndex={tool === "inspect" ? 0 : -1}
                 >
-                  {isUnderConstruction && (
+                  {isUnderConstruction && !isAgentTarget && (
                     <ConstructionProgressBar
                       buildingId={b.id}
                       builtAt={confirmation?.startedAt ?? b.builtAt}
@@ -505,7 +592,7 @@ export default function CityMap(props: Props) {
                       alt=""
                     />
                   )}
-                  {fresh && (
+                  {fresh && !isAgentTarget && (
                     <img
                       className="fx-layer fx-construction"
                       src={sprite("effects/construction")}
@@ -594,6 +681,149 @@ export default function CityMap(props: Props) {
                 </button>
               );
             })}
+        {agentActivity && agentCell && agentPoint && (
+          <div
+            className={`${agentStyles.worksite} ${agentStyles[agentActivity.phase]} ${agentActivity.kind === "sell" ? agentStyles.sell : ""} ${!motion || paused ? agentStyles.noMotion : ""}`}
+            data-agent-phase={agentActivity.phase}
+            data-agent-ticker={agentActivity.ticker}
+          >
+            <svg
+              className={agentStyles.plot}
+              viewBox="0 0 1280 720"
+              aria-hidden="true"
+            >
+              {footprint(agentCell).map((cell) => (
+                <path
+                  key={cellKey(cell)}
+                  className={agentStyles.plotTile}
+                  d={diamond(cell)}
+                />
+              ))}
+              {agentActivity.phase !== "error" && (
+                <g transform={`translate(${agentPoint.x},${agentPoint.y})`}>
+                  <path
+                    className={agentStyles.plotBorder}
+                    d="M0,-36 64,0 0,36 -64,0Z"
+                  />
+                  {agentActivity.phase !== "confirmed" && (
+                    <g className={agentStyles.scaffolding}>
+                      <path d="M-64,0V-84L0,-120 64,-84V0M0,36V-48M-64,-84 0,-48 64,-84M-64,-42 0,-6 64,-42M-64,0 0,-48 64,0M-64,-84 0,-6 64,-84" />
+                      <path
+                        className={agentStyles.scaffoldRail}
+                        d="M-64,0 0,36 64,0"
+                      />
+                    </g>
+                  )}
+                  {agentActivity.phase === "confirmed" && (
+                    <path
+                      className={agentStyles.confirmationRing}
+                      d="M0,-46 82,0 0,46 -82,0Z"
+                    />
+                  )}
+                </g>
+              )}
+            </svg>
+            {agentActivity.kind === "sell" &&
+              agentActivity.phase === "confirmed" &&
+              !agentBuilding &&
+              agentSite?.key === agentKey &&
+              agentSite.image && (
+                <img
+                  className={agentStyles.removedBuilding}
+                  style={{ left: agentPoint.x, top: agentPoint.y + 36 }}
+                  src={agentSite.image}
+                  alt=""
+                  aria-hidden="true"
+                />
+              )}
+            <div
+              className={agentStyles.siteMarker}
+              style={{ left: agentPoint.x, top: agentPoint.y + 44 }}
+              aria-hidden="true"
+            >
+              <span>
+                {agentActivity.phase === "confirmed"
+                  ? "✓"
+                  : agentActivity.kind === "buy"
+                    ? "+"
+                    : "−"}
+              </span>
+              {agentActivity.ticker}
+            </div>
+            <div
+              className={agentStyles.status}
+              style={{
+                left: agentPoint.x,
+                top: agentPoint.y - 190,
+                transform: `translate(-50%, -100%) scale(${Math.max(1, 1 / scale)})`,
+              }}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <div className={agentStyles.statusHeading}>
+                <span className={agentStyles.signal} aria-hidden="true" />
+                <strong>
+                  {agentActivity.phase === "wallet"
+                    ? "Wallet approval"
+                    : agentActivity.phase === "submitted"
+                      ? "On-chain confirmation"
+                      : agentActivity.phase === "confirmed"
+                        ? agentResult
+                        : "Action paused"}
+                </strong>
+                <span className={agentStyles.agentLabel}>AGENT</span>
+              </div>
+              <p>{agentActivity.detail}</p>
+              <ol className={agentStyles.steps} aria-label="Transaction stages">
+                {["Wallet", "BNB Chain", "City updated"].map((label, index) => {
+                  const stage =
+                    agentActivity.phase === "confirmed"
+                      ? 3
+                      : agentActivity.phase === "submitted" ||
+                          (agentActivity.phase === "error" &&
+                            agentActivity.hash)
+                        ? 1
+                        : 0;
+                  const done = index < stage;
+                  const current =
+                    index === stage && agentActivity.phase !== "error";
+                  return (
+                    <li
+                      key={label}
+                      className={
+                        done
+                          ? agentStyles.stepDone
+                          : current
+                            ? agentStyles.stepCurrent
+                            : ""
+                      }
+                      aria-current={current ? "step" : undefined}
+                    >
+                      <span aria-hidden="true">{done ? "✓" : index + 1}</span>
+                      {label}
+                    </li>
+                  );
+                })}
+              </ol>
+              {agentActivity.hash && (
+                <a
+                  className={agentStyles.receipt}
+                  href={bscTxLink(agentActivity.hash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {agentActivity.phase === "confirmed"
+                    ? "View confirmed transaction"
+                    : "View transaction"}
+                  <span aria-hidden="true">↗</span>
+                </a>
+              )}
+            </div>
+          </div>
+        )}
         {tool !== "inspect" && (
           <svg
             className="build-grid"

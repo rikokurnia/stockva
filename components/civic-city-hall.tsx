@@ -8,6 +8,7 @@ import {
   Crosshair,
   ExternalLink,
   MapPin,
+  Plus,
   RefreshCw,
   Wallet,
 } from "lucide-react";
@@ -185,6 +186,19 @@ export default function CivicCityHall(
     };
   }, [historyOpen, walletAddress, refresh, positions]);
   const transactions = transactionHistory([
+    ...(city.agentReceipts ?? [])
+      .filter(
+        (receipt) =>
+          !walletAddress ||
+          receipt.owner.toLowerCase() === walletAddress.toLowerCase(),
+      )
+      .map((receipt): CityTransaction => ({
+        hash: receipt.hash,
+        kind: receipt.action === "buy" ? "agent-buy" : "agent-sell",
+        tickers: [receipt.ticker],
+        at: receipt.at,
+        source: "city",
+      })),
     ...stocks.flatMap((building): CityTransaction[] =>
       building.vaultTx
         ? [
@@ -252,6 +266,7 @@ export default function CivicCityHall(
           "10,000 testnet mUSD claimed. You can now confirm placed buildings.",
         );
         props.onClaimFaucet?.();
+        setRefresh((val) => val + 1);
       } else if (kind === "batch") {
         const result = await recordBuildingsBatch(
           account,
@@ -308,16 +323,24 @@ export default function CivicCityHall(
             activity. Unpaid drafts are kept out of portfolio value.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           {stocks.length > 0 && (
             <button
               className={styles.primary}
               onClick={() => {
                 const topHolding = landscape.holdings[0];
                 const target = topHolding
-                  ? stocks.find(
-                      (stock) => defFor(stock.kind).ticker === topHolding.ticker,
-                    ) ?? stocks[0]
+                  ? (stocks.find(
+                      (stock) =>
+                        defFor(stock.kind).ticker === topHolding.ticker,
+                    ) ?? stocks[0])
                   : stocks[0];
                 if (target) onFocus(target);
               }}
@@ -355,6 +378,22 @@ export default function CivicCityHall(
           label="Available city cash"
           value={money(city.cash)}
           detail="Local treasury · separate from wallet mUSD"
+          action={
+            props.onAddDemoCash ? (
+              <button
+                type="button"
+                className={styles.miniBtn}
+                title="Add +$10,000 Demo USD to Treasury"
+                onClick={() => {
+                  props.onAddDemoCash?.(10000);
+                  setStatus("Added +$10,000 Demo USD to Treasury!");
+                }}
+              >
+                <Plus size={11} />
+                $10k Demo
+              </button>
+            ) : null
+          }
         />
       </div>
       <div className={styles.hallGrid}>
@@ -645,21 +684,45 @@ export default function CivicCityHall(
               </Fact>
             </dl>
             <div className={styles.actions}>
-              <button
-                className={styles.secondary}
-                disabled={Boolean(operation)}
-                aria-busy={operation === "faucet"}
-                onClick={() =>
-                  void transact(walletAddress ? "faucet" : "connect")
-                }
-              >
-                {walletAddress ? <Coins size={16} /> : <Wallet size={16} />}
-                {operation === "faucet"
-                  ? "Claiming…"
-                  : walletAddress
-                    ? "Claim 10,000 mUSD"
-                    : "Connect wallet"}
-              </button>
+              {walletAddress ? (
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  disabled={Boolean(operation)}
+                  aria-busy={operation === "faucet"}
+                  onClick={() => void transact("faucet")}
+                >
+                  <Coins size={16} />
+                  {operation === "faucet"
+                    ? "Claiming 10,000 mUSD…"
+                    : "Claim 10,000 mUSD"}
+                </button>
+              ) : (
+                <div style={{ display: "flex", gap: "8px", width: "100%" }}>
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    style={{ flex: 1 }}
+                    onClick={() => {
+                      props.onAddDemoCash?.(10000);
+                      setStatus("Added +$10,000 Demo USD to Treasury!");
+                    }}
+                  >
+                    <Plus size={15} />
+                    + $10k Demo Cash
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.primary}
+                    style={{ flex: 1 }}
+                    disabled={Boolean(operation)}
+                    onClick={() => void transact("connect")}
+                  >
+                    <Wallet size={15} />
+                    Connect wallet
+                  </button>
+                </div>
+              )}
             </div>
             <p className={styles.caption}>
               Free test funds. Gas requires testnet BNB. mUSD is not redeemable
@@ -769,7 +832,9 @@ export default function CivicCityHall(
         <summary>
           <span>
             Chain transaction history
-            <small>Placements and faucet claims · BNB testnet</small>
+            <small>
+              Agent rebalances, placements and faucet claims · BNB testnet
+            </small>
           </span>
           <span>
             {transactions.length}{" "}
@@ -809,9 +874,13 @@ export default function CivicCityHall(
                 <strong>
                   {transaction.kind === "faucet"
                     ? "Faucet claim"
-                    : transaction.tickers.length > 1
-                      ? "Building batch"
-                      : "Building placement"}
+                    : transaction.kind === "agent-sell"
+                      ? "Agent · building removed"
+                      : transaction.kind === "agent-buy"
+                        ? "Agent · building constructed"
+                        : transaction.tickers.length > 1
+                          ? "Building batch"
+                          : "Building placement"}
                 </strong>
                 <small>
                   {transaction.tickers.join(" · ") || "Testnet mUSD"} ·{" "}
@@ -866,15 +935,20 @@ function Metric({
   value,
   detail,
   tone,
+  action,
 }: {
   label: string;
   value: string;
   detail: string;
   tone?: "gain" | "loss";
+  action?: React.ReactNode;
 }) {
   return (
     <div>
-      <span>{label}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>{label}</span>
+        {action}
+      </div>
       <strong className={tone ? styles[tone] : ""}>{value}</strong>
       <small>{detail}</small>
     </div>

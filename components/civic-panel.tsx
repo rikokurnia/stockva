@@ -33,6 +33,7 @@ export type CivicProps = {
   onScan: () => void;
   walletAddress?: `0x${string}` | null;
   onConnectWallet?: () => Promise<`0x${string}`>;
+  onAddDemoCash?: (amount?: number) => void;
   onClaimFaucet?: () => void;
   onConfirmBatch?: (
     receipts: { buildingId: string; hash: `0x${string}`; vaultId: string }[],
