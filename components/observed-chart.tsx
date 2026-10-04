@@ -5,6 +5,7 @@ import {
   LineSeries,
   ColorType,
   LineStyle,
+  type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { money } from "../lib/city";
@@ -15,18 +16,22 @@ import styles from "./civic-panel.module.css";
 
 export default function ObservedChart({
   history,
+  livePrice,
   compare = false,
   onSourceChange,
 }: {
   history: HistoryFeed;
+  livePrice?: number;
   compare?: boolean;
   onSourceChange?: (source: "token" | "benchmark") => void;
 }) {
   const element = useRef<HTMLDivElement>(null);
-  const [range, setRange] = useState<"day" | "all">("all");
+  const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const [range, setRange] = useState<"1d" | "1w" | "1m" | "1y" | "all">("all");
   const [source, setSource] = useState<"token" | "benchmark">("token");
   const [average, setAverage] = useState(false);
   const [hover, setHover] = useState("");
+
   const token = useMemo(
     () => (history.simulated ? [] : observedSeries(history.points, "token")),
     [history],
@@ -36,64 +41,126 @@ export default function ObservedChart({
       history.simulated ? [] : observedSeries(history.points, "benchmark"),
     [history],
   );
+
   const useToken =
     token.length > 0 && (source === "token" || !benchmark.length);
   const primary = useToken ? token : benchmark;
   const actualSource = useToken ? "Token" : "Underlying";
+
   useEffect(() => {
     onSourceChange?.(actualSource === "Token" ? "token" : "benchmark");
   }, [actualSource, onSourceChange]);
-  const last = Math.max(token.at(-1)?.time ?? 0, benchmark.at(-1)?.time ?? 0);
-  const cutoff = range === "day" ? last - 86400000 : 0;
-  const primaryView = useMemo(
-    () => primary.filter((point) => point.time >= cutoff),
-    [primary, cutoff],
+
+  const last = Math.max(
+    token.at(-1)?.time ?? 0,
+    benchmark.at(-1)?.time ?? 0,
+    Date.now(),
   );
+
+  const cutoff = useMemo(() => {
+    if (range === "1d") return last - 86400000;
+    if (range === "1w") return last - 7 * 86400000;
+    if (range === "1m") return last - 30 * 86400000;
+    if (range === "1y") return last - 365 * 86400000;
+    return 0; // "all"
+  }, [range, last]);
+
+  const primaryView = useMemo(() => {
+    const list = primary.filter((point) => point.time >= cutoff);
+    if (
+      livePrice &&
+      Number.isFinite(livePrice) &&
+      livePrice > 0 &&
+      (range === "1d" || range === "all")
+    ) {
+      const now = Date.now();
+      const lastPoint = list.at(-1);
+      if (!lastPoint || now - lastPoint.time > 1000) {
+        return [...list, { time: now, value: livePrice }];
+      }
+    }
+    return list;
+  }, [primary, cutoff, livePrice, range]);
+
   useEffect(() => {
     setHover("");
     if (!element.current || !primaryView.length) return;
+
     const chart = createChart(element.current, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: "#fffaf0" },
-        textColor: "#716649",
-        fontSize: 12,
-        fontFamily: "Arial, sans-serif",
+        background: { type: ColorType.Solid, color: "#0d1b24" },
+        textColor: "#8fa6b4",
+        fontSize: 11,
+        fontFamily:
+          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       },
-      grid: { vertLines: { visible: false }, horzLines: { color: "#e8dbc1" } },
-      rightPriceScale: { borderColor: "#ddccaa" },
-      timeScale: { borderColor: "#ddccaa", timeVisible: true },
+      grid: {
+        vertLines: {
+          color: "rgba(35, 59, 75, 0.4)",
+          style: LineStyle.Dotted,
+        },
+        horzLines: {
+          color: "rgba(35, 59, 75, 0.4)",
+          style: LineStyle.Dotted,
+        },
+      },
+      rightPriceScale: {
+        borderColor: "#233b4b",
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+      },
+      timeScale: {
+        borderColor: "#233b4b",
+        timeVisible: true,
+        secondsVisible: false,
+        minBarSpacing: 0.5,
+        fixLeftEdge: false,
+        fixRightEdge: false,
+      },
       crosshair: {
-        vertLine: { color: "#b59e74", labelBackgroundColor: "#52683a" },
-        horzLine: { color: "#b59e74", labelBackgroundColor: "#52683a" },
+        vertLine: { color: "#38bdf8", labelBackgroundColor: "#11232e" },
+        horzLine: { color: "#38bdf8", labelBackgroundColor: "#11232e" },
       },
       handleScroll: {
-        mouseWheel: false,
+        mouseWheel: true,
         pressedMouseMove: true,
         horzTouchDrag: true,
         vertTouchDrag: false,
       },
       handleScale: {
-        mouseWheel: false,
+        mouseWheel: true,
         pinch: true,
         axisPressedMouseMove: true,
       },
     });
+
     const line = chart.addSeries(LineSeries, {
-      color: "#52683a",
+      color: actualSource === "Token" ? "#38bdf8" : "#10b981",
       lineWidth: 2,
-      priceLineVisible: false,
+      priceLineVisible: true,
       title: actualSource,
     });
-    const data = (points: { time: number; value: number }[]) =>
-      points.map((point) => ({
-        time: Math.floor(point.time / 1000) as UTCTimestamp,
-        value: point.value,
-      }));
+    lineRef.current = line;
+
+    const data = (points: { time: number; value: number }[]) => {
+      const map = new Map<number, number>();
+      for (const p of points) {
+        const sec = Math.floor(p.time / 1000);
+        map.set(sec, p.value);
+      }
+      return [...map.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([time, value]) => ({
+          time: time as UTCTimestamp,
+          value,
+        }));
+    };
+
     line.setData(data(primaryView));
+
     if (compare && token.length && benchmark.length) {
       const reference = chart.addSeries(LineSeries, {
-        color: "#82642d",
+        color: "#f0b90b",
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
         priceLineVisible: false,
@@ -103,9 +170,10 @@ export default function ObservedChart({
         data(benchmark.filter((point) => point.time >= cutoff)),
       );
     }
+
     if (average && !compare) {
       const ma = chart.addSeries(LineSeries, {
-        color: "#8c7354",
+        color: "#a78bfa",
         lineWidth: 1,
         priceLineVisible: false,
         lastValueVisible: false,
@@ -116,6 +184,7 @@ export default function ObservedChart({
         ),
       );
     }
+
     chart.subscribeCrosshairMove((event) => {
       const point = event.seriesData.get(line);
       setHover(
@@ -124,8 +193,13 @@ export default function ObservedChart({
           : "",
       );
     });
+
     chart.timeScale().fitContent();
-    return () => chart.remove();
+
+    return () => {
+      lineRef.current = null;
+      chart.remove();
+    };
   }, [
     primaryView,
     primary,
@@ -136,12 +210,66 @@ export default function ObservedChart({
     cutoff,
     actualSource,
   ]);
+
+  // Realtime update when live price tick arrives
+  useEffect(() => {
+    if (
+      !lineRef.current ||
+      !livePrice ||
+      livePrice <= 0 ||
+      !Number.isFinite(livePrice)
+    )
+      return;
+    try {
+      const sec = Math.floor(Date.now() / 1000) as UTCTimestamp;
+      lineRef.current.update({
+        time: sec,
+        value: livePrice,
+      });
+    } catch {
+      // Ignore if historical timestamps exceed current client clock
+    }
+  }, [livePrice]);
+
   return (
     <>
       <div className={styles.chartHeader}>
-        <h4>
-          {compare ? "Token vs. underlying" : `${actualSource} · hourly closes`}
-        </h4>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <h4>
+            {compare
+              ? "Token vs. underlying"
+              : `${actualSource} · price history`}
+          </h4>
+          {Boolean(livePrice) && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                fontSize: "10px",
+                fontWeight: 800,
+                color: "#10b981",
+                background: "rgba(16, 185, 129, 0.15)",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+                borderRadius: "12px",
+                padding: "2px 8px",
+                letterSpacing: "0.5px",
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: "#10b981",
+                  boxShadow: "0 0 6px #10b981",
+                  display: "inline-block",
+                }}
+              />
+              LIVE
+            </span>
+          )}
+        </div>
         <div className={styles.chartControls}>
           {!compare && token.length > 0 && benchmark.length > 0 && (
             <>
@@ -160,16 +288,39 @@ export default function ObservedChart({
             </>
           )}
           <button
-            aria-pressed={range === "day"}
-            onClick={() => setRange("day")}
+            aria-pressed={range === "1d"}
+            onClick={() => setRange("1d")}
+            title="Last 24 Hours"
           >
-            Latest 24h
+            1D
+          </button>
+          <button
+            aria-pressed={range === "1w"}
+            onClick={() => setRange("1w")}
+            title="Last 7 Days"
+          >
+            1W
+          </button>
+          <button
+            aria-pressed={range === "1m"}
+            onClick={() => setRange("1m")}
+            title="Last 30 Days"
+          >
+            1M
+          </button>
+          <button
+            aria-pressed={range === "1y"}
+            onClick={() => setRange("1y")}
+            title="Last 1 Year"
+          >
+            1Y
           </button>
           <button
             aria-pressed={range === "all"}
             onClick={() => setRange("all")}
+            title="All Historical Data (Pan & Zoom available)"
           >
-            All data
+            ALL
           </button>
           {!compare && (
             <button
@@ -183,14 +334,14 @@ export default function ObservedChart({
       </div>
       <p className={styles.chartReadout}>
         {hover ||
-          `${primaryView.length} observed closes · ${primaryView.length ? `${stamp(new Date(primaryView[0].time).toISOString())} — ${stamp(new Date(primaryView.at(-1)!.time).toISOString())}` : "No closes in this range"}`}
+          `${primaryView.length} price points · Drag/scroll to pan & zoom history`}
       </p>
       {primaryView.length ? (
         <div
           ref={element}
           className={styles.chart}
           role="img"
-          aria-label={`${actualSource} hourly price chart. Exact observations are available in the table below.`}
+          aria-label={`${actualSource} price history chart. Exact observations are available in the table below.`}
         />
       ) : (
         <div className={styles.empty}>
@@ -200,21 +351,25 @@ export default function ObservedChart({
       )}
       <div className={styles.legend}>
         <span>
-          <i />
+          <i
+            style={{
+              background: actualSource === "Token" ? "#38bdf8" : "#10b981",
+            }}
+          />
           {actualSource === "Token"
             ? history.tokenSource
             : history.benchmarkSource}
         </span>
         {compare && token.length > 0 && benchmark.length > 0 && (
           <span>
-            <i className={styles.reference} />
+            <i className={styles.reference} style={{ background: "#f0b90b" }} />
             {history.benchmarkSource}
           </span>
         )}
         {average && !compare && (
           <span>
-            <i className={styles.average} />
-            20-close simple average
+            <i className={styles.average} style={{ background: "#a78bfa" }} />
+            20-close moving average
           </span>
         )}
       </div>
@@ -230,36 +385,6 @@ export default function ObservedChart({
           stock reference, not a token price.
         </p>
       )}
-      <details className={styles.details}>
-        <summary>
-          <span>Recent price observations</span>
-          <span>{Math.min(10, primary.length)} closes</span>
-        </summary>
-        <div className={styles.detailsBody}>
-          {primary
-            .slice(-10)
-            .reverse()
-            .map((point) => (
-              <div className={styles.simpleRow} key={point.time}>
-                <span>{stamp(new Date(point.time).toISOString())}</span>
-                <strong>{money(point.value)}</strong>
-              </div>
-            ))}
-        </div>
-      </details>
-      <p className={styles.caption}>
-        Drag to explore, pinch to zoom. Range controls filter returned
-        observations; missing hours are not filled. Charts by{" "}
-        <a
-          className={styles.textLink}
-          href="https://www.tradingview.com/lightweight-charts/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          TradingView
-        </a>
-        .
-      </p>
     </>
   );
 }

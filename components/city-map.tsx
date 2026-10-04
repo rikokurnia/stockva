@@ -136,12 +136,15 @@ export default function CityMap(props: Props) {
   useEffect(() => {
     if (!props.focusTarget) return;
     const p = point(props.focusTarget.r + 0.5, props.focusTarget.c + 0.5);
+    const targetCenterX =
+      size.w > 768 ? Math.max(300, size.w / 2 - 120) : size.w / 2;
+    const targetCenterY = size.h / 2;
     const bounded = cameraBounds(size.w, size.h, zoom, {
-      x: (640 - p.x) * scale,
-      y: (390 - p.y) * scale,
+      x: (targetCenterX - p.x) * scale,
+      y: (targetCenterY - p.y) * scale,
     });
     setPan({ x: bounded.x, y: bounded.y });
-  }, [props.focusTarget]);
+  }, [props.focusTarget, size.w, size.h, scale, zoom]);
   const clampPan = (p: { x: number; y: number }) => {
     const bounded = cameraBounds(size.w, size.h, zoom, p);
     return { x: bounded.x, y: bounded.y };

@@ -5,9 +5,10 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  Layers,
   RefreshCw,
 } from "lucide-react";
-import { assets, defFor, money, pct, priceOf } from "../lib/city";
+import { assets, catalogue, defFor, money, pct, priceOf } from "../lib/city";
 import { companyProfiles, type CompanyNews } from "../lib/company-intel";
 import {
   movingAverage,
@@ -211,6 +212,7 @@ export default function CivicResearch(props: Props) {
               ) : history.data ? (
                 <ObservedChart
                   history={history.data}
+                  livePrice={prices[ticker]}
                   onSourceChange={setIndicatorSource}
                 />
               ) : (
@@ -424,12 +426,27 @@ export default function CivicResearch(props: Props) {
           )}
           <div className={styles.actions}>
             {props.bundleAvailable && (
-              <button
-                className={styles.secondary}
-                onClick={props.onAddToBundle}
-              >
-                Add {ticker} to bundle <ArrowUpRight size={16} />
-              </button>
+              <>
+                <button
+                  className={styles.primary}
+                  type="button"
+                  onClick={() => {
+                    const def = catalogue.find((d) => d.ticker === ticker);
+                    if (def) {
+                      props.onBuy(def.kind, 500);
+                    }
+                  }}
+                >
+                  Buy & Place {ticker} <ArrowUpRight size={16} />
+                </button>
+                <button
+                  className={styles.secondary}
+                  type="button"
+                  onClick={props.onAddToBundle}
+                >
+                  <Layers size={16} /> Add to basket
+                </button>
+              </>
             )}
             <button
               className={styles.textButton}
@@ -449,8 +466,7 @@ export default function CivicResearch(props: Props) {
             {held > 0
               ? `Your city holds ${held.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${ticker} units. Manage holdings in City Hall. `
               : ""}
-            Individual buying is in the left-side building menu. This service
-            focuses on research and bundle placement.
+            Buy and place directly on the island, or add to a sector basket to confirm together on BNB Smart Chain.
           </p>
         </>
       )}
@@ -764,7 +780,11 @@ function TokenInspection({
         {historyLoading && !history ? (
           <Loading label="Retrieving independent price histories…" />
         ) : history ? (
-          <ObservedChart history={history} compare />
+          <ObservedChart
+            history={history}
+            livePrice={tokenPrice}
+            compare
+          />
         ) : (
           <p className={styles.notice}>Price history is unavailable.</p>
         )}

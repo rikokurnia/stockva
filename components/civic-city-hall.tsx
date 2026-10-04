@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   ChevronDown,
   Coins,
+  Crosshair,
   ExternalLink,
   MapPin,
   RefreshCw,
@@ -307,14 +308,32 @@ export default function CivicCityHall(
             activity. Unpaid drafts are kept out of portfolio value.
           </p>
         </div>
-        <button
-          className={styles.secondary}
-          disabled={chainLoading || Boolean(operation)}
-          onClick={() => setRefresh((value) => value + 1)}
-        >
-          <RefreshCw size={15} />{" "}
-          {chainLoading ? "Syncing wallet…" : "Sync wallet"}
-        </button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          {stocks.length > 0 && (
+            <button
+              className={styles.primary}
+              onClick={() => {
+                const topHolding = landscape.holdings[0];
+                const target = topHolding
+                  ? stocks.find(
+                      (stock) => defFor(stock.kind).ticker === topHolding.ticker,
+                    ) ?? stocks[0]
+                  : stocks[0];
+                if (target) onFocus(target);
+              }}
+            >
+              <ExternalLink size={15} /> Manage portfolio
+            </button>
+          )}
+          <button
+            className={styles.secondary}
+            disabled={chainLoading || Boolean(operation)}
+            onClick={() => setRefresh((value) => value + 1)}
+          >
+            <RefreshCw size={15} />{" "}
+            {chainLoading ? "Syncing wallet…" : "Sync wallet"}
+          </button>
+        </div>
       </div>
       <div className={styles.summaryStrip}>
         <Metric
@@ -417,28 +436,36 @@ export default function CivicCityHall(
                       </small>
                     </div>
                     <div className={styles.rowActions}>
-                      {building && (
+                      {building ? (
                         <button
-                          className={styles.iconButton}
-                          aria-label={`Find ${holding.ticker} on map`}
+                          className={styles.secondary}
+                          style={{
+                            minHeight: "34px",
+                            padding: "4px 10px",
+                            fontSize: "12px",
+                            whiteSpace: "nowrap",
+                            gap: "6px",
+                          }}
+                          aria-label={`Manage ${holding.ticker} portfolio`}
                           onClick={() => onFocus(building)}
                         >
-                          <MapPin size={16} />
+                          <Crosshair size={14} /> Manage
+                        </button>
+                      ) : (
+                        <button
+                          className={styles.textButton}
+                          onClick={() => {
+                            setSaleTicker(
+                              saleTicker === holding.ticker
+                                ? null
+                                : holding.ticker,
+                            );
+                            setSaleMessage("");
+                          }}
+                        >
+                          Sell
                         </button>
                       )}
-                      <button
-                        className={styles.textButton}
-                        onClick={() => {
-                          setSaleTicker(
-                            saleTicker === holding.ticker
-                              ? null
-                              : holding.ticker,
-                          );
-                          setSaleMessage("");
-                        }}
-                      >
-                        Manage
-                      </button>
                     </div>
                   </div>
                 );

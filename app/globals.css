@@ -3629,36 +3629,43 @@ input {
 }
 .inspection-panel {
   position: absolute;
-  top: 68px;
-  right: 16px;
-  width: 290px;
-  max-height: calc(100dvh - 140px);
-  background: linear-gradient(135deg, rgba(14, 34, 48, 0.95), rgba(18, 44, 60, 0.92));
+  top: 60px;
+  right: 18px;
+  width: 308px;
+  max-height: calc(100dvh - 76px);
+  background: #0d1b24;
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1.5px solid #233b4b;
   border-radius: 14px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
-  color: #f0f6fa;
-  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+  color: #edf2f3;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   z-index: 1070;
+  scrollbar-width: thin;
+  scrollbar-color: #233b4b transparent;
 }
 :is(.inspection-panel, .utility-panel)
   :is(h2, h3, strong, b, small, p, label, span, dt, dd, kbd, button, a) {
   color: inherit;
 }
 :is(.inspection-panel, .utility-panel) > header {
-  background: rgba(10, 24, 34, 0.75);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  background: #11232e;
+  border-bottom: 1.5px solid #233b4b;
   padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex-shrink: 0;
 }
 :is(.inspection-panel, .utility-panel) > header > button {
-  color: #9cbccc;
+  color: #8fa6b4;
   background: none;
   border: 0;
   cursor: pointer;
@@ -3669,6 +3676,50 @@ input {
 :is(.inspection-panel, .utility-panel) > header > button:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
+}
+.inspection-panel .inspection-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px;
+  margin-top: 8px;
+}
+.inspection-panel .inspection-actions > button {
+  flex: 1;
+  min-height: 38px;
+  background: #1e3646;
+  border: 1px solid #2c4c62;
+  color: #edf2f3;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+.inspection-panel .inspection-actions > button:hover:not(:disabled) {
+  background: #254457;
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+.inspection-panel .inspection-actions > button:last-child {
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+}
+.inspection-panel .inspection-actions > button:last-child:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: #f87171;
+  color: #ffffff;
+}
+.inspection-panel .inspection-note {
+  padding: 10px 14px 18px;
+  font-size: 11px;
+  color: #8fa6b4;
+  line-height: 1.5;
+  text-align: center;
 }
 .empty-panel,
 .market-note,

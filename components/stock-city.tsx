@@ -769,8 +769,8 @@ export default function StockCity() {
       } else if (!fromTray && bundleQueue.length > 1) {
         // Bundle flow: advance to the next queued stock.
         const rest = bundleQueue.slice(1);
-        const done = bundleQueue.length - rest.length;
-        const total = bundleQueue.length;
+        const done = bundleBuildingIds.length + 1;
+        const total = bundleBuildingIds.length + bundleQueue.length;
         setBundleBuildingIds((prev) => [...prev, placed.id]);
         setBundleQueue(rest);
         setAmount(rest[0].amount);
@@ -1264,6 +1264,7 @@ export default function StockCity() {
       )}
       {(!city.buildings.length || !city.roads.length) &&
         !panel &&
+        !selected &&
         booted &&
         !category && (
           <div

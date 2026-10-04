@@ -173,3 +173,51 @@ test("bundle validation rejects partial/invalid selections instead of silently b
   assert.equal(valid.valid, true);
   assert.equal(valid.total, 600.5);
 });
+
+test("sector baskets can bundle all stocks in a sector and map to valid building kinds in catalogue", async () => {
+  const { catalogue, SECTOR_DEFINITIONS } = await import("../lib/city.ts");
+  for (const sec of SECTOR_DEFINITIONS) {
+    assert.ok(sec.stocks.length > 0);
+    const available = [...sec.stocks];
+    const amounts = Object.fromEntries(sec.stocks.map((t) => [t, "500"]));
+    const res = validateBundle(sec.stocks, amounts, available, sec.stocks.length * 500);
+    assert.equal(res.valid, true);
+    assert.equal(res.total, sec.stocks.length * 500);
+
+    // Verify all tickers in sector bundle map to valid catalogue building kinds
+    const items = res.tickers.map((ticker) => {
+      const def = catalogue.find((d) => d.ticker === ticker);
+      assert.ok(def, `Missing catalogue definition for sector stock ${ticker}`);
+      assert.equal(def.category, "sectors");
+      assert.equal(def.sectorKey, sec.key);
+      return { kind: def.kind, amount: Number(amounts[ticker]) };
+    });
+    assert.equal(items.length, sec.stocks.length);
+  }
+});
+
+test("stock exchange supports buying single-stock bundles as well as mixed multi-sector baskets", async () => {
+  const { catalogue } = await import("../lib/city.ts");
+
+  // 1. Single stock bundle
+  const singleAvailable = ["JNJ"];
+  const singleRes = validateBundle(["JNJ"], { JNJ: "500" }, singleAvailable, 1000);
+  assert.equal(singleRes.valid, true);
+  assert.equal(singleRes.tickers.length, 1);
+  const singleDef = catalogue.find((d) => d.ticker === "JNJ");
+  assert.ok(singleDef);
+  assert.equal(singleDef.kind, "jnj");
+
+  // 2. Mixed multi-sector basket (hero stocks + sector stocks)
+  const mixedTickers = ["NVDA", "JNJ", "TXN", "BAC", "CAT"];
+  const mixedAmounts = { NVDA: "1000", JNJ: "500", TXN: "500", BAC: "250", CAT: "750" };
+  const mixedRes = validateBundle(mixedTickers, mixedAmounts, mixedTickers, 5000);
+  assert.equal(mixedRes.valid, true);
+  assert.equal(mixedRes.total, 3000);
+  const mixedItems = mixedRes.tickers.map((t) => ({
+    kind: catalogue.find((d) => d.ticker === t).kind,
+    amount: Number(mixedAmounts[t]),
+  }));
+  assert.equal(mixedItems.length, 5);
+  assert.deepEqual(mixedItems.map((i) => i.kind), ["nvidia", "jnj", "txn", "bac", "cat"]);
+});

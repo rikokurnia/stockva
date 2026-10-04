@@ -9,6 +9,19 @@ export async function GET(request: NextRequest) {
   const pair = request.nextUrl.searchParams.get("pair");
   if (pair && !/^[A-Za-z0-9]{3,25}$/.test(pair))
     return NextResponse.json({ error: "Invalid pair" }, { status: 400 });
+  const range = request.nextUrl.searchParams.get("range") ?? "5y";
+  const interval =
+    request.nextUrl.searchParams.get("interval") ??
+    (range === "1d"
+      ? "2m"
+      : range === "5d"
+        ? "15m"
+        : range === "1mo" || range === "3mo"
+          ? "60m"
+          : "1d");
+  const krakenInterval =
+    range === "1d" ? 5 : range === "5d" ? 15 : range === "1mo" ? 60 : 1440;
+
   const output: HistoryFeed = {
     points: [],
     simulated: false,
@@ -18,12 +31,12 @@ export async function GET(request: NextRequest) {
   const [token, stock] = await Promise.allSettled([
     pair
       ? fetch(
-          `https://api.kraken.com/0/public/OHLC?pair=${encodeURIComponent(pair)}&interval=60&asset_class=tokenized_asset`,
+          `https://api.kraken.com/0/public/OHLC?pair=${encodeURIComponent(pair)}&interval=${krakenInterval}&asset_class=tokenized_asset`,
           { signal: AbortSignal.timeout(8000), next: { revalidate: 60 } },
         ).then((r) => r.json())
       : Promise.resolve(null),
     fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.replace(".", "-"))}?interval=60m&range=5d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.replace(".", "-"))}?interval=${interval}&range=${range}`,
       {
         signal: AbortSignal.timeout(8000),
         headers: { "User-Agent": "Mozilla/5.0" },
@@ -41,7 +54,7 @@ export async function GET(request: NextRequest) {
       ([key]) => key !== "last",
     )?.[1];
     if (Array.isArray(rows))
-      for (const row of rows.slice(-120)) {
+      for (const row of rows.slice(-720)) {
         const time = Number(row[0]) * 1000;
         const price = Number(row[4]);
         if (Number.isFinite(time) && Number.isFinite(price) && price > 0)
@@ -49,7 +62,10 @@ export async function GET(request: NextRequest) {
       }
     if (points.size) {
       output.simulated = false;
-      output.tokenSource = "Kraken · hourly close";
+      output.tokenSource =
+        krakenInterval === 1440
+          ? "Kraken · daily close"
+          : "Kraken · token observation";
       output.tokenAt = new Date(Math.max(...points.keys())).toISOString();
     }
   }
