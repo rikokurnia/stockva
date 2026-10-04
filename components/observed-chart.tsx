@@ -101,8 +101,23 @@ export default function ObservedChart({
 
   const useToken =
     tokenSeries.length > 0 && (source === "token" || !benchmarkSeries.length);
-  const primary = useToken ? tokenSeries : benchmarkSeries;
-  const actualSource = useToken ? "Token" : "Underlying";
+  // Compare mode (Data Center) shows only raw observations, never filled data.
+  const primary = compare
+    ? rawToken.length
+      ? rawToken
+      : rawBenchmark
+    : useToken
+      ? tokenSeries
+      : benchmarkSeries;
+  const comparable = compare && rawToken.length > 0 && rawBenchmark.length > 0;
+  const actualSource = (compare ? rawToken.length > 0 : useToken)
+    ? "Token"
+    : "Underlying";
+  // Provenance: which observations are real vs. illustrative fill.
+  const observedPrimary = useToken ? scaledToken : rawBenchmark;
+  const fullyIllustrative = observedPrimary.length < 10;
+  const tokenFromUnderlying =
+    useToken && rawToken.length < 10 && scaledToken !== rawToken;
 
   useEffect(() => {
     onSourceChange?.(actualSource === "Token" ? "token" : "benchmark");
@@ -275,14 +290,14 @@ export default function ObservedChart({
       candleSeries.setData([]);
     }
 
-    if (showVolume) {
+    if (showVolume && !compare) {
       volumeSeries.setData(formatVolumeData(ohlcBars));
     } else {
       volumeSeries.setData([]);
     }
 
     // 4. Comparison Reference line (if compare enabled)
-    if (compare && benchmarkSeries.length) {
+    if (comparable) {
       const reference = chart.addSeries(LineSeries, {
         color: "#f0b90b",
         lineWidth: 2,
@@ -291,7 +306,7 @@ export default function ObservedChart({
         title: "Underlying",
       });
       refLineRef.current = reference;
-      reference.setData(formatLineData(benchmarkSeries));
+      reference.setData(formatLineData(rawBenchmark));
     }
 
     // 5. MA 10 series (amber/gold)
@@ -424,9 +439,9 @@ export default function ObservedChart({
   useEffect(() => {
     if (!volumeSeriesRef.current) return;
     volumeSeriesRef.current.setData(
-      showVolume ? formatVolumeData(ohlcBars) : [],
+      showVolume && !compare ? formatVolumeData(ohlcBars) : [],
     );
-  }, [showVolume, ohlcBars]);
+  }, [showVolume, ohlcBars, compare]);
 
   // Instant toggle for MA 10
   useEffect(() => {
@@ -447,6 +462,8 @@ export default function ObservedChart({
   // Realtime update when live price tick arrives
   useEffect(() => {
     if (!livePrice || livePrice <= 0 || !Number.isFinite(livePrice)) return;
+    // Live price is a token quote; never paint it onto an underlying-only series.
+    if (actualSource !== "Token") return;
     try {
       const sec = Math.floor(Date.now() / 1000) as UTCTimestamp;
       if (chartType === "candles" && candleSeriesRef.current && ohlcBars.length) {
@@ -479,7 +496,7 @@ export default function ObservedChart({
     } catch {
       // Ignore if timestamps exceed client clock
     }
-  }, [livePrice, chartType, showMA10, showMA20, latestMA10, latestMA20, ohlcBars]);
+  }, [livePrice, chartType, showMA10, showMA20, latestMA10, latestMA20, ohlcBars, actualSource]);
 
   return (
     <>
@@ -600,9 +617,9 @@ export default function ObservedChart({
               <button
                 aria-pressed={showVolume}
                 onClick={() => setShowVolume((value) => !value)}
-                title="Volume Histogram"
+                title="Estimated activity (not exchange-reported volume)"
               >
-                Vol
+                Vol est.
               </button>
             </>
           )}
@@ -622,7 +639,7 @@ export default function ObservedChart({
       ) : (
         <div className={styles.empty}>
           <h4>No observed chart data.</h4>
-          <p>Refresh or choose another asset. No synthetic chart is shown.</p>
+          <p>Refresh or choose another asset.</p>
         </div>
       )}
       <div className={styles.legend}>
@@ -641,7 +658,7 @@ export default function ObservedChart({
             ? (history.tokenSource || "Token Price")
             : (history.benchmarkSource || "Underlying Stock")}
         </span>
-        {compare && benchmarkSeries.length > 0 && (
+        {comparable && (
           <span>
             <i className={styles.reference} style={{ background: "#f0b90b" }} />
             {history.benchmarkSource || "Underlying Reference"}
@@ -662,19 +679,32 @@ export default function ObservedChart({
         {showVolume && !compare && (
           <span>
             <i style={{ background: "rgba(16, 185, 129, 0.6)" }} />
-            Volume
+            Volume (estimated)
           </span>
         )}
       </div>
-      {compare && (!tokenSeries.length || !benchmarkSeries.length) && (
+      {compare && !comparable && (
         <p className={styles.notice}>
           Only one observed series is available. The missing series is not
           generated or substituted.
         </p>
       )}
-      {!compare && !rawToken.length && benchmarkSeries.length > 0 && (
+      {!compare && fullyIllustrative && (
+        <p className={styles.notice}>
+          Too few observed prices for this asset. The chart shows an
+          illustrative path ending at the current price — not historical data.
+        </p>
+      )}
+      {!compare && !fullyIllustrative && tokenFromUnderlying && (
         <p className={styles.caption}>
-          Direct token trades are quiet. The chart reflects authentic underlying market movements tracked to current token liquidity.
+          Token trades are sparse, so the shape follows observed underlying
+          stock moves, scaled to the current token price.
+        </p>
+      )}
+      {!compare && !fullyIllustrative && (
+        <p className={styles.caption}>
+          Periods without observations (e.g. market closed) are bridged with
+          an illustrative path to the live price. Volume bars are estimates.
         </p>
       )}
     </>
