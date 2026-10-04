@@ -276,6 +276,12 @@ input {
   gap: 4.5px;
 }
 
+.stock-badge-logo {
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
 .stock-badge-sub {
   display: inline-flex;
   align-items: center;

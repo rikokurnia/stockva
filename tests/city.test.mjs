@@ -27,6 +27,8 @@ import {
   validThresholds,
   DEFAULT_THRESHOLDS,
   SIMULATION_INTERVALS,
+  SECTOR_DEFINITIONS,
+  defForSector,
 } from "../lib/city.ts";
 
 test("custom tiers classify exact boundaries without gaps or overlaps", () => {
@@ -404,11 +406,15 @@ test("building placement is strictly limited to 1 per service and 1 per company"
   assert.match(dupNvda.error, /already built/i);
   assert.equal(dupNvda.state, nvda1.state);
 });
-test("hero catalogue contains 30 bespoke stocks with all 4 tier sprites, 5 civic services, and 30+ market assets", () => {
+test("catalogue contains 30 hero bespoke stocks, 10 sector templates, 70 sector companies, 5 civic services, and 100 S&P 100 assets", () => {
+  const heroDefs = catalogue.filter((d) => d.category === "companies" && d.ticker);
+  assert.equal(heroDefs.length, 30);
+  const sectorCompanyDefs = catalogue.filter((d) => d.category === "sectors" && d.ticker);
+  assert.equal(sectorCompanyDefs.length, 70);
   const companyDefs = catalogue.filter((d) => d.ticker);
-  assert.equal(companyDefs.length, 30);
-  assert.equal(catalogue.length, 35);
-  assert.ok(assets.length >= 30);
+  assert.equal(companyDefs.length, 100);
+  assert.equal(catalogue.length, 115);
+  assert.equal(assets.length, 100);
   assert.equal(HERO_TICKERS.length, 30);
   for (const def of catalogue) {
     const baseCity = def.ticker ? tradingCity() : newCity();
@@ -427,8 +433,7 @@ test("hero catalogue contains 30 bespoke stocks with all 4 tier sprites, 5 civic
       ),
       path,
     );
-    if (def.ticker) {
-      assert.ok(isHeroTicker(def.ticker));
+    if (def.ticker && isHeroTicker(def.ticker)) {
       for (const lvl of ["minus", "level_1", "level_2", "level_3"]) {
         assert.ok(
           existsSync(
@@ -438,6 +443,18 @@ test("hero catalogue contains 30 bespoke stocks with all 4 tier sprites, 5 civic
             ),
           ),
           `${def.kind}/${lvl}.png`,
+        );
+      }
+    } else if (def.sectorKey) {
+      for (const lvl of ["minus", "level_1", "level_2", "level_3"]) {
+        assert.ok(
+          existsSync(
+            new URL(
+              `../public/assets/sprites/${def.sectorKey}/${lvl}.png`,
+              import.meta.url,
+            ),
+          ),
+          `${def.sectorKey}/${lvl}.png`,
         );
       }
     }
@@ -489,3 +506,37 @@ test("locked draft buildings persist and validate as saved cities", async () => 
   assert.ok(isSavedCity({ ...newCity(), paper: [] }));
   assert.ok(!isSavedCity({ ...newCity(), paper: [{ id: 1 }] }));
 });
+
+test("sector towers support multi-deployment of the same sector for different companies while strictly enforcing single-instance per stock", () => {
+  assert.equal(SECTOR_DEFINITIONS.length, 10);
+  const healthDef = defForSector("sector_healthcare");
+  assert.ok(healthDef);
+  assert.equal(healthDef.stocks.length, 10);
+  assert.ok(healthDef.stocks.includes("JNJ"));
+  assert.ok(healthDef.stocks.includes("LLY"));
+
+  // 1. Build Stock Exchange first
+  const baseCity = constructBuilding("exchange", { r: -6, c: 0 }, 400, newCity()).state;
+
+  // 2. Build JNJ Healthcare Tower
+  const b1 = constructBuilding("jnj", { r: 1, c: 1 }, 500, baseCity);
+  assert.equal(b1.error, "");
+  assert.equal(b1.state.buildings.length, 2);
+  const jnjBuilding = b1.state.buildings.find((b) => b.kind === "jnj");
+  assert.ok(jnjBuilding);
+  assert.equal(buildingImage(jnjBuilding), "sector_healthcare/level_1");
+
+  // 3. Deploy a second Healthcare Tower for LLY on adjacent valid coordinates
+  const b2 = constructBuilding("lly", { r: 3, c: 1 }, 500, b1.state);
+  assert.equal(b2.error, "");
+  assert.equal(b2.state.buildings.length, 3);
+  const llyBuilding = b2.state.buildings.find((b) => b.kind === "lly");
+  assert.ok(llyBuilding);
+  assert.equal(buildingImage(llyBuilding), "sector_healthcare/level_1");
+
+  // 4. Verify duplicate building rule: attempting to build JNJ again fails
+  const bDuplicate = constructBuilding("jnj", { r: 5, c: 1 }, 500, b2.state);
+  assert.match(bDuplicate.error, /already built/i);
+  assert.equal(bDuplicate.state.buildings.length, 3);
+});
+

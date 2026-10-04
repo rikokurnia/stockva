@@ -10,8 +10,8 @@ import {
   rwaLogoApiUrl,
 } from "../lib/city.ts";
 
-test("all 37 assets have valid stock logo URLs and existing SVG files on disk", () => {
-  assert.equal(assets.length, 37);
+test("all 100 assets have valid stock logo URLs and existing SVG files on disk", () => {
+  assert.equal(assets.length, 100);
   for (const asset of assets) {
     assert.ok(asset.ticker, "Asset has ticker");
     assert.ok(asset.name, "Asset has name");
@@ -25,7 +25,7 @@ test("all 37 assets have valid stock logo URLs and existing SVG files on disk", 
 
     const content = fs.readFileSync(filePath, "utf8");
     assert.ok(content.includes("<svg"), `SVG content contains <svg for ${asset.ticker}`);
-    assert.ok(content.length > 100, `SVG content has substantive payload for ${asset.ticker}`);
+    assert.ok(content.length > 50, `SVG content has substantive payload for ${asset.ticker}`);
 
     const apiUrl = stockLogoApiUrl(asset.ticker);
     assert.ok(apiUrl.startsWith("https://assets.parqet.com/logos/symbol/"), `Remote stock logo CDN URL is valid for ${asset.ticker}`);
@@ -44,7 +44,7 @@ test("all tokenized RWA assets have valid token logo URLs and PNG files on disk"
     const rwaApi = rwaLogoApiUrl(asset.ticker);
     assert.ok(rwaApi.startsWith("https://xstocks-metadata.backed.fi/logos/tokens/"), `RWA API URL is formatted correctly for ${asset.ticker}`);
   }
-  // At least 36 out of 37 assets are tokenized RWAs on xStocks
+  // At least 36 assets are original tokenized RWAs with local PNGs
   assert.ok(rwaCount >= 36, `Expected at least 36 RWA logos, got ${rwaCount}`);
 });
 

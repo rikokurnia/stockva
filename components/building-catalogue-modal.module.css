@@ -740,3 +740,266 @@
   font-family: ui-monospace, monospace;
   margin: 4px 0;
 }
+
+/* ========================================================
+   SECTOR CARDS & SPECIAL SECTOR FORM STYLES
+   ======================================================== */
+
+.sectorGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 58vh;
+  padding-right: 4px;
+}
+
+@media (max-width: 680px) {
+  .sectorGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sectorCard {
+  background: #11232e;
+  border: 1.5px solid #233b4b;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  position: relative;
+  text-align: left;
+}
+
+.sectorCard:hover {
+  background: #152d3c;
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.sectorCardSpriteBox {
+  width: 90px;
+  height: 90px;
+  flex-shrink: 0;
+  background: radial-gradient(circle at 50% 60%, rgba(56, 189, 248, 0.1), transparent 70%);
+  border: 1px dashed rgba(56, 189, 248, 0.25);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+}
+
+.sectorCardSprite {
+  max-width: 78px;
+  max-height: 78px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+
+.sectorCardContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sectorCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sectorBadgeTag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.sectorDeployCount {
+  font-size: 10px;
+  color: #8da4b0;
+  font-family: ui-monospace, monospace;
+}
+
+.sectorCardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #edf2f3;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.sectorCardDesc {
+  font-size: 11px;
+  color: #8fa6b4;
+  margin: 0;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sectorStockListSummary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: #38bdf8;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Special Sector Form Layout */
+.sectorFormHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #1a2d39;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.sectorSwitcherBar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 2px 0 6px 0;
+}
+
+.sectorSwitcherPill {
+  background: #11232e;
+  border: 1px solid #233b4b;
+  color: #8fa6b4;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.sectorSwitcherPill:hover {
+  background: #17303f;
+  color: #edf2f3;
+}
+
+.sectorSwitcherPillActive {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+/* Sector Company Picker */
+.sectorStockPickerBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #081219;
+  border: 1px solid #1a2d39;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.sectorStockPickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sectorStockPickerTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: #edf2f3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sectorStockGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sectorStockBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #11232e;
+  border: 1.5px solid #233b4b;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.sectorStockBtn:hover:not(:disabled) {
+  background: #19384b;
+  border-color: #38bdf8;
+}
+
+.sectorStockBtnActive {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.sectorStockBtnBuilt {
+  opacity: 0.45;
+  background: #081016;
+  border-color: #172935;
+  cursor: not-allowed;
+}
+
+.sectorStockMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sectorStockTicker {
+  font-size: 11px;
+  font-weight: 800;
+  color: #edf2f3;
+  line-height: 1.1;
+}
+
+.sectorStockName {
+  font-size: 9px;
+  color: #8da4b0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 75px;
+}
+
+.sectorStockBuiltPill {
+  font-size: 8px;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-top: 2px;
+  width: fit-content;
+}

@@ -31,7 +31,7 @@ export function rwaLogoApiUrl(ticker: string): string {
   return `https://xstocks-metadata.backed.fi/logos/tokens/${clean}x.png`;
 }
 
-export const assets: Asset[] = [
+export const HERO_ASSETS: Asset[] = [
   {
     ticker: "NVDA",
     name: "NVIDIA",
@@ -122,52 +122,311 @@ export const assets: Asset[] = [
     color: "#002677",
     sprite: "unitedhealth",
   },
-  ...[
-    ["ADBE", "Adobe", "Technology", 345.2, 0.4],
-    ["CRM", "Salesforce", "Technology", 260.1, -0.3],
-    ["ORCL", "Oracle", "Technology", 168.4, 0.8],
-    ["INTC", "Intel", "Technology", 23.8, -0.5],
-    ["PLTR", "Palantir", "Technology", 88.2, 1.3],
-    ["CSCO", "Cisco", "Technology", 61.3, 0.2],
-    ["PEP", "PepsiCo", "Consumer", 148.3, -0.2],
-    ["MCD", "McDonald’s", "Consumer", 307.2, 0.3],
-    ["COST", "Costco", "Consumer", 963.7, 0.5],
-    ["DIS", "Walt Disney", "Consumer", 110.8, 0.6],
-    ["ABT", "Abbott", "Healthcare", 132.7, 0.1],
-    ["MRK", "Merck", "Healthcare", 85.4, -0.3],
-    ["PFE", "Pfizer", "Healthcare", 25.1, 0.2],
-    ["CVX", "Chevron", "Energy", 156.8, 0.4],
-    ["GS", "Goldman Sachs", "Finance", 589.2, 0.6],
-    ["MA", "Mastercard", "Finance", 542.1, 0.4],
-    ["AAPL", "Apple", "Technology", 237.49, 1.12],
-    ["GOOGL", "Alphabet", "Technology", 192.04, 1.43],
-    ["META", "Meta", "Technology", 612.77, -0.64],
-    ["NFLX", "Netflix", "Consumer", 886.12, 2.1],
-    ["AMD", "AMD", "Technology", 121.34, -1.08],
-    ["AVGO", "Broadcom", "Technology", 228.4, 1.65],
-    ["COIN", "Coinbase", "Finance", 274.3, -2.32],
-    ["BRK.B", "Berkshire Hathaway", "Finance", 478.2, 0.31],
-    ["V", "Visa", "Finance", 338.14, 0.92],
-    ["SPY", "S&P 500 ETF", "Index", 598.48, 0.73],
-    ["QQQ", "Nasdaq 100 ETF", "Index", 523.16, 1.08],
-  ].map(([ticker, name, sector, price, change]) => ({
-    ticker: String(ticker),
-    name: String(name),
-    sector: String(sector),
-    price: Number(price),
-    change: Number(change),
+  {
+    ticker: "AAPL",
+    name: "Apple",
+    sector: "Technology",
+    price: 237.49,
+    change: 1.12,
+    color: "#a2aaad",
+    sprite: "aapl",
+  },
+  {
+    ticker: "GOOGL",
+    name: "Alphabet",
+    sector: "Technology",
+    price: 192.04,
+    change: 1.43,
+    color: "#4285f4",
+    sprite: "googl",
+  },
+  {
+    ticker: "META",
+    name: "Meta",
+    sector: "Technology",
+    price: 612.77,
+    change: -0.64,
+    color: "#0668e1",
+    sprite: "meta",
+  },
+  {
+    ticker: "NFLX",
+    name: "Netflix",
+    sector: "Consumer",
+    price: 886.12,
+    change: 2.1,
+    color: "#e50914",
+    sprite: "nflx",
+  },
+  {
+    ticker: "AMD",
+    name: "AMD",
+    sector: "Technology",
+    price: 121.34,
+    change: -1.08,
+    color: "#ed1c24",
+    sprite: "amd",
+  },
+  {
+    ticker: "AVGO",
+    name: "Broadcom",
+    sector: "Technology",
+    price: 228.4,
+    change: 1.65,
+    color: "#cc092f",
+    sprite: "avgo",
+  },
+  {
+    ticker: "COIN",
+    name: "Coinbase",
+    sector: "Finance",
+    price: 274.3,
+    change: -2.32,
+    color: "#0052ff",
+    sprite: "coin",
+  },
+  {
+    ticker: "V",
+    name: "Visa",
+    sector: "Finance",
+    price: 338.14,
+    change: 0.92,
+    color: "#1a1f71",
+    sprite: "v",
+  },
+  {
+    ticker: "SPY",
+    name: "S&P 500 ETF",
+    sector: "Index",
+    price: 598.48,
+    change: 0.73,
+    color: "#003366",
+    sprite: "spy",
+  },
+  {
+    ticker: "QQQ",
+    name: "Nasdaq 100 ETF",
+    sector: "Index",
+    price: 523.16,
+    change: 1.08,
+    color: "#1b5e20",
+    sprite: "qqq",
+  },
+  {
+    ticker: "ADBE",
+    name: "Adobe",
+    sector: "Technology",
+    price: 345.2,
+    change: 0.4,
+    color: "#fa0f00",
+    sprite: "adbe",
+  },
+  {
+    ticker: "CRM",
+    name: "Salesforce",
+    sector: "Technology",
+    price: 260.1,
+    change: -0.3,
+    color: "#00a1e0",
+    sprite: "crm",
+  },
+  {
+    ticker: "ORCL",
+    name: "Oracle",
+    sector: "Technology",
+    price: 168.4,
+    change: 0.8,
+    color: "#c74634",
+    sprite: "orcl",
+  },
+  {
+    ticker: "INTC",
+    name: "Intel",
+    sector: "Technology",
+    price: 23.8,
+    change: -0.5,
+    color: "#0071c5",
+    sprite: "intc",
+  },
+  {
+    ticker: "PLTR",
+    name: "Palantir",
+    sector: "Technology",
+    price: 88.2,
+    change: 1.3,
+    color: "#101113",
+    sprite: "pltr",
+  },
+  {
+    ticker: "PEP",
+    name: "PepsiCo",
+    sector: "Consumer",
+    price: 148.3,
+    change: -0.2,
+    color: "#004b93",
+    sprite: "pep",
+  },
+  {
+    ticker: "MCD",
+    name: "McDonald’s",
+    sector: "Consumer",
+    price: 307.2,
+    change: 0.3,
+    color: "#ffbc0d",
+    sprite: "mcd",
+  },
+  {
+    ticker: "COST",
+    name: "Costco",
+    sector: "Consumer",
+    price: 963.7,
+    change: 0.5,
+    color: "#005dab",
+    sprite: "cost",
+  },
+  {
+    ticker: "DIS",
+    name: "Walt Disney",
+    sector: "Consumer",
+    price: 110.8,
+    change: 0.6,
+    color: "#113ccf",
+    sprite: "dis",
+  },
+  {
+    ticker: "PFE",
+    name: "Pfizer",
+    sector: "Healthcare",
+    price: 25.1,
+    change: 0.2,
+    color: "#0093d0",
+    sprite: "pfe",
+  },
+];
+
+export const SECTOR_COMPANIES_RAW: [
+  ticker: string,
+  name: string,
+  sector: string,
+  price: number,
+  change: number,
+  sectorKey: SectorBuildingKind,
+  kind: SectorCompanyKind,
+][] = [
+  // 1. sector_healthcare (10 stocks)
+  ["JNJ", "Johnson & Johnson", "Healthcare", 161.2, 0.35, "sector_healthcare", "jnj"],
+  ["LLY", "Eli Lilly", "Healthcare", 885.4, 1.25, "sector_healthcare", "lly"],
+  ["ABBV", "AbbVie", "Healthcare", 188.7, -0.42, "sector_healthcare", "abbv"],
+  ["TMO", "Thermo Fisher", "Healthcare", 572.1, 0.85, "sector_healthcare", "tmo"],
+  ["DHR", "Danaher", "Healthcare", 258.9, -0.15, "sector_healthcare", "dhr"],
+  ["BMY", "Bristol-Myers", "Healthcare", 53.6, 0.45, "sector_healthcare", "bmy"],
+  ["AMGN", "Amgen", "Healthcare", 314.8, 0.62, "sector_healthcare", "amgn"],
+  ["GILD", "Gilead", "Healthcare", 84.5, 0.92, "sector_healthcare", "gild"],
+  ["ABT", "Abbott", "Healthcare", 132.7, 0.1, "sector_healthcare", "abt"],
+  ["MRK", "Merck", "Healthcare", 85.4, -0.3, "sector_healthcare", "mrk"],
+
+  // 2. sector_technology (7 stocks)
+  ["IBM", "IBM", "Technology", 221.4, 0.48, "sector_technology", "ibm"],
+  ["NOW", "ServiceNow", "Technology", 892.6, 1.34, "sector_technology", "now"],
+  ["INTU", "Intuit", "Technology", 645.8, 0.72, "sector_technology", "intu"],
+  ["PANW", "Palo Alto Networks", "Technology", 368.9, 0.88, "sector_technology", "panw"],
+  ["SNPS", "Synopsys", "Technology", 512.4, 0.65, "sector_technology", "snps"],
+  ["CDNS", "Cadence Design", "Technology", 284.1, 0.52, "sector_technology", "cdns"],
+  ["CSCO", "Cisco", "Technology", 61.3, 0.2, "sector_technology", "csco"],
+
+  // 3. sector_semiconductor (7 stocks)
+  ["TXN", "Texas Instruments", "Technology", 204.3, -0.32, "sector_semiconductor", "txn"],
+  ["QCOM", "Qualcomm", "Technology", 168.2, 0.94, "sector_semiconductor", "qcom"],
+  ["AMAT", "Applied Materials", "Technology", 202.5, 1.05, "sector_semiconductor", "amat"],
+  ["LRCX", "Lam Research", "Technology", 81.4, 1.42, "sector_semiconductor", "lrcx"],
+  ["MU", "Micron Technology", "Technology", 104.2, -1.12, "sector_semiconductor", "mu"],
+  ["ADI", "Analog Devices", "Technology", 218.6, 0.38, "sector_semiconductor", "adi"],
+  ["KLAC", "KLA Corporation", "Technology", 712.5, 1.22, "sector_semiconductor", "klac"],
+
+  // 4. sector_finance (9 stocks)
+  ["BAC", "Bank of America", "Finance", 42.8, 0.65, "sector_finance", "bac"],
+  ["WFC", "Wells Fargo", "Finance", 64.2, 0.42, "sector_finance", "wfc"],
+  ["C", "Citigroup", "Finance", 66.8, 0.81, "sector_finance", "c"],
+  ["MS", "Morgan Stanley", "Finance", 112.5, 0.95, "sector_finance", "ms"],
+  ["SCHW", "Charles Schwab", "Finance", 73.6, -0.35, "sector_finance", "schw"],
+  ["PGR", "Progressive", "Finance", 248.9, 0.78, "sector_finance", "pgr"],
+  ["MCO", "Moody’s", "Finance", 475.6, 0.61, "sector_finance", "mco"],
+  ["GS", "Goldman Sachs", "Finance", 589.2, 0.6, "sector_finance", "gs"],
+  ["MA", "Mastercard", "Finance", 542.1, 0.4, "sector_finance", "ma"],
+
+  // 5. sector_consumer (9 stocks)
+  ["PG", "Procter & Gamble", "Consumer", 172.5, 0.22, "sector_consumer", "pg"],
+  ["HD", "Home Depot", "Consumer", 398.2, 0.55, "sector_consumer", "hd"],
+  ["NKE", "Nike", "Consumer", 84.6, -0.85, "sector_consumer", "nke"],
+  ["SBUX", "Starbucks", "Consumer", 95.8, 0.45, "sector_consumer", "sbux"],
+  ["LOW", "Lowe’s", "Consumer", 262.4, 0.38, "sector_consumer", "low"],
+  ["TJX", "TJX Companies", "Consumer", 118.6, 0.68, "sector_consumer", "tjx"],
+  ["MDLZ", "Mondelez", "Consumer", 71.8, 0.15, "sector_consumer", "mdlz"],
+  ["PM", "Philip Morris", "Consumer", 124.6, 0.42, "sector_consumer", "pm"],
+  ["MO", "Altria Group", "Consumer", 52.8, -0.22, "sector_consumer", "mo"],
+
+  // 6. sector_energy (6 stocks)
+  ["COP", "ConocoPhillips", "Energy", 108.4, 0.95, "sector_energy", "cop"],
+  ["EOG", "EOG Resources", "Energy", 126.8, 0.75, "sector_energy", "eog"],
+  ["MPC", "Marathon Petroleum", "Energy", 168.2, 1.05, "sector_energy", "mpc"],
+  ["PSX", "Phillips 66", "Energy", 134.6, 0.62, "sector_energy", "psx"],
+  ["VLO", "Valero Energy", "Energy", 142.8, 0.84, "sector_energy", "vlo"],
+  ["CVX", "Chevron", "Energy", 156.8, 0.4, "sector_energy", "cvx"],
+
+  // 7. sector_industrial (9 stocks)
+  ["CAT", "Caterpillar", "Industrial", 388.5, 1.45, "sector_industrial", "cat"],
+  ["GE", "GE Aerospace", "Industrial", 188.2, 1.82, "sector_industrial", "ge"],
+  ["UNP", "Union Pacific", "Industrial", 242.6, 0.34, "sector_industrial", "unp"],
+  ["HON", "Honeywell", "Industrial", 212.8, 0.25, "sector_industrial", "hon"],
+  ["RTX", "RTX Corporation", "Industrial", 122.4, 0.58, "sector_industrial", "rtx"],
+  ["LMT", "Lockheed Martin", "Industrial", 578.9, 0.72, "sector_industrial", "lmt"],
+  ["BA", "Boeing", "Industrial", 154.8, -1.45, "sector_industrial", "ba"],
+  ["DE", "Deere & Company", "Industrial", 408.2, 0.64, "sector_industrial", "de"],
+  ["UPS", "UPS", "Industrial", 132.5, -0.52, "sector_industrial", "ups"],
+
+  // 8. sector_communication (4 stocks)
+  ["CMCSA", "Comcast", "Communication", 44.2, -0.32, "sector_communication", "cmcsa"],
+  ["TMUS", "T-Mobile US", "Communication", 204.8, 0.85, "sector_communication", "tmus"],
+  ["VZ", "Verizon", "Communication", 43.6, 0.22, "sector_communication", "vz"],
+  ["CHTR", "Charter", "Communication", 335.4, -0.92, "sector_communication", "chtr"],
+
+  // 9. sector_etf_index (3 stocks)
+  ["IWM", "Russell 2000 ETF", "Index", 218.4, 0.82, "sector_etf_index", "iwm"],
+  ["VTI", "Vanguard Total Stock", "Index", 284.5, 0.68, "sector_etf_index", "vti"],
+  ["VOO", "Vanguard S&P 500", "Index", 548.2, 0.71, "sector_etf_index", "voo"],
+
+  // 10. sector_generic (6 stocks)
+  ["LIN", "Linde", "Materials", 468.2, 0.38, "sector_generic", "lin"],
+  ["NEE", "NextEra Energy", "Utilities", 82.4, 0.52, "sector_generic", "nee"],
+  ["SO", "Southern Company", "Utilities", 88.6, 0.28, "sector_generic", "so"],
+  ["DUK", "Duke Energy", "Utilities", 114.2, 0.18, "sector_generic", "duk"],
+  ["WM", "Waste Management", "Industrial", 214.5, 0.42, "sector_generic", "wm"],
+  ["BRK.B", "Berkshire Hathaway", "Finance", 478.2, 0.31, "sector_generic", "brk_b"],
+];
+
+export const assets: Asset[] = [
+  ...HERO_ASSETS,
+  ...SECTOR_COMPANIES_RAW.map(([ticker, name, sector, price, change, sectorKey]) => ({
+    ticker,
+    name,
+    sector,
+    price,
+    change,
     color: "#6c8179",
+    sprite: sectorKey,
   })),
 ];
+
 for (const a of assets) {
   a.logo = stockLogoUrl(a.ticker);
   a.rwaLogo = rwaLogoUrl(a.ticker);
 }
 
 export type Cell = { r: number; c: number };
-export type Category = "roads" | "companies" | "services";
+export type Category = "roads" | "companies" | "sectors" | "services";
 export type Tool = "inspect" | "road" | "build" | "bulldoze" | "move";
-export type BuildingKind =
+
+export type HeroBuildingKind =
   | "nvidia"
   | "tesla"
   | "amazon"
@@ -197,12 +456,105 @@ export type BuildingKind =
   | "mcd"
   | "cost"
   | "dis"
-  | "pfe"
+  | "pfe";
+
+export type ServiceBuildingKind =
   | "hall"
   | "exchange"
   | "oracle"
   | "monument"
   | "agent_hall";
+
+export type SectorBuildingKind =
+  | "sector_technology"
+  | "sector_semiconductor"
+  | "sector_finance"
+  | "sector_healthcare"
+  | "sector_consumer"
+  | "sector_energy"
+  | "sector_industrial"
+  | "sector_communication"
+  | "sector_etf_index"
+  | "sector_generic";
+
+export type SectorCompanyKind =
+  | "jnj"
+  | "lly"
+  | "abbv"
+  | "tmo"
+  | "dhr"
+  | "bmy"
+  | "amgn"
+  | "gild"
+  | "abt"
+  | "mrk"
+  | "ibm"
+  | "now"
+  | "intu"
+  | "panw"
+  | "snps"
+  | "cdns"
+  | "csco"
+  | "txn"
+  | "qcom"
+  | "amat"
+  | "lrcx"
+  | "mu"
+  | "adi"
+  | "klac"
+  | "bac"
+  | "wfc"
+  | "c"
+  | "ms"
+  | "schw"
+  | "pgr"
+  | "mco"
+  | "gs"
+  | "ma"
+  | "pg"
+  | "hd"
+  | "nke"
+  | "sbux"
+  | "low"
+  | "tjx"
+  | "mdlz"
+  | "pm"
+  | "mo"
+  | "cop"
+  | "eog"
+  | "mpc"
+  | "psx"
+  | "vlo"
+  | "cvx"
+  | "cat"
+  | "ge"
+  | "unp"
+  | "hon"
+  | "rtx"
+  | "lmt"
+  | "ba"
+  | "de"
+  | "ups"
+  | "cmcsa"
+  | "tmus"
+  | "vz"
+  | "chtr"
+  | "iwm"
+  | "vti"
+  | "voo"
+  | "lin"
+  | "nee"
+  | "so"
+  | "duk"
+  | "wm"
+  | "brk_b";
+
+export type BuildingKind =
+  | HeroBuildingKind
+  | ServiceBuildingKind
+  | SectorBuildingKind
+  | SectorCompanyKind;
+
 export const HERO_TICKERS = [
   "NVDA",
   "TSLA",
@@ -235,20 +587,220 @@ export const HERO_TICKERS = [
   "DIS",
   "PFE",
 ] as const;
+
 export type HeroTicker = (typeof HERO_TICKERS)[number];
 export const isHeroTicker = (ticker: string): ticker is HeroTicker =>
   (HERO_TICKERS as readonly string[]).includes(ticker);
+
 export type BuildingDef = {
   kind: BuildingKind;
   name: string;
-  category: "companies" | "services";
+  category: "companies" | "sectors" | "services";
   ticker?: string;
   image: string;
   cost: number;
   description: string;
+  sectorKey?: SectorBuildingKind;
 };
+
+export type SectorDefinition = {
+  key: SectorBuildingKind;
+  kind: SectorBuildingKind;
+  name: string;
+  sectorName: string;
+  category: "sectors";
+  image: string;
+  cost: number;
+  description: string;
+  color: string;
+  badge: string;
+  stocks: string[];
+};
+
+export const SECTOR_DEFINITIONS: SectorDefinition[] = [
+  {
+    key: "sector_technology",
+    kind: "sector_technology",
+    name: "Tech Innovation Tower",
+    sectorName: "Technology & Software",
+    category: "sectors",
+    image: "sector_technology/level_1",
+    cost: 500,
+    description: "Enterprise software, cloud systems, and cybersecurity powerhouses.",
+    color: "#38bdf8",
+    badge: "TECH",
+    stocks: ["IBM", "NOW", "INTU", "PANW", "SNPS", "CDNS", "CSCO"],
+  },
+  {
+    key: "sector_semiconductor",
+    kind: "sector_semiconductor",
+    name: "Silicon Foundry",
+    sectorName: "Semiconductors & Hardware",
+    category: "sectors",
+    image: "sector_semiconductor/level_1",
+    cost: 500,
+    description: "Cutting-edge microchip design, wafer fab, and advanced lithography.",
+    color: "#a855f7",
+    badge: "SEMI",
+    stocks: ["TXN", "QCOM", "AMAT", "LRCX", "MU", "ADI", "KLAC"],
+  },
+  {
+    key: "sector_finance",
+    kind: "sector_finance",
+    name: "Capital Exchange",
+    sectorName: "Financial Services & Banking",
+    category: "sectors",
+    image: "sector_finance/level_1",
+    cost: 500,
+    description: "Global commercial banking, credit networks, and asset custodians.",
+    color: "#34d399",
+    badge: "FIN",
+    stocks: ["BAC", "WFC", "C", "MS", "SCHW", "PGR", "MCO", "GS", "MA"],
+  },
+  {
+    key: "sector_healthcare",
+    kind: "sector_healthcare",
+    name: "Healthcare & Bio Complex",
+    sectorName: "Healthcare & Pharmaceuticals",
+    category: "sectors",
+    image: "sector_healthcare/level_1",
+    cost: 500,
+    description: "Biomedical research, clinical therapies, and life sciences innovation.",
+    color: "#f43f5e",
+    badge: "HEALTH",
+    stocks: ["JNJ", "LLY", "ABBV", "TMO", "DHR", "BMY", "AMGN", "GILD", "ABT", "MRK"],
+  },
+  {
+    key: "sector_consumer",
+    kind: "sector_consumer",
+    name: "Consumer Plaza",
+    sectorName: "Consumer & Retail",
+    category: "sectors",
+    image: "sector_consumer/level_1",
+    cost: 500,
+    description: "Iconic consumer goods, retail chains, and household brand staples.",
+    color: "#f59e0b",
+    badge: "CONS",
+    stocks: ["PG", "HD", "NKE", "SBUX", "LOW", "TJX", "MDLZ", "PM", "MO"],
+  },
+  {
+    key: "sector_energy",
+    kind: "sector_energy",
+    name: "Energy Grid & Terminal",
+    sectorName: "Energy & Petroleum",
+    category: "sectors",
+    image: "sector_energy/level_1",
+    cost: 500,
+    description: "Exploration, refining infrastructure, and modern energy distribution.",
+    color: "#ef4444",
+    badge: "NRG",
+    stocks: ["COP", "EOG", "MPC", "PSX", "VLO", "CVX"],
+  },
+  {
+    key: "sector_industrial",
+    kind: "sector_industrial",
+    name: "Industrial Works",
+    sectorName: "Industrials & Aerospace",
+    category: "sectors",
+    image: "sector_industrial/level_1",
+    cost: 500,
+    description: "Aerospace defense, heavy machinery, rail freight, and global logistics.",
+    color: "#f97316",
+    badge: "IND",
+    stocks: ["CAT", "GE", "UNP", "HON", "RTX", "LMT", "BA", "DE", "UPS"],
+  },
+  {
+    key: "sector_communication",
+    kind: "sector_communication",
+    name: "Telecom Network Hub",
+    sectorName: "Communication & Media",
+    category: "sectors",
+    image: "sector_communication/level_1",
+    cost: 500,
+    description: "5G broadband, wireless telecom infrastructure, and digital broadcasting.",
+    color: "#818cf8",
+    badge: "COMM",
+    stocks: ["CMCSA", "TMUS", "VZ", "CHTR"],
+  },
+  {
+    key: "sector_etf_index",
+    kind: "sector_etf_index",
+    name: "Index & ETF Pavilion",
+    sectorName: "Index & Broad Market ETFs",
+    category: "sectors",
+    image: "sector_etf_index/level_1",
+    cost: 500,
+    description: "Benchmark market trackers, broad-market equities, and liquidity hubs.",
+    color: "#eab308",
+    badge: "ETF",
+    stocks: ["IWM", "VTI", "VOO"],
+  },
+  {
+    key: "sector_generic",
+    kind: "sector_generic",
+    name: "Enterprise Conglomerate",
+    sectorName: "Conglomerates & Utilities",
+    category: "sectors",
+    image: "sector_generic/level_1",
+    cost: 500,
+    description: "Diversified industrial gases, clean utilities, waste management, and holdings.",
+    color: "#64748b",
+    badge: "CORP",
+    stocks: ["LIN", "NEE", "SO", "DUK", "WM", "BRK.B"],
+  },
+];
+
+export const defForSector = (sectorKey: string): SectorDefinition | undefined =>
+  SECTOR_DEFINITIONS.find((s) => s.key === sectorKey);
+
 export const catalogue: BuildingDef[] = [
-  { kind: "agent_hall", name: "Agent Hall", category: "services", image: "functional/agent_hall", cost: 350, description: "Cokoo’s command center. Explore portfolio allocation, preview baskets and stress-test your city." },
+  // 1. Civic services
+  {
+    kind: "agent_hall",
+    name: "Agent Hall",
+    category: "services",
+    image: "functional/agent_hall",
+    cost: 350,
+    description:
+      "Cokoo’s command center. Explore portfolio allocation, preview baskets and stress-test your city.",
+  },
+  {
+    kind: "hall",
+    name: "City Hall",
+    category: "services",
+    image: "functional/portfolio_city_hall",
+    cost: 250,
+    description:
+      "Your city headquarters. Select it to inspect city finances and your portfolio.",
+  },
+  {
+    kind: "exchange",
+    name: "Stock Exchange",
+    category: "services",
+    image: "functional/stock_exchange",
+    cost: 400,
+    description: "A home for the market. Select it to open the stock watchlist.",
+  },
+  {
+    kind: "oracle",
+    name: "Data Center",
+    category: "services",
+    image: "functional/oracle_data_center",
+    cost: 300,
+    description:
+      "Your city’s information hub. Select it to inspect on-chain city data.",
+  },
+  {
+    kind: "monument",
+    name: "BNB Monument",
+    category: "services",
+    image: "functional/bnb_monument",
+    cost: 500,
+    description:
+      "A grand golden monument honoring BNB Smart Chain and the Web3 builders. A proud island landmark.",
+  },
+
+  // 2. Hero Company Buildings (30 bespoke isometric 4-tier models)
   {
     kind: "nvidia",
     name: "NVIDIA",
@@ -549,43 +1101,35 @@ export const catalogue: BuildingDef[] = [
     description:
       "Biopharmaceutical innovation & essential medicine. Place a building to create a Pfizer tokenized stock position.",
   },
-  {
-    kind: "hall",
-    name: "City Hall",
-    category: "services",
-    image: "functional/portfolio_city_hall",
-    cost: 250,
-    description:
-      "Your city headquarters. Select it to inspect city finances and your portfolio.",
-  },
-  {
-    kind: "exchange",
-    name: "Stock Exchange",
-    category: "services",
-    image: "functional/stock_exchange",
-    cost: 400,
-    description:
-      "A home for the market. Select it to open the stock watchlist.",
-  },
-  {
-    kind: "oracle",
-    name: "Data Center",
-    category: "services",
-    image: "functional/oracle_data_center",
-    cost: 300,
-    description:
-      "Your city’s information hub. Select it to inspect on-chain city data.",
-  },
-  {
-    kind: "monument",
-    name: "BNB Monument",
-    category: "services",
-    image: "functional/bnb_monument",
-    cost: 500,
-    description:
-      "A grand golden monument honoring BNB Smart Chain and the Web3 builders. A proud island landmark.",
-  },
+
+  // 3. 10 Sector Building Templates
+  ...SECTOR_DEFINITIONS.map(
+    (sec): BuildingDef => ({
+      kind: sec.kind,
+      name: sec.name,
+      category: "sectors",
+      image: sec.image,
+      cost: sec.cost,
+      description: sec.description,
+      sectorKey: sec.key,
+    }),
+  ),
+
+  // 4. 70 S&P 100 Sector Company Buildings
+  ...SECTOR_COMPANIES_RAW.map(
+    ([ticker, name, sector, price, change, sectorKey, kind]): BuildingDef => ({
+      kind,
+      name,
+      category: "sectors",
+      ticker,
+      image: `${sectorKey}/level_1`,
+      cost: 500,
+      description: `${name} (${ticker}) tokenized stock position housed in the ${defForSector(sectorKey)?.name ?? "Sector Tower"}.`,
+      sectorKey,
+    }),
+  ),
 ];
+
 for (const a of assets) {
   if (!a.sprite) {
     const def = catalogue.find((d) => d.ticker === a.ticker);
@@ -594,8 +1138,6 @@ for (const a of assets) {
     }
   }
 }
-// Catalogue strictly contains the 10 Hero Companies with dedicated 4-tier isometric sprites + 4 civic services.
-// Other assets remain in the 24/7 on-chain Stock Exchange market watchlist.
 export type Building = Cell & {
   id: string;
   kind: BuildingKind;

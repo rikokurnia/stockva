@@ -546,12 +546,15 @@ export default function StockCity() {
     setPlaceSource(null);
   };
   const chooseCategory = (next: Category) => {
-    if (next === "companies" && !hasExchange) {
-      setCategory("companies");
+    if ((next === "companies" || next === "sectors") && !hasExchange) {
+      setCategory(next);
       setTool("inspect");
       setKind(null);
       setPanel(null);
-      notify("Build the Stock Exchange first to unlock Companies.", true);
+      notify(
+        `Build the Stock Exchange first to unlock ${next === "sectors" ? "Sector Towers" : "Companies"}.`,
+        true,
+      );
       return;
     }
     setPortfolioView(false);

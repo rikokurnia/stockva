@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import StockLogo from "./stock-logo";
 import type {
   Building,
   BuildingKind,
@@ -550,6 +551,13 @@ export default function CityMap(props: Props) {
                       aria-label={`${def.name} (${def.ticker}) ${portfolioPercent(ret)} ${tierName(currentTier)}${b.locked ? ", locked unpaid" : ""}`}
                     >
                       <div className="stock-badge-main">
+                        <StockLogo
+                          ticker={def.ticker}
+                          name={def.name}
+                          size={13}
+                          shape="circle"
+                          className="stock-badge-logo"
+                        />
                         <span className="stock-badge-ticker">{def.ticker}</span>
                         <span className="stock-badge-pct">
                           {b.locked && <span className="stock-badge-lock">🔒</span>}
