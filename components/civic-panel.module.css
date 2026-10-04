@@ -1065,6 +1065,31 @@
   background: rgba(244, 205, 96, 0.08);
 }
 
+.bundleCardBuilt {
+  opacity: 0.55;
+  border-color: rgba(43, 216, 138, 0.25);
+  cursor: not-allowed;
+  background: rgba(13, 31, 38, 0.5);
+}
+
+.bundleCardBuiltBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(18, 52, 40, 0.95);
+  color: #2bd88a;
+  border: 1px solid rgba(43, 216, 138, 0.5);
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 .bundleCardSprite {
   width: 44px;
   height: 44px;

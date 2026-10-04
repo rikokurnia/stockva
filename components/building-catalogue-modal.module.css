@@ -325,6 +325,43 @@
   cursor: not-allowed;
 }
 
+.buildingCardBuilt {
+  opacity: 0.65;
+  border-color: rgba(43, 216, 138, 0.25);
+  background: rgba(13, 31, 38, 0.6);
+  cursor: not-allowed;
+}
+
+.cardBuiltBadge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(18, 52, 40, 0.95);
+  color: #2bd88a;
+  border: 1px solid rgba(43, 216, 138, 0.5);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  letter-spacing: 0.3px;
+  z-index: 3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.alreadyBuiltNotice {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #8da4b0;
+  line-height: 1.4;
+  background: rgba(30, 48, 60, 0.5);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-left: 3px solid #2bd88a;
+}
+
 .cardSpriteBox {
   position: relative;
   width: 90px;

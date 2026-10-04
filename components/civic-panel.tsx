@@ -1069,7 +1069,15 @@ export default function CivicPanel({
                               type="button"
                               className={styles.bundlePresetQuickBtn}
                               onClick={() => {
-                                const top5 = ["NVDA", "TSLA", "AAPL", "MSFT", "AMZN"];
+                                const isBuilt = (t: string) =>
+                                  city.buildings.some((b) => defFor(b.kind).ticker === t);
+                                const top5 = [
+                                  "NVDA",
+                                  "TSLA",
+                                  "AAPL",
+                                  "MSFT",
+                                  "AMZN",
+                                ].filter((t) => !isBuilt(t));
                                 setSelectedBundleTickers(top5);
                                 setBundleAmounts((prev) => {
                                   const next = { ...prev };
@@ -1084,8 +1092,10 @@ export default function CivicPanel({
                               type="button"
                               className={styles.bundlePresetQuickBtn}
                               onClick={() => {
+                                const isBuilt = (t: string) =>
+                                  city.buildings.some((b) => defFor(b.kind).ticker === t);
                                 const allHero = assets
-                                  .filter((a) => isHeroTicker(a.ticker))
+                                  .filter((a) => isHeroTicker(a.ticker) && !isBuilt(a.ticker))
                                   .map((a) => a.ticker);
                                 setSelectedBundleTickers(allHero);
                                 setBundleAmounts((prev) => {
@@ -1095,7 +1105,7 @@ export default function CivicPanel({
                                 });
                               }}
                             >
-                              All 10
+                              Available
                             </button>
                             <button
                               type="button"
@@ -1114,6 +1124,11 @@ export default function CivicPanel({
                             .map((a) => {
                               const def = catalogue.find((d) => d.ticker === a.ticker);
                               const isSelected = selectedBundleTickers.includes(a.ticker);
+                              const isAlreadyBuilt = city.buildings.some(
+                                (b) =>
+                                  b.kind === def?.kind ||
+                                  (def?.ticker && defFor(b.kind).ticker === def.ticker),
+                              );
                               const p = priceOf(a.ticker, prices);
                               return (
                                 <button
@@ -1121,8 +1136,15 @@ export default function CivicPanel({
                                   type="button"
                                   className={`${styles.bundleCard} ${
                                     isSelected ? styles.bundleCardActive : ""
-                                  }`}
+                                  } ${isAlreadyBuilt ? styles.bundleCardBuilt : ""}`}
+                                  disabled={isAlreadyBuilt}
+                                  title={
+                                    isAlreadyBuilt
+                                      ? `${a.name} is already built on your island (Max 1 allowed)`
+                                      : undefined
+                                  }
                                   onClick={() => {
+                                    if (isAlreadyBuilt) return;
                                     if (isSelected) {
                                       setSelectedBundleTickers((prev) =>
                                         prev.filter((t) => t !== a.ticker),
@@ -1141,6 +1163,11 @@ export default function CivicPanel({
                                     }
                                   }}
                                 >
+                                  {isAlreadyBuilt && (
+                                    <span className={styles.bundleCardBuiltBadge}>
+                                      <Check size={8} /> Built
+                                    </span>
+                                  )}
                                   {def && (
                                     <img
                                       src={sprite(def.image)}
@@ -1596,25 +1623,58 @@ export default function CivicPanel({
                       />
                       {catalogue.find((d) => d.ticker === selected.ticker) ? (
                         <>
-                          <button
-                            className={styles.primary}
-                            disabled={!validAmount || !hasExchange}
-                            onClick={() =>
-                              onBuy(
-                                catalogue.find((d) => d.ticker === selected.ticker)!
-                                  .kind,
-                                input,
-                              )
-                            }
-                          >
-                            Buy & place building
-                            <ArrowUpRight size={17} />
-                          </button>
-                          <p className={styles.caption}>
-                            Places a locked draft on the island. Pay in City
-                            Hall (bundle, 1 signature) to unlock it
-                            permanently.
-                          </p>
+                          {city.buildings.some(
+                            (b) => defFor(b.kind).ticker === selected.ticker,
+                          ) ? (
+                            <>
+                              <button
+                                className={styles.primary}
+                                disabled
+                                style={{
+                                  opacity: 0.6,
+                                  cursor: "not-allowed",
+                                  background: "var(--civic-line)",
+                                }}
+                              >
+                                Building already on island (Max 1)
+                              </button>
+                              <p className={styles.caption}>
+                                You already have {selected.name} built on your island. To increase your investment, add to your position below.
+                              </p>
+                              <button
+                                className={styles.primary}
+                                disabled={!validAmount}
+                                onClick={() =>
+                                  setMessage(onBuyPaper(selected.ticker, input))
+                                }
+                              >
+                                Add to position (no extra building)
+                                <ArrowUpRight size={17} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                className={styles.primary}
+                                disabled={!validAmount || !hasExchange}
+                                onClick={() =>
+                                  onBuy(
+                                    catalogue.find((d) => d.ticker === selected.ticker)!
+                                      .kind,
+                                    input,
+                                  )
+                                }
+                              >
+                                Buy & place building
+                                <ArrowUpRight size={17} />
+                              </button>
+                              <p className={styles.caption}>
+                                Places a locked draft on the island. Pay in City
+                                Hall (bundle, 1 signature) to unlock it
+                                permanently.
+                              </p>
+                            </>
+                          )}
                         </>
                       ) : (
                         <>

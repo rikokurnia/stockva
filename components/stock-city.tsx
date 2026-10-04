@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   ArrowDownUp,
@@ -200,6 +200,17 @@ export default function StockCity() {
   const hasExchange = city.buildings.some((b) => b.kind === "exchange");
   const hasData = city.buildings.some((b) => b.kind === "oracle");
   const hasAgentHall = city.buildings.some((b) => b.kind === "agent_hall");
+  const builtKinds = useMemo(() => {
+    const set = new Set<BuildingKind>();
+    for (const b of city.buildings) {
+      set.add(b.kind);
+      const def = defFor(b.kind);
+      if (def.ticker) {
+        set.add(def.ticker.toLowerCase() as BuildingKind);
+      }
+    }
+    return set;
+  }, [city.buildings]);
   const scanBuilding = city.buildings.find((b) => b.id === scanTarget);
   const scanTicker = scanBuilding
     ? defFor(scanBuilding.kind).ticker
@@ -563,7 +574,20 @@ export default function StockCity() {
     autoClose = false,
     source: "tray" | "exchange" = "tray",
   ) => {
-    if (defFor(value).ticker && !hasExchange) {
+    const def = defFor(value);
+    const alreadyBuilt = city.buildings.some(
+      (b) =>
+        b.kind === value ||
+        (Boolean(def.ticker) && defFor(b.kind).ticker === def.ticker),
+    );
+    if (alreadyBuilt) {
+      notify(
+        `${def.name} is already built on your island. Only one instance is allowed.`,
+        true,
+      );
+      return;
+    }
+    if (def.ticker && !hasExchange) {
       notify("Build the Stock Exchange first.", true);
       return;
     }
@@ -607,6 +631,21 @@ export default function StockCity() {
   };
   const onPlace = (cell: Cell) => {
     if (!kind || !ready) return;
+    const def = defFor(kind);
+    const alreadyBuilt = city.buildings.some(
+      (b) =>
+        b.kind === kind ||
+        (Boolean(def.ticker) && defFor(b.kind).ticker === def.ticker),
+    );
+    if (alreadyBuilt) {
+      notify(
+        `${def.name} is already built on your island. Only one instance is allowed.`,
+        true,
+      );
+      setTool("inspect");
+      setKind(null);
+      return;
+    }
     if (tool === "move" && moving) {
       const error = placementError(cell, city, moving);
       if (error) {
@@ -1265,6 +1304,7 @@ export default function StockCity() {
         prices={prices}
         walletAddress={wallet}
         initialKind={kind}
+        builtKinds={builtKinds}
         onStartDrawRoad={() => {
           setTool("road");
           setKind(null);
@@ -1660,6 +1700,17 @@ export default function StockCity() {
           }}
           onBuyBundle={(items) => {
             if (!items.length) return "Pick at least one stock for the bundle.";
+            const alreadyBuiltItem = items.find((i) => {
+              const def = defFor(i.kind);
+              return city.buildings.some(
+                (b) =>
+                  b.kind === i.kind ||
+                  (Boolean(def.ticker) && defFor(b.kind).ticker === def.ticker),
+              );
+            });
+            if (alreadyBuiltItem) {
+              return `${defFor(alreadyBuiltItem.kind).name} is already built on your island. Only 1 building per company or service is allowed.`;
+            }
             const totalCost = items.reduce((s, i) => s + i.amount, 0);
             if (totalCost > city.cash)
               return `Bundle costs ${money(totalCost)} but you have ${money(city.cash)}. Lower some amounts.`;

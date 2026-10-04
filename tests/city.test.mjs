@@ -359,33 +359,50 @@ test("progression rejects company construction without an Exchange, including af
   );
 });
 test("partial and complete liquidation conserve cash, units and remaining cost basis", () => {
-  let city = constructBuilding("nvidia", { r: 1, c: 1 }, 500, tradingCity(), {
+  const city = constructBuilding("nvidia", { r: 1, c: 1 }, 800, tradingCity(), {
     NVDA: 100,
-  }).state;
-  city = constructBuilding("nvidia", { r: 1, c: 4 }, 300, city, {
-    NVDA: 150,
   }).state;
   const cash = city.cash;
   const partial = sellPosition(city, "NVDA", 0.25, { NVDA: 200 });
   assert.equal(partial.error, "");
-  assert.equal(partial.state.cash, cash + 350);
-  assert.equal(partial.state.realizedPnl, 150);
+  assert.equal(partial.state.cash, cash + 400);
+  assert.equal(partial.state.realizedPnl, 200);
   const stocks = partial.state.buildings.filter((b) => b.kind === "nvidia");
   assert.equal(
     stocks.reduce((s, b) => s + b.quantity, 0),
-    5.25,
+    6,
   );
   assert.equal(
     stocks.reduce((s, b) => s + b.quantity * b.entry, 0),
     600,
   );
   const full = sellPosition(partial.state, "NVDA", 1, { NVDA: 200 });
-  assert.equal(full.state.realizedPnl, 600);
-  assert.equal(full.state.cash, cash + 1400);
+  assert.equal(full.state.realizedPnl, 800);
+  assert.equal(full.state.cash, cash + 1600);
   assert.equal(full.state.buildings.length, 1);
   for (const fraction of [0, -1, 1.1, NaN, Infinity])
     assert.equal(sellPosition(city, "NVDA", fraction).state, city);
   assert.match(sellPosition(city, "TSLA", 1).error, /do not own/);
+});
+test("building placement is strictly limited to 1 per service and 1 per company", () => {
+  const city = tradingCity(); // contains 'exchange'
+  // 1. Service building duplicate rejection
+  const dupExchange = constructBuilding("exchange", { r: 1, c: 1 }, 400, city);
+  assert.match(dupExchange.error, /already built/i);
+  assert.equal(dupExchange.state, city);
+
+  const hall = constructBuilding("hall", { r: -4, c: -3 }, 250, city);
+  assert.equal(hall.error, "");
+  const dupHall = constructBuilding("hall", { r: 1, c: 1 }, 250, hall.state);
+  assert.match(dupHall.error, /already built/i);
+  assert.equal(dupHall.state, hall.state);
+
+  // 2. Company building duplicate rejection
+  const nvda1 = constructBuilding("nvidia", { r: 1, c: 1 }, 500, hall.state, { NVDA: 100 });
+  assert.equal(nvda1.error, "");
+  const dupNvda = constructBuilding("nvidia", { r: 1, c: 4 }, 500, nvda1.state, { NVDA: 100 });
+  assert.match(dupNvda.error, /already built/i);
+  assert.equal(dupNvda.state, nvda1.state);
 });
 test("hero catalogue contains 30 bespoke stocks with all 4 tier sprites, 5 civic services, and 30+ market assets", () => {
   const companyDefs = catalogue.filter((d) => d.ticker);
@@ -394,11 +411,12 @@ test("hero catalogue contains 30 bespoke stocks with all 4 tier sprites, 5 civic
   assert.ok(assets.length >= 30);
   assert.equal(HERO_TICKERS.length, 30);
   for (const def of catalogue) {
+    const baseCity = def.ticker ? tradingCity() : newCity();
     const built = constructBuilding(
       def.kind,
       { r: 1, c: 1 },
       100,
-      tradingCity(),
+      baseCity,
     );
     assert.equal(built.error, "");
     assert.ok(isSavedCity(built.state));

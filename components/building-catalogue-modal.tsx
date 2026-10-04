@@ -35,6 +35,7 @@ interface BuildingCatalogueModalProps {
   prices: Record<string, number>;
   walletAddress?: `0x${string}` | null | undefined;
   initialKind?: BuildingKind | null;
+  builtKinds?: Set<BuildingKind>;
   onStartDrawRoad: () => void;
   onPayAndPlace: (kind: BuildingKind, amount: number) => void;
 }
@@ -49,6 +50,7 @@ export function BuildingCatalogueModal({
   prices,
   walletAddress,
   initialKind = null,
+  builtKinds,
   onStartDrawRoad,
   onPayAndPlace,
 }: BuildingCatalogueModalProps) {
@@ -381,25 +383,48 @@ export function BuildingCatalogueModal({
                       />
 
                       {/* Commit button */}
-                      <button
-                        type="button"
-                        className={styles.commitBtn}
-                        disabled={!validAmount}
-                        onClick={() => {
-                          onPayAndPlace(selectedDef.kind, amount);
-                          onClose();
-                        }}
-                      >
-                        <span>
-                          Pay {money(Number.isFinite(amount) ? amount : 0)} &
-                          Place on Island
-                        </span>
-                        <ArrowUpRight size={18} />
-                      </button>
-                      <small className={styles.signatureNote}>
-                        ⚡ Direct on-chain placement: prompts wallet signature
-                        immediately upon placing on the grid.
-                      </small>
+                      {Boolean(selectedDef && builtKinds?.has(selectedDef.kind)) ? (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.commitBtn}
+                            disabled
+                            style={{
+                              opacity: 0.55,
+                              cursor: "not-allowed",
+                              background: "#1e3646",
+                              color: "#8fa6b4",
+                            }}
+                          >
+                            <span>Already Built on Island (Max 1)</span>
+                          </button>
+                          <p className={styles.alreadyBuiltNotice}>
+                            {selectedDef.name} is already placed on your island. Each stock building can only be built once.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.commitBtn}
+                            disabled={!validAmount}
+                            onClick={() => {
+                              onPayAndPlace(selectedDef.kind, amount);
+                              onClose();
+                            }}
+                          >
+                            <span>
+                              Pay {money(Number.isFinite(amount) ? amount : 0)} &
+                              Place on Island
+                            </span>
+                            <ArrowUpRight size={18} />
+                          </button>
+                          <small className={styles.signatureNote}>
+                            ⚡ Direct on-chain placement: prompts wallet signature
+                            immediately upon placing on the grid.
+                          </small>
+                        </>
+                      )}
                     </>
                   ) : (
                     /* Service Building Form */
@@ -422,20 +447,41 @@ export function BuildingCatalogueModal({
                         compact
                       />
 
-                      <button
-                        type="button"
-                        className={styles.commitBtn}
-                        disabled={cityCash < selectedDef.cost}
-                        onClick={() => {
-                          onPayAndPlace(selectedDef.kind, selectedDef.cost);
-                          onClose();
-                        }}
-                      >
-                        <span>
-                          Pay {wholeMoney(selectedDef.cost)} & Place on Island
-                        </span>
-                        <ArrowUpRight size={18} />
-                      </button>
+                      {Boolean(selectedDef && builtKinds?.has(selectedDef.kind)) ? (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.commitBtn}
+                            disabled
+                            style={{
+                              opacity: 0.55,
+                              cursor: "not-allowed",
+                              background: "#1e3646",
+                              color: "#8fa6b4",
+                            }}
+                          >
+                            <span>Already Built on Island (Max 1)</span>
+                          </button>
+                          <p className={styles.alreadyBuiltNotice}>
+                            {selectedDef.name} is already placed on your island. Each civic service building can only be built once.
+                          </p>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.commitBtn}
+                          disabled={cityCash < selectedDef.cost}
+                          onClick={() => {
+                            onPayAndPlace(selectedDef.kind, selectedDef.cost);
+                            onClose();
+                          }}
+                        >
+                          <span>
+                            Pay {wholeMoney(selectedDef.cost)} & Place on Island
+                          </span>
+                          <ArrowUpRight size={18} />
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -476,16 +522,33 @@ export function BuildingCatalogueModal({
                 {filteredBuildings.map((def: BuildingDef) => {
                   const p = def.ticker ? priceOf(def.ticker, prices) : def.cost;
                   const canAfford = cityCash >= (def.ticker ? 1 : def.cost);
+                  const isAlreadyBuilt = Boolean(builtKinds?.has(def.kind));
                   return (
                     <button
                       key={def.kind}
                       type="button"
                       className={`${styles.buildingCard} ${
-                        !canAfford ? styles.buildingCardDisabled : ""
+                        isAlreadyBuilt
+                          ? styles.buildingCardBuilt
+                          : !canAfford
+                            ? styles.buildingCardDisabled
+                            : ""
                       }`}
-                      onClick={() => handleSelectBuilding(def)}
-                      disabled={!canAfford}
+                      onClick={() => {
+                        if (!isAlreadyBuilt) handleSelectBuilding(def);
+                      }}
+                      disabled={isAlreadyBuilt || !canAfford}
+                      title={
+                        isAlreadyBuilt
+                          ? `${def.name} is already built on your island (Max 1 allowed)`
+                          : undefined
+                      }
                     >
+                      {isAlreadyBuilt && (
+                        <span className={styles.cardBuiltBadge}>
+                          <Check size={9} /> Built
+                        </span>
+                      )}
                       <div className={styles.cardSpriteBox}>
                         <img
                           src={sprite(def.image)}

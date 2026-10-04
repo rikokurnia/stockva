@@ -984,8 +984,20 @@ export function constructBuilding(
   state: CityState,
   prices?: PriceMap,
 ) {
+  const def = defFor(kind);
+  const alreadyBuilt = state.buildings.some(
+    (b) =>
+      b.kind === kind ||
+      (Boolean(def.ticker) && defFor(b.kind).ticker === def.ticker),
+  );
+  if (alreadyBuilt)
+    return {
+      state,
+      error: `${def.name} is already built. Only one instance is allowed on the island.`,
+    };
+
   if (
-    defFor(kind).ticker &&
+    def.ticker &&
     !state.buildings.some((b) => b.kind === "exchange")
   )
     return {
@@ -994,8 +1006,7 @@ export function constructBuilding(
     };
   const error = placementError(cell, state);
   if (error) return { state, error };
-  const def = defFor(kind),
-    cost = def.ticker ? amount : def.cost;
+  const cost = def.ticker ? amount : def.cost;
   if (!Number.isFinite(cost) || cost < 1)
     return { state, error: "Enter a position amount of at least $1" };
   if (cost > state.cash) return { state, error: "Not enough funds" };
