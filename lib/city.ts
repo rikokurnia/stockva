@@ -178,10 +178,31 @@ export type BuildingKind =
   | "coca_cola"
   | "exxonmobil"
   | "unitedhealth"
+  | "aapl"
+  | "googl"
+  | "meta"
+  | "nflx"
+  | "amd"
+  | "avgo"
+  | "coin"
+  | "v"
+  | "spy"
+  | "qqq"
+  | "adbe"
+  | "crm"
+  | "orcl"
+  | "intc"
+  | "pltr"
+  | "pep"
+  | "mcd"
+  | "cost"
+  | "dis"
+  | "pfe"
   | "hall"
   | "exchange"
   | "oracle"
-  | "monument";
+  | "monument"
+  | "agent_hall";
 export const HERO_TICKERS = [
   "NVDA",
   "TSLA",
@@ -193,6 +214,26 @@ export const HERO_TICKERS = [
   "KO",
   "XOM",
   "UNH",
+  "AAPL",
+  "GOOGL",
+  "META",
+  "NFLX",
+  "AMD",
+  "AVGO",
+  "COIN",
+  "V",
+  "SPY",
+  "QQQ",
+  "ADBE",
+  "CRM",
+  "ORCL",
+  "INTC",
+  "PLTR",
+  "PEP",
+  "MCD",
+  "COST",
+  "DIS",
+  "PFE",
 ] as const;
 export type HeroTicker = (typeof HERO_TICKERS)[number];
 export const isHeroTicker = (ticker: string): ticker is HeroTicker =>
@@ -207,6 +248,7 @@ export type BuildingDef = {
   description: string;
 };
 export const catalogue: BuildingDef[] = [
+  { kind: "agent_hall", name: "Agent Hall", category: "services", image: "functional/agent_hall", cost: 350, description: "Cokoo’s command center. Explore portfolio allocation, preview baskets and stress-test your city." },
   {
     kind: "nvidia",
     name: "NVIDIA",
@@ -308,6 +350,206 @@ export const catalogue: BuildingDef[] = [
       "Healthcare & medical services. Place a building to create a UnitedHealth tokenized stock position.",
   },
   {
+    kind: "aapl",
+    name: "Apple",
+    category: "companies",
+    ticker: "AAPL",
+    image: "aapl/level_1",
+    cost: 500,
+    description:
+      "Consumer technology & ecosystem devices. Place a building to create an Apple tokenized stock position.",
+  },
+  {
+    kind: "googl",
+    name: "Alphabet",
+    category: "companies",
+    ticker: "GOOGL",
+    image: "googl/level_1",
+    cost: 500,
+    description:
+      "Search, cloud computing & artificial intelligence. Place a building to create an Alphabet tokenized stock position.",
+  },
+  {
+    kind: "meta",
+    name: "Meta",
+    category: "companies",
+    ticker: "META",
+    image: "meta/level_1",
+    cost: 500,
+    description:
+      "Social technologies, metaverse & AI platforms. Place a building to create a Meta tokenized stock position.",
+  },
+  {
+    kind: "nflx",
+    name: "Netflix",
+    category: "companies",
+    ticker: "NFLX",
+    image: "nflx/level_1",
+    cost: 500,
+    description:
+      "Streaming entertainment & digital media production. Place a building to create a Netflix tokenized stock position.",
+  },
+  {
+    kind: "amd",
+    name: "AMD",
+    category: "companies",
+    ticker: "AMD",
+    image: "amd/level_1",
+    cost: 500,
+    description:
+      "High-performance computing & graphics processors. Place a building to create an AMD tokenized stock position.",
+  },
+  {
+    kind: "avgo",
+    name: "Broadcom",
+    category: "companies",
+    ticker: "AVGO",
+    image: "avgo/level_1",
+    cost: 500,
+    description:
+      "Semiconductor infrastructure & enterprise software. Place a building to create a Broadcom tokenized stock position.",
+  },
+  {
+    kind: "coin",
+    name: "Coinbase",
+    category: "companies",
+    ticker: "COIN",
+    image: "coin/level_1",
+    cost: 500,
+    description:
+      "Crypto economy infrastructure & digital asset exchange. Place a building to create a Coinbase tokenized stock position.",
+  },
+  {
+    kind: "v",
+    name: "Visa",
+    category: "companies",
+    ticker: "V",
+    image: "v/level_1",
+    cost: 500,
+    description:
+      "Global payments & transaction technology network. Place a building to create a Visa tokenized stock position.",
+  },
+  {
+    kind: "spy",
+    name: "S&P 500 ETF",
+    category: "companies",
+    ticker: "SPY",
+    image: "spy/level_1",
+    cost: 500,
+    description:
+      "Diversified large-cap U.S. equities benchmark. Place a building to create an S&P 500 ETF tokenized position.",
+  },
+  {
+    kind: "qqq",
+    name: "Nasdaq 100 ETF",
+    category: "companies",
+    ticker: "QQQ",
+    image: "qqq/level_1",
+    cost: 500,
+    description:
+      "Innovation & top non-financial tech equities. Place a building to create a Nasdaq 100 ETF tokenized position.",
+  },
+  {
+    kind: "adbe",
+    name: "Adobe",
+    category: "companies",
+    ticker: "ADBE",
+    image: "adbe/level_1",
+    cost: 500,
+    description:
+      "Creative software & digital experience solutions. Place a building to create an Adobe tokenized stock position.",
+  },
+  {
+    kind: "crm",
+    name: "Salesforce",
+    category: "companies",
+    ticker: "CRM",
+    image: "crm/level_1",
+    cost: 500,
+    description:
+      "Customer relationship management & enterprise cloud. Place a building to create a Salesforce tokenized stock position.",
+  },
+  {
+    kind: "orcl",
+    name: "Oracle",
+    category: "companies",
+    ticker: "ORCL",
+    image: "orcl/level_1",
+    cost: 500,
+    description:
+      "Cloud enterprise database software & infrastructure. Place a building to create an Oracle tokenized stock position.",
+  },
+  {
+    kind: "intc",
+    name: "Intel",
+    category: "companies",
+    ticker: "INTC",
+    image: "intc/level_1",
+    cost: 500,
+    description:
+      "Semiconductor design & advanced silicon manufacturing. Place a building to create an Intel tokenized stock position.",
+  },
+  {
+    kind: "pltr",
+    name: "Palantir",
+    category: "companies",
+    ticker: "PLTR",
+    image: "pltr/level_1",
+    cost: 500,
+    description:
+      "Big data analytics & enterprise AI operating systems. Place a building to create a Palantir tokenized stock position.",
+  },
+  {
+    kind: "pep",
+    name: "PepsiCo",
+    category: "companies",
+    ticker: "PEP",
+    image: "pep/level_1",
+    cost: 500,
+    description:
+      "Global snack & beverage brands portfolio. Place a building to create a PepsiCo tokenized stock position.",
+  },
+  {
+    kind: "mcd",
+    name: "McDonald’s",
+    category: "companies",
+    ticker: "MCD",
+    image: "mcd/level_1",
+    cost: 500,
+    description:
+      "Global quick-service restaurant & franchise network. Place a building to create a McDonald’s tokenized stock position.",
+  },
+  {
+    kind: "cost",
+    name: "Costco",
+    category: "companies",
+    ticker: "COST",
+    image: "cost/level_1",
+    cost: 500,
+    description:
+      "Membership warehouse retail & bulk supply network. Place a building to create a Costco tokenized stock position.",
+  },
+  {
+    kind: "dis",
+    name: "Walt Disney",
+    category: "companies",
+    ticker: "DIS",
+    image: "dis/level_1",
+    cost: 500,
+    description:
+      "Global entertainment, theme parks & media streaming. Place a building to create a Walt Disney tokenized stock position.",
+  },
+  {
+    kind: "pfe",
+    name: "Pfizer",
+    category: "companies",
+    ticker: "PFE",
+    image: "pfe/level_1",
+    cost: 500,
+    description:
+      "Biopharmaceutical innovation & essential medicine. Place a building to create a Pfizer tokenized stock position.",
+  },
+  {
     kind: "hall",
     name: "City Hall",
     category: "services",
@@ -344,6 +586,14 @@ export const catalogue: BuildingDef[] = [
       "A grand golden monument honoring BNB Smart Chain and the Web3 builders. A proud island landmark.",
   },
 ];
+for (const a of assets) {
+  if (!a.sprite) {
+    const def = catalogue.find((d) => d.ticker === a.ticker);
+    if (def) {
+      a.sprite = def.image.split("/")[0];
+    }
+  }
+}
 // Catalogue strictly contains the 10 Hero Companies with dedicated 4-tier isometric sprites + 4 civic services.
 // Other assets remain in the 24/7 on-chain Stock Exchange market watchlist.
 export type Building = Cell & {
