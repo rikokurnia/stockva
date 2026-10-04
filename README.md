@@ -35,7 +35,7 @@ Every corporate headquarters dynamically evolves across architectural tiers base
 - **Civic Progression Hierarchy:** Founding the **Stock Exchange** unlocks active market trading, while establishing **City Hall** enables treasury budgeting, portfolio telemetry, and on-chain settlement.
 
 ### 2. Tokenized Stocks & Dynamic Tier Evolution
-- **37+ Buildables & Assets:** Diverse equity coverage across Technology, Finance, Consumer, Energy, and Indices (e.g., Apple, Tesla, NVIDIA, Microsoft, Alphabet, Amazon, Berkshire Hathaway).
+- **100 S&P 100 Assets (115 Catalogue Entries):** 30 hero bespoke stocks plus 70 sector companies across Technology, Finance, Consumer, Energy, and Indices (e.g., Apple, Tesla, NVIDIA, Microsoft, Alphabet, Amazon, Berkshire Hathaway), plus 5 civic services including the Agent Hall.
 - **Dynamic 4-Tier Architectural State:** Corporate buildings adapt their visual presence in response to market returns:
   - **Distressed Tier:** Active when returns fall below the liquidation threshold.
   - **Level 1 (Foundation):** Standard entry-level commercial operations.
@@ -55,7 +55,12 @@ Every corporate headquarters dynamically evolves across architectural tiers base
 
 ### 5. Intelligent City Advisor
 - **Context-Aware Recommendations:** Financial and municipal advisory system conditioned on real-time city state (cash reserves, active buildings, portfolio allocation, and market movements).
-- **Resilient Fallback Design:** Dual-engine architecture with intelligent fallback heuristics ensuring continuous, prompt advice even during network disruptions.
+- **Triple-Provider Fallback (Gemini → DeepSeek → MuseSpark):** `/api/advisor` and `/api/rebalance` try the configured server AI keys in order. Without any key, both return an explicit "unavailable" error — no fabricated reviews or plans. Provider names are never exposed to the client.
+
+### 6. Agent Hall — Cokoo's Command Center
+- **Four Tabs, One Flow:** Rebalance (agent blueprint → wallet approval → city restructuring), Overview (portfolio landscape), Strategy Lab (equal-weight basket templates), and Stress Test (hypothetical ±50% shock playground).
+- **Verified-Only Rebalance:** Plans derive every transaction from read-only BNB Testnet vault positions mapped 1:1 to buildings. Changed positions fully close before rebuilding; local, draft, and unmapped holdings stay outside the plan.
+- **Review-First Execution:** Fingerprinted, expiring blueprints (5 min) with before/after allocation shift, road-connected blueprint preview, per-step receipts in City Hall, and pause/resume with hash recovery on reload.
 
 ---
 
@@ -117,14 +122,27 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Template variables:
+Template variables (see `.env.example`):
 
 ```env
-# Web3 Provider
-NEXT_PUBLIC_APP_ID=
+# Wallet login (Privy)
+NEXT_PUBLIC_PRIVY_APP_ID=
+PRIVY_APP_ID=
+PRIVY_APP_SECRET=
 
-# AI Advisory Engine (Optional — automated heuristic fallback active by default)
-AI_API_KEY=
+# AI providers for Cokoo advisor (/api/advisor) and Agent Hall rebalance (/api/rebalance).
+# Set at least one key; providers are tried in order Gemini → DeepSeek → MuseSpark.
+# Without any key, AI reviews/plans return an explicit "unavailable" error (no fabricated plans).
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-chat
+MUSESPARK_API_KEY=
+MUSESPARK_BASE_URL=https://api.musespark.ai/v1
+MUSESPARK_MODEL=muse-spark-1.3
+
+# Optional: identifying app name + contact for SEC EDGAR fair-access
+SEC_USER_AGENT=
 ```
 
 ### 3. Install Dependencies
@@ -186,13 +204,18 @@ forge test -vvv
 ```
 projects/stockcity/
 ├── app/                  # Next.js App Router (pages, layout, API routes)
-│   ├── api/              # Server endpoints (advisor, market, news, passport)
+│   ├── api/              # advisor, rebalance, market, history, research, company-news, passport, stock-logo
 │   ├── city/             # Main simulation canvas & HUD
 │   ├── layout.tsx        # Root layout with Web3 providers
 │   └── page.tsx          # Cinematic landing experience
 ├── components/           # UI components, simulation engine, and game dialogs
+│   ├── agent-hall.tsx    # Cokoo command center (Rebalance, Overview, Strategy Lab, Stress Test)
+│   ├── agent-rebalance.tsx # Agent blueprint, allocation shift, step ledger + execution dock
 │   ├── city-advisor.tsx  # Interactive AI Mayor dialogue system
-│   ├── civic-panel.tsx   # Treasury, Exchange, and On-chain Vault ledger
+│   ├── civic-panel.tsx   # Treasury, Exchange, Data Center, and On-chain Vault ledger
+│   ├── civic-city-hall.tsx # Holdings ledger, drafts, faucet, receipts
+│   ├── civic-market.tsx  # Stock Exchange research + bundle placement
+│   ├── civic-research.tsx # Data Center issuer/reserve/price evidence
 │   ├── landing-hero.tsx  # Landing page presentation
 │   ├── onchain-wallet.tsx# In-game Web3 wallet chip & modal
 │   └── stock-city.tsx    # Isometric canvas renderer & game loop
@@ -200,6 +223,10 @@ projects/stockcity/
 │   ├── src/              # StockCityVault.sol & MockUSD.sol
 │   └── script/           # Deployment scripts for BSC Testnet
 ├── lib/                  # Simulation algorithms, city state, and contract ABI
+│   ├── advisor.ts        # Snapshot + hallAnalysis prompt builders (overview/basket/stress)
+│   ├── agent-hall.ts     # Portfolio landscape, stress scenarios, basket budgets
+│   ├── rebalance.ts      # Verified-only plan builder (fingerprint, expiry, 1:1 mapping)
+│   └── rebalance-execution.ts # Receipt application + paused-execution recovery
 └── public/               # Static assets, sprites, audio, and corporate logos
 ```
 
