@@ -29,7 +29,6 @@ import {
   X,
 } from "lucide-react";
 import CityMap from "./city-map";
-import CivicPanel from "./civic-panel";
 import OnchainWallet from "./onchain-wallet";
 import { fallbackFeed, type MarketFeed } from "../lib/market";
 import {
@@ -95,6 +94,7 @@ import {
   portfolioStatus,
 } from "../lib/portfolio-view";
 const AgentHall = dynamic(() => import("./agent-hall"), { ssr: false });
+const CivicPanel = dynamic(() => import("./civic-panel"), { ssr: false });
 
 type Panel =
   "portfolio" | "market" | "settings" | "help" | "data" | "agent" | null;
@@ -1676,6 +1676,11 @@ export default function StockCity() {
           onClose={() => setPanel(null)}
           onRetry={() => setRefreshKey((n) => n + 1)}
           walletAddress={wallet}
+          onConnectWallet={async () => {
+            const account = await connectInjectedWallet();
+            setWallet(account);
+            return account;
+          }}
           onConfirmBatch={(receipts) => {
             const latest = simulationLatest.current.city;
             const byId = new Map(receipts.map((r) => [r.buildingId, r]));
@@ -1703,6 +1708,7 @@ export default function StockCity() {
           }}
           onBuyBundle={(items) => {
             if (!items.length) return "Pick at least one stock for the bundle.";
+            if (!hasExchange) return "Build the Stock Exchange on your island before placing a bundle.";
             const alreadyBuiltItem = items.find((i) => {
               const def = defFor(i.kind);
               return city.buildings.some(

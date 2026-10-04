@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assets } from "../../../lib/city";
-import {
-  sampleHistory,
-  type HistoryFeed,
-  type PricePoint,
-} from "../../../lib/market";
+import { type HistoryFeed, type PricePoint } from "../../../lib/market";
 export async function GET(request: NextRequest) {
   const ticker = request.nextUrl.searchParams.get("ticker") ?? "";
   const asset = assets.find((a) => a.ticker === ticker);
@@ -15,8 +11,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid pair" }, { status: 400 });
   const output: HistoryFeed = {
     points: [],
-    simulated: true,
-    tokenSource: "Illustrative fallback",
+    simulated: false,
+    tokenSource: "Token history unavailable",
     benchmarkSource: "Unavailable",
   };
   const [token, stock] = await Promise.allSettled([
@@ -28,7 +24,11 @@ export async function GET(request: NextRequest) {
       : Promise.resolve(null),
     fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.replace(".", "-"))}?interval=60m&range=5d`,
-      { signal: AbortSignal.timeout(8000), next: { revalidate: 60 } },
+      {
+        signal: AbortSignal.timeout(8000),
+        headers: { "User-Agent": "Mozilla/5.0" },
+        next: { revalidate: 60 },
+      },
     ).then((r) => r.json()),
   ]);
   const points = new Map<number, PricePoint>();
@@ -72,11 +72,9 @@ export async function GET(request: NextRequest) {
         if (typeof close === "number" && Number.isFinite(close) && close > 0) {
           const key = time * 1000;
           const existing = points.get(key);
-          const tokenPrice =
-            existing?.token ?? close * (1 + Math.sin(time / 10000) * 0.0012);
           points.set(key, {
+            ...existing,
             time: key,
-            token: Number(tokenPrice.toFixed(2)),
             benchmark: close,
           });
         }
@@ -84,6 +82,5 @@ export async function GET(request: NextRequest) {
     }
   }
   output.points = [...points.values()].sort((a, b) => a.time - b.time);
-  if (!output.points.length) output.points = sampleHistory(asset.price);
   return NextResponse.json(output);
 }
