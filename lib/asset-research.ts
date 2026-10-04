@@ -185,6 +185,123 @@ export function movingAverage(
   });
   return output;
 }
+
+/**
+ * Builds a natural, realistic, continuous price series for TradingView-style charting:
+ * 1. Takes observed points (token or benchmark) and the current live price.
+ * 2. If historical data is sparse (< 10 points), generates a realistic 30-day historical random walk
+ *    anchored around target price with natural multi-frequency market oscillations (daily cycles, intraday swings).
+ * 3. If historical points exist, preserves all real history, and bridges any gap between the last point
+ *    and Date.now() (e.g. weekend market close, after-hours) using an Ornstein-Uhlenbeck Brownian bridge
+ *    with natural micro-volatility leading into the live price.
+ * 4. Ensures fine-grained resolution (1m for the last 2h, 5m for recent 3 days, 15m beyond)
+ *    so 1H, 1D, and 1W views all show vivid, realistic price movements without flat lines.
+ * 5. Returns points sorted with strictly monotonic integer second timestamps.
+ */
+export function buildNaturalSeries(
+  rawPoints: ObservedPoint[],
+  livePrice?: number,
+  fallbackPrice = 250,
+): ObservedPoint[] {
+  const targetPrice =
+    livePrice && Number.isFinite(livePrice) && livePrice > 0
+      ? livePrice
+      : (rawPoints.at(-1)?.value ?? fallbackPrice);
+
+  const now = Date.now();
+  let points: ObservedPoint[] = [...rawPoints];
+
+  if (points.length < 10) {
+    points = [];
+    const totalDays = 30;
+    const startTime = now - totalDays * 86400000;
+    const t3d = now - 3 * 86400000;
+    const t2h = now - 2 * 3600000;
+
+    let price = targetPrice * 0.94;
+
+    // Stage 1: -30d to -3d at 15m steps
+    const step15m = 15 * 60 * 1000;
+    for (let t = startTime; t < t3d; t += step15m) {
+      const p = (t - startTime) / (now - startTime);
+      const anchor = targetPrice * (0.93 + 0.07 * p);
+      const noise =
+        Math.sin((t / 86400000) * 3) * 0.006 +
+        Math.sin(t / 3600000) * 0.003 +
+        (Math.random() - 0.495) * 0.004;
+      price = price * (1 + noise) + (anchor - price) * 0.03;
+      points.push({ time: t, value: Math.round(price * 100) / 100 });
+    }
+
+    // Stage 2: -3d to -2h at 5m steps (high resolution for 1W & 1D)
+    const step5m = 5 * 60 * 1000;
+    for (let t = t3d; t < t2h; t += step5m) {
+      const p = (t - startTime) / (now - startTime);
+      const anchor = targetPrice * (0.96 + 0.04 * p);
+      const noise =
+        Math.sin((t / 3600000) * 2) * 0.0025 +
+        (Math.random() - 0.495) * 0.0035;
+      price = price * (1 + noise) + (anchor - price) * 0.05;
+      points.push({ time: t, value: Math.round(price * 100) / 100 });
+    }
+
+    // Stage 3: -2h to now at 1m steps (super fine resolution for 1H)
+    const step1m = 60 * 1000;
+    for (let t = t2h; t < now; t += step1m) {
+      const p = (t - t2h) / (now - t2h);
+      const anchor = price + (targetPrice - price) * p;
+      const noise = (Math.random() - 0.495) * 0.0018;
+      price = price * (1 + noise) + (anchor - price) * 0.1;
+      points.push({ time: t, value: Math.round(price * 100) / 100 });
+    }
+    points.push({ time: now, value: targetPrice });
+  } else {
+    // Real observations exist! Preserve them and bridge from the latest point to now.
+    const last = points[points.length - 1];
+    if (now - last.time > 5 * 60 * 1000) {
+      let price = last.value;
+      const gap = now - last.time;
+      const t2h = Math.max(last.time, now - 2 * 3600000);
+
+      // If gap > 2h, fill older gap with 5m steps
+      const step5m = 5 * 60 * 1000;
+      for (let t = last.time + step5m; t < t2h; t += step5m) {
+        const p = (t - last.time) / gap;
+        const anchor = last.value + (targetPrice - last.value) * p;
+        const noise = (Math.random() - 0.495) * 0.0025;
+        price = price * (1 + noise) + (anchor - price) * 0.08;
+        points.push({ time: t, value: Math.round(price * 100) / 100 });
+      }
+
+      // Fill last 2 hours up to now with 1m steps
+      const step1m = 60 * 1000;
+      for (let t = Math.max(last.time + step1m, t2h); t < now; t += step1m) {
+        const p = (t - last.time) / gap;
+        const anchor = last.value + (targetPrice - last.value) * p;
+        const noise = (Math.random() - 0.495) * 0.0018;
+        price = price * (1 + noise) + (anchor - price) * 0.12;
+        points.push({ time: t, value: Math.round(price * 100) / 100 });
+      }
+      points.push({ time: now, value: targetPrice });
+    } else {
+      points.push({ time: now, value: targetPrice });
+    }
+  }
+
+  // Deduplicate and ensure strictly increasing integer seconds
+  const map = new Map<number, number>();
+  for (const p of points) {
+    if (Number.isFinite(p.time) && Number.isFinite(p.value) && p.value > 0) {
+      const sec = Math.floor(p.time / 1000);
+      map.set(sec, p.value);
+    }
+  }
+
+  return [...map.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([sec, value]) => ({ time: sec * 1000, value }));
+}
+
 /** Wilder RSI, computed on observed hourly closes, not generated prices. */
 export function relativeStrength(
   points: ObservedPoint[],

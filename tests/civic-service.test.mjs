@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   observedSeries,
   movingAverage,
+  buildNaturalSeries,
   relativeStrength,
   secFinancials,
 } from "../lib/asset-research.ts";
@@ -221,3 +222,35 @@ test("stock exchange supports buying single-stock bundles as well as mixed multi
   assert.equal(mixedItems.length, 5);
   assert.deepEqual(mixedItems.map((i) => i.kind), ["nvidia", "jnj", "txn", "bac", "cat"]);
 });
+
+test("buildNaturalSeries creates rich continuous history for 1h, 1d, 1w and past scrollback", () => {
+  const targetPrice = 251.31;
+  const series = buildNaturalSeries([], targetPrice);
+  assert.ok(series.length > 2000, `Expected >2000 points, got ${series.length}`);
+  
+  // Strictly monotonic time
+  for (let i = 1; i < series.length; i++) {
+    assert.ok(series[i].time > series[i - 1].time, `Timestamp must strictly increase at ${i}`);
+    assert.ok(series[i].value > 0, `Value must be positive at ${i}`);
+  }
+
+  // Final point matches target price
+  assert.equal(series[series.length - 1].value, targetPrice);
+
+  // Time window coverage
+  const now = series[series.length - 1].time;
+  const p1h = series.filter((p) => p.time >= now - 3600 * 1000);
+  const p1d = series.filter((p) => p.time >= now - 86400 * 1000);
+  const p1w = series.filter((p) => p.time >= now - 7 * 86400 * 1000);
+
+  assert.ok(p1h.length >= 30, `Expected at least 30 points in 1h, got ${p1h.length}`);
+  assert.ok(p1d.length >= 100, `Expected at least 100 points in 1d, got ${p1d.length}`);
+  assert.ok(p1w.length >= 500, `Expected at least 500 points in 1w, got ${p1w.length}`);
+
+  // Moving average MA 10 and MA 20 compute cleanly
+  const ma10 = movingAverage(series, 10);
+  const ma20 = movingAverage(series, 20);
+  assert.equal(ma10.length, series.length - 9);
+  assert.equal(ma20.length, series.length - 19);
+});
+

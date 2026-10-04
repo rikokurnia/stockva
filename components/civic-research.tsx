@@ -98,7 +98,7 @@ export default function CivicResearch(props: Props) {
   );
   const update = revision + localRevision;
   const history = useResource<HistoryFeed>(
-    `/api/history?ticker=${encodeURIComponent(ticker)}${quote?.pair ? `&pair=${encodeURIComponent(quote.pair)}` : ""}`,
+    `/api/history?ticker=${encodeURIComponent(ticker)}${quote?.pair ? `&pair=${encodeURIComponent(quote.pair)}` : ""}&range=1mo&interval=15m`,
     60000,
     update,
   );
@@ -130,6 +130,7 @@ export default function CivicResearch(props: Props) {
       ? tokenCloses
       : underlyingCloses;
   const indicators = {
+    ma10: movingAverage(closes, 10).at(-1)?.value,
     sma20: movingAverage(closes, 20).at(-1)?.value,
     sma50: movingAverage(closes, 50).at(-1)?.value,
     rsi: relativeStrength(closes),
@@ -222,7 +223,13 @@ export default function CivicResearch(props: Props) {
               )}
               <div className={styles.technicalStats}>
                 <Indicator
-                  label="SMA 20 · hourly closes"
+                  label="MA 10 · moving average"
+                  value={
+                    indicators.ma10 == null ? "—" : money(indicators.ma10)
+                  }
+                />
+                <Indicator
+                  label="MA 20 · moving average"
                   value={
                     indicators.sma20 == null ? "—" : money(indicators.sma20)
                   }

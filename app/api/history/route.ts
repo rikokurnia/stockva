@@ -9,16 +9,16 @@ export async function GET(request: NextRequest) {
   const pair = request.nextUrl.searchParams.get("pair");
   if (pair && !/^[A-Za-z0-9]{3,25}$/.test(pair))
     return NextResponse.json({ error: "Invalid pair" }, { status: 400 });
-  const range = request.nextUrl.searchParams.get("range") ?? "5y";
+  const range = request.nextUrl.searchParams.get("range") ?? "1mo";
   const interval =
     request.nextUrl.searchParams.get("interval") ??
     (range === "1d"
       ? "2m"
       : range === "5d"
-        ? "15m"
+        ? "5m"
         : range === "1mo" || range === "3mo"
-          ? "60m"
-          : "1d");
+          ? "15m"
+          : "60m");
   const krakenInterval =
     range === "1d" ? 5 : range === "5d" ? 15 : range === "1mo" ? 60 : 1440;
 
