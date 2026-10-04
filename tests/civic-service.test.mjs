@@ -4,6 +4,7 @@ import {
   observedSeries,
   movingAverage,
   buildNaturalSeries,
+  buildOhlcSeries,
   relativeStrength,
   secFinancials,
 } from "../lib/asset-research.ts";
@@ -253,4 +254,29 @@ test("buildNaturalSeries creates rich continuous history for 1h, 1d, 1w and past
   assert.equal(ma10.length, series.length - 9);
   assert.equal(ma20.length, series.length - 19);
 });
+
+test("buildOhlcSeries constructs valid TradingView candlesticks and volume for 1h, 1d, 1w", () => {
+  const targetPrice = 251.31;
+  const series = buildNaturalSeries([], targetPrice);
+
+  for (const tf of ["1h", "1d", "1w"]) {
+    const bars = buildOhlcSeries(series, tf);
+    assert.ok(bars.length > 50, `Expected >50 bars for ${tf}, got ${bars.length}`);
+
+    // Verify OHLC candle validity
+    for (let i = 0; i < bars.length; i++) {
+      const b = bars[i];
+      assert.ok(b.high >= b.low, `High must be >= low at ${i}`);
+      assert.ok(b.high >= b.open, `High must be >= open at ${i}`);
+      assert.ok(b.high >= b.close, `High must be >= close at ${i}`);
+      assert.ok(b.low <= b.open, `Low must be <= open at ${i}`);
+      assert.ok(b.low <= b.close, `Low must be <= close at ${i}`);
+      assert.ok(b.volume > 0, `Volume must be positive at ${i}`);
+      if (i > 0) {
+        assert.ok(b.time > bars[i - 1].time, `Bar timestamps must increase strictly at ${i}`);
+      }
+    }
+  }
+});
+
 

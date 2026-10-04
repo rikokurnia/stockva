@@ -2,7 +2,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
+  CandlestickSeries,
+  AreaSeries,
   LineSeries,
+  HistogramSeries,
   ColorType,
   LineStyle,
   type IChartApi,
@@ -14,7 +17,8 @@ import {
   movingAverage,
   observedSeries,
   buildNaturalSeries,
-  type ObservedPoint,
+  buildOhlcSeries,
+  type OhlcBar,
 } from "../lib/asset-research";
 import type { HistoryFeed } from "../lib/market";
 import { stamp } from "../lib/civic";
@@ -33,17 +37,24 @@ export default function ObservedChart({
 }) {
   const element = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
+
+  // TradingView Series References
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const areaSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const refLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ma10Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
 
   // Time range restricted strictly to: 1h, 1d, 1w
   const [range, setRange] = useState<"1h" | "1d" | "1w">("1d");
+  const [chartType, setChartType] = useState<"candles" | "area">("candles");
   const [source, setSource] = useState<"token" | "benchmark">("token");
-  // Technical indicators: MA 10 + MA 20
+
+  // Technical indicators: MA 10 + MA 20 + Volume
   const [showMA10, setShowMA10] = useState(true);
   const [showMA20, setShowMA20] = useState(true);
+  const [showVolume, setShowVolume] = useState(true);
   const [hover, setHover] = useState("");
 
   // Extract raw observations from API
@@ -97,25 +108,53 @@ export default function ObservedChart({
     onSourceChange?.(actualSource === "Token" ? "token" : "benchmark");
   }, [actualSource, onSourceChange]);
 
-  // Compute MA 10 and MA 20 on the entire series so visible range has no cold start
-  const ma10Series = useMemo(() => movingAverage(primary, 10), [primary]);
-  const ma20Series = useMemo(() => movingAverage(primary, 20), [primary]);
+  // Build TradingView OHLC candlesticks & Volume bars matched to selected timeframe
+  const ohlcBars: OhlcBar[] = useMemo(
+    () => buildOhlcSeries(primary, range),
+    [primary, range],
+  );
+
+  // Compute MA 10 and MA 20 on bar closes across the full history
+  const closeSeries = useMemo(
+    () => ohlcBars.map((b) => ({ time: b.time, value: b.close })),
+    [ohlcBars],
+  );
+  const ma10Series = useMemo(() => movingAverage(closeSeries, 10), [closeSeries]);
+  const ma20Series = useMemo(() => movingAverage(closeSeries, 20), [closeSeries]);
 
   const latestMA10 = ma10Series.at(-1)?.value;
   const latestMA20 = ma20Series.at(-1)?.value;
 
-  const formatData = (pts: ObservedPoint[]) => {
-    const map = new Map<number, number>();
-    for (const p of pts) {
-      map.set(Math.floor(p.time / 1000), p.value);
-    }
-    return [...map.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([sec, value]) => ({
-        time: sec as UTCTimestamp,
-        value,
-      }));
-  };
+  const formatCandleData = (bars: OhlcBar[]) =>
+    bars.map((b) => ({
+      time: Math.floor(b.time / 1000) as UTCTimestamp,
+      open: b.open,
+      high: b.high,
+      low: b.low,
+      close: b.close,
+    }));
+
+  const formatAreaData = (bars: OhlcBar[]) =>
+    bars.map((b) => ({
+      time: Math.floor(b.time / 1000) as UTCTimestamp,
+      value: b.close,
+    }));
+
+  const formatVolumeData = (bars: OhlcBar[]) =>
+    bars.map((b) => ({
+      time: Math.floor(b.time / 1000) as UTCTimestamp,
+      value: b.volume,
+      color:
+        b.close >= b.open
+          ? "rgba(16, 185, 129, 0.45)"
+          : "rgba(239, 68, 68, 0.45)",
+    }));
+
+  const formatLineData = (pts: { time: number; value: number }[]) =>
+    pts.map((p) => ({
+      time: Math.floor(p.time / 1000) as UTCTimestamp,
+      value: p.value,
+    }));
 
   const applyVisibleRange = (
     targetRange: "1h" | "1d" | "1w",
@@ -132,7 +171,7 @@ export default function ObservedChart({
   // Main chart initialization
   useEffect(() => {
     setHover("");
-    if (!element.current || !primary.length) return;
+    if (!element.current || !ohlcBars.length) return;
 
     const chart = createChart(element.current, {
       autoSize: true,
@@ -155,13 +194,13 @@ export default function ObservedChart({
       },
       rightPriceScale: {
         borderColor: "#233b4b",
-        scaleMargins: { top: 0.1, bottom: 0.1 },
+        scaleMargins: { top: 0.08, bottom: 0.22 }, // leaves 22% space at bottom for volume
       },
       timeScale: {
         borderColor: "#233b4b",
         timeVisible: true,
         secondsVisible: false,
-        minBarSpacing: 0.5,
+        minBarSpacing: 1,
         fixLeftEdge: false,
         fixRightEdge: false,
         rightOffset: 6,
@@ -184,17 +223,65 @@ export default function ObservedChart({
     });
     chartRef.current = chart;
 
-    // Primary price line
-    const line = chart.addSeries(LineSeries, {
-      color: actualSource === "Token" ? "#38bdf8" : "#10b981",
+    // 1. Candlestick Series (TradingView Standard OHLC)
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: "#10b981",
+      downColor: "#ef4444",
+      borderVisible: true,
+      borderUpColor: "#10b981",
+      borderDownColor: "#ef4444",
+      wickUpColor: "#10b981",
+      wickDownColor: "#ef4444",
+      title: actualSource,
+    });
+    candleSeriesRef.current = candleSeries;
+
+    // 2. Area Series (Sleek glowing gradient view)
+    const areaColor = actualSource === "Token" ? "#38bdf8" : "#10b981";
+    const areaSeries = chart.addSeries(AreaSeries, {
+      lineColor: areaColor,
+      topColor:
+        actualSource === "Token"
+          ? "rgba(56, 189, 248, 0.35)"
+          : "rgba(16, 185, 129, 0.35)",
+      bottomColor: "rgba(13, 27, 36, 0.0)",
       lineWidth: 2,
       priceLineVisible: true,
       title: actualSource,
     });
-    lineRef.current = line;
-    line.setData(formatData(primary));
+    areaSeriesRef.current = areaSeries;
 
-    // Optional comparison reference series
+    // 3. Volume Histogram Series (Bottom overlay)
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      priceFormat: {
+        type: "volume",
+      },
+      priceScaleId: "", // overlay scale
+    });
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.8, // volume bars occupy bottom 20%
+        bottom: 0,
+      },
+    });
+    volumeSeriesRef.current = volumeSeries;
+
+    // Apply primary data based on selected chart type
+    if (chartType === "candles") {
+      candleSeries.setData(formatCandleData(ohlcBars));
+      areaSeries.setData([]);
+    } else {
+      areaSeries.setData(formatAreaData(ohlcBars));
+      candleSeries.setData([]);
+    }
+
+    if (showVolume) {
+      volumeSeries.setData(formatVolumeData(ohlcBars));
+    } else {
+      volumeSeries.setData([]);
+    }
+
+    // 4. Comparison Reference line (if compare enabled)
     if (compare && benchmarkSeries.length) {
       const reference = chart.addSeries(LineSeries, {
         color: "#f0b90b",
@@ -204,10 +291,10 @@ export default function ObservedChart({
         title: "Underlying",
       });
       refLineRef.current = reference;
-      reference.setData(formatData(benchmarkSeries));
+      reference.setData(formatLineData(benchmarkSeries));
     }
 
-    // MA 10 series (amber/gold)
+    // 5. MA 10 series (amber/gold)
     const ma10 = chart.addSeries(LineSeries, {
       color: "#f59e0b",
       lineWidth: 2,
@@ -216,9 +303,9 @@ export default function ObservedChart({
       title: "MA 10",
     });
     ma10Ref.current = ma10;
-    ma10.setData(showMA10 && !compare ? formatData(ma10Series) : []);
+    ma10.setData(showMA10 && !compare ? formatLineData(ma10Series) : []);
 
-    // MA 20 series (purple/violet)
+    // 6. MA 20 series (purple/violet)
     const ma20 = chart.addSeries(LineSeries, {
       color: "#a78bfa",
       lineWidth: 2,
@@ -227,85 +314,156 @@ export default function ObservedChart({
       title: "MA 20",
     });
     ma20Ref.current = ma20;
-    ma20.setData(showMA20 && !compare ? formatData(ma20Series) : []);
+    ma20.setData(showMA20 && !compare ? formatLineData(ma20Series) : []);
 
-    // Crosshair hover tooltip
+    // Crosshair hover tooltip (TradingView OHLC + Volume readout)
     chart.subscribeCrosshairMove((event) => {
       if (!event.time || typeof event.time !== "number") {
         setHover("");
         return;
       }
-      const pVal = event.seriesData.get(line);
-      const m10Val = event.seriesData.get(ma10);
-      const m20Val = event.seriesData.get(ma20);
+      const cVal = candleSeriesRef.current
+        ? (event.seriesData.get(candleSeriesRef.current) as
+            | { open?: number; high?: number; low?: number; close?: number }
+            | undefined)
+        : undefined;
+      const aVal = areaSeriesRef.current
+        ? (event.seriesData.get(areaSeriesRef.current) as
+            | { value?: number }
+            | undefined)
+        : undefined;
+      const volVal = volumeSeriesRef.current
+        ? (event.seriesData.get(volumeSeriesRef.current) as
+            | { value?: number }
+            | undefined)
+        : undefined;
+      const m10Val = ma10Ref.current
+        ? (event.seriesData.get(ma10Ref.current) as
+            | { value?: number }
+            | undefined)
+        : undefined;
+      const m20Val = ma20Ref.current
+        ? (event.seriesData.get(ma20Ref.current) as
+            | { value?: number }
+            | undefined)
+        : undefined;
 
       const parts: string[] = [];
-      if (pVal && "value" in pVal) {
-        parts.push(`${actualSource} ${money(pVal.value)}`);
+      if (
+        cVal &&
+        typeof cVal.open === "number" &&
+        typeof cVal.high === "number" &&
+        typeof cVal.low === "number" &&
+        typeof cVal.close === "number"
+      ) {
+        parts.push(
+          `O: ${money(cVal.open)} · H: ${money(cVal.high)} · L: ${money(cVal.low)} · C: ${money(cVal.close)}`,
+        );
+      } else if (aVal && typeof aVal.value === "number") {
+        parts.push(`${actualSource}: ${money(aVal.value)}`);
       }
-      if (showMA10 && !compare && m10Val && "value" in m10Val) {
-        parts.push(`MA 10 ${money(m10Val.value)}`);
+      if (volVal && typeof volVal.value === "number") {
+        const v = volVal.value;
+        const volText =
+          v >= 1000000
+            ? `${(v / 1000000).toFixed(1)}M`
+            : `${(v / 1000).toFixed(1)}K`;
+        parts.push(`Vol: ${volText}`);
       }
-      if (showMA20 && !compare && m20Val && "value" in m20Val) {
-        parts.push(`MA 20 ${money(m20Val.value)}`);
+      if (showMA10 && !compare && m10Val && typeof m10Val.value === "number") {
+        parts.push(`MA 10: ${money(m10Val.value)}`);
+      }
+      if (showMA20 && !compare && m20Val && typeof m20Val.value === "number") {
+        parts.push(`MA 20: ${money(m20Val.value)}`);
       }
       parts.push(stamp(new Date(event.time * 1000).toISOString()));
       setHover(parts.join(" · "));
     });
 
     // Set initial visible range
-    const lastSec = Math.floor(primary[primary.length - 1].time / 1000);
+    const lastSec = Math.floor(ohlcBars[ohlcBars.length - 1].time / 1000);
     applyVisibleRange(range, chart, lastSec);
 
     return () => {
       chartRef.current = null;
-      lineRef.current = null;
+      candleSeriesRef.current = null;
+      areaSeriesRef.current = null;
+      volumeSeriesRef.current = null;
       refLineRef.current = null;
       ma10Ref.current = null;
       ma20Ref.current = null;
       chart.remove();
     };
   }, [
-    primary,
+    ohlcBars,
     benchmarkSeries,
     compare,
     actualSource,
   ]);
 
-  // Smoothly adjust visible range when user clicks 1H, 1D, or 1W
+  // Adjust visible range when user clicks 1H, 1D, or 1W
   useEffect(() => {
-    if (!chartRef.current || !primary.length) return;
-    const lastSec = Math.floor(primary[primary.length - 1].time / 1000);
+    if (!chartRef.current || !ohlcBars.length) return;
+    const lastSec = Math.floor(ohlcBars[ohlcBars.length - 1].time / 1000);
     applyVisibleRange(range, chartRef.current, lastSec);
-  }, [range, primary]);
+  }, [range, ohlcBars]);
 
-  // Instant toggle for MA 10 series without full chart rebuild
+  // Toggle chart type (Candlesticks vs. Area) instantly without recreating chart
+  useEffect(() => {
+    if (!candleSeriesRef.current || !areaSeriesRef.current) return;
+    if (chartType === "candles") {
+      candleSeriesRef.current.setData(formatCandleData(ohlcBars));
+      areaSeriesRef.current.setData([]);
+    } else {
+      areaSeriesRef.current.setData(formatAreaData(ohlcBars));
+      candleSeriesRef.current.setData([]);
+    }
+  }, [chartType, ohlcBars]);
+
+  // Toggle Volume histogram
+  useEffect(() => {
+    if (!volumeSeriesRef.current) return;
+    volumeSeriesRef.current.setData(
+      showVolume ? formatVolumeData(ohlcBars) : [],
+    );
+  }, [showVolume, ohlcBars]);
+
+  // Instant toggle for MA 10
   useEffect(() => {
     if (!ma10Ref.current) return;
-    ma10Ref.current.setData(showMA10 && !compare ? formatData(ma10Series) : []);
+    ma10Ref.current.setData(
+      showMA10 && !compare ? formatLineData(ma10Series) : [],
+    );
   }, [showMA10, ma10Series, compare]);
 
-  // Instant toggle for MA 20 series without full chart rebuild
+  // Instant toggle for MA 20
   useEffect(() => {
     if (!ma20Ref.current) return;
-    ma20Ref.current.setData(showMA20 && !compare ? formatData(ma20Series) : []);
+    ma20Ref.current.setData(
+      showMA20 && !compare ? formatLineData(ma20Series) : [],
+    );
   }, [showMA20, ma20Series, compare]);
 
   // Realtime update when live price tick arrives
   useEffect(() => {
-    if (
-      !lineRef.current ||
-      !livePrice ||
-      livePrice <= 0 ||
-      !Number.isFinite(livePrice)
-    )
-      return;
+    if (!livePrice || livePrice <= 0 || !Number.isFinite(livePrice)) return;
     try {
       const sec = Math.floor(Date.now() / 1000) as UTCTimestamp;
-      lineRef.current.update({
-        time: sec,
-        value: livePrice,
-      });
+      if (chartType === "candles" && candleSeriesRef.current && ohlcBars.length) {
+        const lastBar = ohlcBars[ohlcBars.length - 1];
+        candleSeriesRef.current.update({
+          time: Math.floor(lastBar.time / 1000) as UTCTimestamp,
+          open: lastBar.open,
+          high: Math.max(lastBar.high, livePrice),
+          low: Math.min(lastBar.low, livePrice),
+          close: livePrice,
+        });
+      } else if (areaSeriesRef.current) {
+        areaSeriesRef.current.update({
+          time: sec,
+          value: livePrice,
+        });
+      }
       if (showMA10 && ma10Ref.current && latestMA10) {
         ma10Ref.current.update({
           time: sec,
@@ -319,9 +477,9 @@ export default function ObservedChart({
         });
       }
     } catch {
-      // Ignore if historical timestamps exceed current client clock
+      // Ignore if timestamps exceed client clock
     }
-  }, [livePrice, showMA10, showMA20, latestMA10, latestMA20]);
+  }, [livePrice, chartType, showMA10, showMA20, latestMA10, latestMA20, ohlcBars]);
 
   return (
     <>
@@ -363,6 +521,7 @@ export default function ObservedChart({
           )}
         </div>
         <div className={styles.chartControls}>
+          {/* Source toggle */}
           {!compare && tokenSeries.length > 0 && benchmarkSeries.length > 0 && (
             <>
               <button
@@ -379,27 +538,47 @@ export default function ObservedChart({
               </button>
             </>
           )}
+
+          {/* Chart Type: Candlestick vs Area */}
+          <button
+            aria-pressed={chartType === "candles"}
+            onClick={() => setChartType("candles")}
+            title="Japanese Candlesticks (OHLC)"
+          >
+            Candles
+          </button>
+          <button
+            aria-pressed={chartType === "area"}
+            onClick={() => setChartType("area")}
+            title="Area Line with Gradient"
+          >
+            Area
+          </button>
+
+          {/* Timeframe buttons: 1H, 1D, 1W strictly */}
           <button
             aria-pressed={range === "1h"}
             onClick={() => setRange("1h")}
-            title="Last 1 Hour (Minute detail · pan left for past history)"
+            title="Last 1 Hour (1-minute candles · pan left for past history)"
           >
             1H
           </button>
           <button
             aria-pressed={range === "1d"}
             onClick={() => setRange("1d")}
-            title="Last 24 Hours (Intraday · pan left for past history)"
+            title="Last 24 Hours (5-minute candles · pan left for past history)"
           >
             1D
           </button>
           <button
             aria-pressed={range === "1w"}
             onClick={() => setRange("1w")}
-            title="Last 7 Days (Multi-day · pan left for past history)"
+            title="Last 7 Days (15-minute candles · pan left for past history)"
           >
             1W
           </button>
+
+          {/* Technical indicators: MA 10, MA 20, Volume */}
           {!compare && (
             <>
               <button
@@ -418,20 +597,27 @@ export default function ObservedChart({
               >
                 MA 20
               </button>
+              <button
+                aria-pressed={showVolume}
+                onClick={() => setShowVolume((value) => !value)}
+                title="Volume Histogram"
+              >
+                Vol
+              </button>
             </>
           )}
         </div>
       </div>
       <p className={styles.chartReadout}>
         {hover ||
-          `${range.toUpperCase()} view (${primary.length} points) · Drag or scroll horizontally to explore past history`}
+          `${range.toUpperCase()} view (${ohlcBars.length} ${chartType === "candles" ? "candles" : "bars"}) · Drag or scroll horizontally to explore past history`}
       </p>
-      {primary.length ? (
+      {ohlcBars.length ? (
         <div
           ref={element}
           className={styles.chart}
           role="img"
-          aria-label={`${actualSource} price history chart with MA 10 and MA 20 technical indicators. Drag or scroll to explore past history.`}
+          aria-label={`${actualSource} TradingView chart with ${chartType} view, volume histogram, and MA 10 / MA 20 indicators.`}
         />
       ) : (
         <div className={styles.empty}>
@@ -443,7 +629,12 @@ export default function ObservedChart({
         <span>
           <i
             style={{
-              background: actualSource === "Token" ? "#38bdf8" : "#10b981",
+              background:
+                chartType === "candles"
+                  ? "#10b981"
+                  : actualSource === "Token"
+                    ? "#38bdf8"
+                    : "#10b981",
             }}
           />
           {actualSource === "Token"
@@ -466,6 +657,12 @@ export default function ObservedChart({
           <span>
             <i style={{ background: "#a78bfa" }} />
             MA 20 {latestMA20 ? `· ${money(latestMA20)}` : ""}
+          </span>
+        )}
+        {showVolume && !compare && (
+          <span>
+            <i style={{ background: "rgba(16, 185, 129, 0.6)" }} />
+            Volume
           </span>
         )}
       </div>
