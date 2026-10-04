@@ -155,6 +155,10 @@ export default function StockCity() {
   const [wallet, setWallet] = useState<`0x${string}` | null>(null);
   const [agentExecution, setAgentExecution] =
     useState<RebalanceExecution | null>(null);
+  const [dockDismissed, setDockDismissed] = useState<{
+    id: string;
+    status: string;
+  } | null>(null);
   const executionRef = useRef<RebalanceExecution | null>(null);
   const agentRunning = useRef(false);
   const [agentActivity, setAgentActivity] = useState<AgentMapActivity | null>(
@@ -2283,12 +2287,32 @@ export default function StockCity() {
           }}
         />
       )}
-      {agentExecution && panel !== "agent" && (
-        <AgentExecutionDock
-          execution={agentExecution}
-          onOpen={() => setPanel("agent")}
-        />
-      )}
+      {agentExecution &&
+        panel !== "agent" &&
+        !(
+          dockDismissed?.id === agentExecution.plan.id &&
+          dockDismissed?.status === agentExecution.status
+        ) && (
+          <AgentExecutionDock
+            execution={agentExecution}
+            onOpen={() => setPanel("agent")}
+            onClose={() => {
+              if (agentExecution.status === "completed") {
+                // Receipts already live in City Hall; drop the finished run so it stays dismissed.
+                localStorage.removeItem(REBALANCE_STORAGE);
+                executionRef.current = null;
+                setAgentExecution(null);
+                setAgentActivity(null);
+              } else {
+                // In-flight or paused runs stay resumable; hide only until the status changes.
+                setDockDismissed({
+                  id: agentExecution.plan.id,
+                  status: agentExecution.status,
+                });
+              }
+            }}
+          />
+        )}
       {panel && !["portfolio", "market", "data", "agent"].includes(panel) && (
         <aside
           ref={panelRef}

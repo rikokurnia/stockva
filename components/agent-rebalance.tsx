@@ -19,6 +19,7 @@ import {
   Sparkles,
   Trash2,
   Wallet,
+  X,
 } from "lucide-react";
 import {
   catalogue,
@@ -1074,9 +1075,11 @@ export default function AgentRebalance({
 export function AgentExecutionDock({
   execution,
   onOpen,
+  onClose,
 }: {
   execution: RebalanceExecution;
   onOpen: () => void;
+  onClose: () => void;
 }) {
   const confirmed = execution.steps.filter(
     (step) => step.status === "confirmed",
@@ -1116,6 +1119,14 @@ export function AgentExecutionDock({
         ) : (
           <StatusIcon progress={progress} />
         )}
+        <button
+          type="button"
+          className={styles.dockClose}
+          onClick={onClose}
+          aria-label="Dismiss notification"
+        >
+          <X size={15} aria-hidden="true" />
+        </button>
       </div>
       <p>
         {execution.status === "completed"

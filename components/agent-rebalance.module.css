@@ -1005,6 +1005,19 @@
 .dock[data-status="completed"] .dockHeader > svg {
   color: #71d3af;
 }
+.dock .dockClose {
+  width: auto;
+  min-height: 0;
+  padding: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #a7bac5;
+  flex-shrink: 0;
+}
+.dock .dockClose:hover {
+  color: #e7eef2;
+  border-color: #49606f;
+}
 @media (hover: hover) {
   .primary:hover:not(:disabled) {
     background: color-mix(in srgb, var(--rb-accent) 85%, white);
