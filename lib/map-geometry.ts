@@ -6,6 +6,98 @@ export const project = (p: GroundPoint, height = 0) => ({
   x: 640 + p.x - p.y,
   y: 350 + (p.x + p.y) * 0.5625 - height,
 });
+export type ViewportRect = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+export type InspectorPlacement = {
+  left: number;
+  top: number;
+  width: number;
+  maxHeight: number;
+};
+const INSPECTOR_EDGE = 8;
+const INSPECTOR_GAP = 12;
+const INSPECTOR_HEADER = 64;
+const INSPECTOR_WIDTH = 308;
+const INSPECTOR_MIN_VISIBLE = 200;
+const overlapsX = (
+  left: number,
+  width: number,
+  other: { left: number; right: number },
+) =>
+  // Ignore grazes under 24px (rounded corners / borders); only real overlaps
+  // force the card to end above the advisor.
+  left + 24 < other.right && left + width - 24 > other.left;
+const clamp = (value: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, value));
+/**
+ * Dock the building inspector card beside a selected building without
+ * covering it and without sliding under the AI advisor (bottom-right).
+ * Returns null when there is no building rect, letting CSS docking apply.
+ */
+export function inspectorPlacement(
+  viewport: { w: number; h: number },
+  building: ViewportRect | null,
+  advisor: { left: number; top: number; right: number } | null,
+): InspectorPlacement | null {
+  const { w, h } = viewport;
+  if (!building || w <= 0 || h <= 0) return null;
+  const width =
+    w < 560 ? w - INSPECTOR_EDGE * 2 : Math.min(INSPECTOR_WIDTH, w - INSPECTOR_EDGE * 2);
+  const bottomLimit = (left: number) =>
+    advisor && overlapsX(left, width, advisor)
+      ? advisor.top - INSPECTOR_GAP
+      : h - INSPECTOR_EDGE;
+  const spaceRight = w - INSPECTOR_EDGE - (building.right + INSPECTOR_GAP);
+  const spaceLeft = building.left - INSPECTOR_GAP - INSPECTOR_EDGE;
+  if (spaceRight >= width) {
+    const left = clamp(
+      building.right + INSPECTOR_GAP,
+      INSPECTOR_EDGE,
+      w - INSPECTOR_EDGE - width,
+    );
+    const limit = bottomLimit(left);
+    const top = clamp(building.top - 24, INSPECTOR_HEADER, limit - 120);
+    return { left, top, width, maxHeight: Math.max(160, limit - top) };
+  }
+  if (spaceLeft >= width) {
+    const left = clamp(
+      building.left - INSPECTOR_GAP - width,
+      INSPECTOR_EDGE,
+      w - INSPECTOR_EDGE - width,
+    );
+    const limit = bottomLimit(left);
+    const top = clamp(building.top - 24, INSPECTOR_HEADER, limit - 120);
+    return { left, top, width, maxHeight: Math.max(160, limit - top) };
+  }
+  // Narrow screen: stack the card above or below the building instead.
+  const left = clamp(
+    (building.left + building.right) / 2 - width / 2,
+    INSPECTOR_EDGE,
+    w - INSPECTOR_EDGE - width,
+  );
+  const limit = bottomLimit(left);
+  const below = limit - (building.bottom + INSPECTOR_GAP);
+  if (below >= 260) {
+    const top = building.bottom + INSPECTOR_GAP;
+    return { left, top, width, maxHeight: Math.max(160, limit - top) };
+  }
+  const roomAbove = building.top - INSPECTOR_GAP - INSPECTOR_HEADER;
+  const maxHeight = Math.max(160, roomAbove);
+  const top = Math.max(
+    INSPECTOR_HEADER,
+    building.top - INSPECTOR_GAP - Math.min(420, maxHeight),
+  );
+  return {
+    left,
+    top,
+    width,
+    maxHeight: Math.max(160, building.top - INSPECTOR_GAP - top),
+  };
+}
 export function cameraBounds(
   w: number,
   h: number,

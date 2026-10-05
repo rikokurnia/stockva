@@ -30,6 +30,7 @@ import {
   X,
 } from "lucide-react";
 import CityMap, { type AgentMapActivity } from "./city-map";
+import { inspectorPlacement } from "../lib/map-geometry";
 import { rebalanceFingerprint, type RebalancePlan } from "../lib/rebalance";
 import {
   applyRebalanceReceipt,
@@ -235,6 +236,9 @@ export default function StockCity() {
     c: number;
     nonce: number;
   } | null>(null);
+  const [inspectorStyle, setInspectorStyle] =
+    useState<React.CSSProperties | null>(null);
+  const inspectorStyleKey = useRef("dock");
   const hasHall = city.buildings.some((b) => b.kind === "hall");
   const hasExchange = city.buildings.some((b) => b.kind === "exchange");
   const hasData = city.buildings.some((b) => b.kind === "oracle");
@@ -1544,6 +1548,86 @@ export default function StockCity() {
         resetRef.current?.querySelector<HTMLButtonElement>("button")?.focus(),
       );
   }, [confirmReset]);
+  const inspectorOpen = Boolean(
+    current && definition && tool === "inspect" && !panel && !scanMode && !intelBuilding,
+  );
+  const placeInspector = useCallback(() => {
+    if (typeof window === "undefined" || !selected) return;
+    const node = document.querySelector(
+      `[data-building-id="${CSS.escape(selected)}"]`,
+    );
+    const rect = node?.getBoundingClientRect() ?? null;
+    const advisor = document.querySelector('aside[aria-label="cokoo"]');
+    const advisorRect = advisor?.getBoundingClientRect() ?? null;
+    const next = inspectorPlacement(
+      { w: window.innerWidth, h: window.innerHeight },
+      rect
+        ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+        : null,
+      advisorRect
+        ? { left: advisorRect.left, top: advisorRect.top, right: advisorRect.right }
+        : null,
+    );
+    const key = next
+      ? `${next.left}|${next.top}|${next.width}|${next.maxHeight}`
+      : "dock";
+    if (inspectorStyleKey.current !== key) {
+      inspectorStyleKey.current = key;
+      setInspectorStyle(
+        next
+          ? {
+              position: "fixed",
+              left: next.left,
+              top: next.top,
+              width: next.width,
+              maxHeight: next.maxHeight,
+              right: "auto",
+              bottom: "auto",
+            }
+          : null,
+      );
+    }
+  }, [selected]);
+  useEffect(() => {
+    if (!inspectorOpen) {
+      if (inspectorStyleKey.current !== "dock") {
+        inspectorStyleKey.current = "dock";
+        setInspectorStyle(null);
+      }
+      return;
+    }
+    placeInspector();
+    let raf = 0;
+    let last = "";
+    const snapshot = () => {
+      const node = selected
+        ? document.querySelector(`[data-building-id="${CSS.escape(selected)}"]`)
+        : null;
+      const rect = node?.getBoundingClientRect();
+      const advisor = document.querySelector('aside[aria-label="cokoo"]');
+      const advisorRect = advisor?.getBoundingClientRect();
+      return [
+        window.innerWidth,
+        window.innerHeight,
+        rect ? `${rect.left},${rect.top},${rect.width},${rect.height}` : "gone",
+        advisorRect ? `${advisorRect.left},${advisorRect.top},${advisorRect.right}` : "none",
+      ].join("|");
+    };
+    const tick = () => {
+      const currentSnapshot = snapshot();
+      if (currentSnapshot !== last) {
+        last = currentSnapshot;
+        placeInspector();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    window.addEventListener("resize", placeInspector);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", placeInspector);
+    };
+  }, [inspectorOpen, placeInspector, selected, zoom]);
   const steps = [
     city.roads.length > 0,
     hasExchange,
@@ -1965,7 +2049,11 @@ export default function StockCity() {
         !panel &&
         !scanMode &&
         !intelBuilding && (
-          <aside className="inspection-panel" aria-label="Selected building">
+          <aside
+            className="inspection-panel"
+            aria-label="Selected building"
+            style={inspectorStyle ?? undefined}
+          >
             <header>
               <div>
                 <small>
@@ -2014,6 +2102,7 @@ export default function StockCity() {
                   ),
                 )}
                 alt={definition.name}
+                draggable={false}
               />
               <span>
                 {definition.ticker

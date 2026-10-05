@@ -1761,7 +1761,8 @@ input {
 }
 .inspection-art {
   position: relative;
-  height: 143px;
+  height: 152px;
+  min-height: 152px;
   overflow: hidden;
   background:
     radial-gradient(ellipse at 50% 100%, #64826c65, transparent 75%),
@@ -1777,12 +1778,17 @@ input {
   position: absolute;
   bottom: 9px;
   left: 50%;
-  width: 164px;
+  height: 130px;
+  width: auto;
+  max-width: 84%;
+  object-fit: contain;
   transform: translateX(-50%);
   filter: drop-shadow(2px 5px 3px #061c3150);
 }
 .inspection-art.services > img {
-  width: 128px;
+  height: 106px;
+  width: auto;
+  max-width: 80%;
   bottom: 8px;
 }
 .inspection-art > span {
