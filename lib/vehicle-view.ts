@@ -9,6 +9,18 @@ export const VEHICLE_LABELS: Record<Vehicle, string> = {
   construction_truck: "Construction truck",
   maintenance_van: "Maintenance van",
 };
+/**
+ * Scales the traffic fleet with user-placed roads:
+ * Starts with the 3 base vehicles, adding another trio every 5 placed roads.
+ */
+export function trafficFleet(roadCount: number): Vehicle[] {
+  const sets = 1 + Math.floor(Math.max(0, roadCount) / 5);
+  const fleet: Vehicle[] = [];
+  for (let s = 0; s < sets; s++) {
+    fleet.push(...VEHICLES);
+  }
+  return fleet;
+}
 export const DIRECTIONS = [
   "lower_right",
   "down",

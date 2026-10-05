@@ -306,8 +306,14 @@ test("vehicle paths have continuous positions and headings through corners and d
   }
 });
 
-const { vehicleView, vehicleSize, VEHICLES, DIRECTIONS, screenHeading } =
-  await import("../lib/vehicle-view.ts");
+const {
+  vehicleView,
+  vehicleSize,
+  VEHICLES,
+  DIRECTIONS,
+  screenHeading,
+  trafficFleet,
+} = await import("../lib/vehicle-view.ts");
 test("vehicle art follows all eight road headings without mirroring", () => {
   for (let i = 0; i < 8; i++) {
     const view = vehicleView((i * Math.PI) / 4);
@@ -362,6 +368,31 @@ test("each original vehicle has all eight local image frames with valid crop bou
       if (direction.startsWith("upper"))
         assert.ok(f.src.endsWith(`${direction}.webp`));
     }
+});
+
+test("traffic fleet scales by adding all 3 vehicle types every 5 placed road tiles", () => {
+  assert.equal(trafficFleet(0).length, 3);
+  assert.deepEqual(trafficFleet(0), [
+    "electric_bus",
+    "construction_truck",
+    "maintenance_van",
+  ]);
+  assert.equal(trafficFleet(3).length, 3);
+  assert.equal(trafficFleet(4).length, 3);
+  assert.equal(trafficFleet(5).length, 6);
+  assert.deepEqual(trafficFleet(5), [
+    "electric_bus",
+    "construction_truck",
+    "maintenance_van",
+    "electric_bus",
+    "construction_truck",
+    "maintenance_van",
+  ]);
+  assert.equal(trafficFleet(9).length, 6);
+  assert.equal(trafficFleet(10).length, 9);
+  assert.equal(trafficFleet(14).length, 9);
+  assert.equal(trafficFleet(15).length, 12);
+  assert.equal(trafficFleet(20).length, 15);
 });
 
 test("progression rejects company construction without an Exchange, including after demolition", () => {

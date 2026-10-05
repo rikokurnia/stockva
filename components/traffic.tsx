@@ -7,6 +7,7 @@ import {
   VEHICLE_LABELS,
   vehicleView,
   vehicleSize,
+  trafficFleet,
   type Vehicle,
   type Direction,
 } from "../lib/vehicle-view";
@@ -24,6 +25,7 @@ export default function Traffic({
   speed: number;
 }) {
   const samples = useMemo(() => trafficSamples(trafficRoute(roads)), [roads]);
+  const fleet = useMemo(() => trafficFleet(roads.length), [roads.length]);
   const refs = useRef<(SVGSVGElement | null)[]>([]);
   const clock = useRef(0);
   useEffect(() => {
@@ -46,15 +48,17 @@ export default function Traffic({
       if (!paused)
         clock.current += (Math.min(now - last, 60) / 1000) * speed * 12;
       last = now;
-      refs.current.forEach((el, i) => {
+      const count = fleet.length;
+      const totalDistance = samples.at(-1)?.distance || 1;
+      fleet.forEach((vehicle, i) => {
+        const el = refs.current[i];
         if (!el) return;
         const pose = sampleTraffic(
           samples,
-          clock.current + (i * samples.at(-1)!.distance) / 3,
+          clock.current + (i * totalDistance) / count,
         );
         const center = project(pose),
-          view = vehicleView(pose.angle),
-          vehicle = VEHICLES[i];
+          view = vehicleView(pose.angle);
         const asset = assets[vehicle][view.direction],
           size = vehicleSize(vehicle, pose.angle);
         el.style.left = `${center.x}px`;
@@ -67,10 +71,12 @@ export default function Traffic({
         if (el.dataset.direction !== view.direction) {
           el.dataset.direction = view.direction;
           el.setAttribute("viewBox", asset.viewBox);
-          const img = el.firstElementChild!;
-          img.setAttribute("href", asset.src);
-          img.setAttribute("width", String(asset.width));
-          img.setAttribute("height", String(asset.height));
+          const img = el.firstElementChild;
+          if (img) {
+            img.setAttribute("href", asset.src);
+            img.setAttribute("width", String(asset.width));
+            img.setAttribute("height", String(asset.height));
+          }
         }
       });
       if (!paused) frame = requestAnimationFrame(tick);
@@ -86,13 +92,13 @@ export default function Traffic({
       disposed = true;
       cancelAnimationFrame(frame);
     };
-  }, [samples, paused, speed]);
+  }, [samples, fleet, paused, speed]);
   if (samples.length < 2) return null;
   return (
     <>
-      {VEHICLES.map((vehicle, i) => (
+      {fleet.map((vehicle, i) => (
         <svg
-          key={vehicle}
+          key={`traffic-${vehicle}-${i}`}
           ref={(el) => {
             refs.current[i] = el;
           }}
