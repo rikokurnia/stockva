@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { ExternalLink } from "lucide-react";
 import { money, pct, priceOf, type CityState, type PriceMap } from "../lib/city";
 import { bscTxLink } from "../lib/contracts";
@@ -121,6 +122,13 @@ export default function CivicPerformance({
                           rel="noreferrer"
                           className={styles.textLink}
                         >
+                          <Image
+                            src="/bnb-logo.png"
+                            alt="BNB"
+                            width={14}
+                            height={14}
+                            style={{ flexShrink: 0 }}
+                          />
                           <code>
                             {sale.hash.slice(0, 6)}…
                             {sale.hash.slice(-4)}

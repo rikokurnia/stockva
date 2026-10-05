@@ -146,3 +146,18 @@ test("paper sales record history too", () => {
   assert.equal(sold.state.saleHistory[0].ticker, "AAPL");
   assert.equal(sold.state.saleHistory[0].source, "local");
 });
+
+test("buys never move realized P/L or sale history — only sells do", () => {
+  let state = { ...newCity(), cash: 10000 };
+  state = constructBuilding("exchange", { r: -6, c: 0 }, 400, state).state;
+  state = constructBuilding("nvidia", { r: 1, c: 1 }, 500, state, {
+    NVDA: 100,
+  }).state;
+  state = buyPaper(state, "AAPL", 1000, 200).state;
+  assert.equal(state.realizedPnl, 0);
+  assert.deepEqual(state.saleHistory ?? [], []);
+  const sold = sellPosition(state, "NVDA", 1, { NVDA: 110 });
+  assert.equal(sold.error, "");
+  assert.equal(sold.state.realizedPnl, 50);
+  assert.equal(sold.state.saleHistory.length, 1);
+});

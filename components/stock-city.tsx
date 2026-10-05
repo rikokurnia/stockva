@@ -2255,6 +2255,12 @@ export default function StockCity() {
     setInspectorSellOpen(false);
     setInspectorSellPct(100);
   }, [selected]);
+  useEffect(() => {
+    if (inspectorSellOpen)
+      document
+        .getElementById("inspector-sell-form")
+        ?.scrollIntoView({ block: "start" });
+  }, [inspectorSellOpen]);
   const steps = [
     city.roads.length > 0,
     hasExchange,
@@ -2736,6 +2742,7 @@ export default function StockCity() {
             </header>
             {definition.ticker && inspectorSellOpen && (
               <div
+                id="inspector-sell-form"
                 style={{
                   margin: "12px 12px 0",
                   padding: "12px",
@@ -2772,6 +2779,76 @@ export default function StockCity() {
                   >
                     <X size={15} />
                   </button>
+                </div>
+                <small
+                  style={{
+                    display: "block",
+                    marginTop: "8px",
+                    color: "#b6ccd3",
+                    fontSize: "11px",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Balance{" "}
+                  {current.quantity.toLocaleString(undefined, {
+                    maximumFractionDigits: 4,
+                  })}{" "}
+                  units · {money(current.cost)} invested ·{" "}
+                  {money(valueOf(current, prices))} value → selling{" "}
+                  {inspectorSellPct}% ≈{" "}
+                  {money(
+                    (valueOf(current, prices) * inspectorSellPct) / 100,
+                  )}
+                </small>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "6px",
+                    marginTop: "10px",
+                    alignItems: "stretch",
+                  }}
+                >
+                  <label
+                    style={{
+                      flex: "0 0 96px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      border: "1px solid #2c4c62",
+                      borderRadius: "7px",
+                      padding: "0 8px",
+                      background: "rgba(8, 16, 22, 0.5)",
+                      color: "#edf2f3",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <input
+                      type="number"
+                      aria-label="Custom sell percent"
+                      min={1}
+                      max={100}
+                      value={inspectorSellPct}
+                      onChange={(event) => {
+                        const next = Math.floor(Number(event.target.value));
+                        setInspectorSellPct(
+                          Number.isFinite(next)
+                            ? Math.max(1, Math.min(100, next))
+                            : 1,
+                        );
+                      }}
+                      style={{
+                        width: "100%",
+                        background: "transparent",
+                        border: 0,
+                        outline: "none",
+                        color: "inherit",
+                        font: "inherit",
+                        minHeight: "34px",
+                      }}
+                    />
+                    <span style={{ color: "#8fa6b4" }}>%</span>
+                  </label>
                 </div>
                 <div
                   style={{
