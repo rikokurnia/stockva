@@ -285,8 +285,7 @@ export function BuildingCatalogueModal({
 
         {/* Content Body */}
         <div className={styles.body}>
-          {(currentCategory === "companies" ||
-            currentCategory === "sectors") &&
+          {(currentCategory === "companies" || currentCategory === "sectors") &&
           !hasExchange ? (
             <div className={styles.companiesLocked}>
               <div className={styles.lockIconBox}>
@@ -612,7 +611,9 @@ export function BuildingCatalogueModal({
                                 key={preset}
                                 type="button"
                                 className={`${styles.presetBtn} ${
-                                  amount === preset ? styles.presetBtnActive : ""
+                                  amount === preset
+                                    ? styles.presetBtnActive
+                                    : ""
                                 }`}
                                 onClick={() => handlePresetClick(preset)}
                               >
@@ -1129,9 +1130,7 @@ export function BuildingCatalogueModal({
               {/* Vertical Grid */}
               <div className={styles.verticalGrid}>
                 {filteredBuildings.map((def: BuildingDef) => {
-                  const p = def.ticker
-                    ? priceOf(def.ticker, prices)
-                    : def.cost;
+                  const p = def.ticker ? priceOf(def.ticker, prices) : def.cost;
                   const canAfford = cityCash >= (def.ticker ? 1 : def.cost);
                   const isAlreadyBuilt = Boolean(builtKinds?.has(def.kind));
                   return (

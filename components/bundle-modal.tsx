@@ -65,7 +65,9 @@ export default function BundleModal({
         batchItems,
         (step, stepHash) => {
           if (step === "approve" && !stepHash) {
-            setStatusMsg("Confirm the $mUSD allowance approval in your wallet…");
+            setStatusMsg(
+              "Confirm the $mUSD allowance approval in your wallet…",
+            );
           } else if (step === "approve" && stepHash) {
             setStatusMsg(
               `Allowance approved. Now confirm all ${buildings.length} buildings in 1 signature…`,
@@ -75,7 +77,9 @@ export default function BundleModal({
               `Confirm batch purchase popup — ${buildings.length} positions, 1 signature…`,
             );
           } else if (step === "buy" && stepHash) {
-            setStatusMsg("Transaction broadcast! Waiting for BSC block confirmation…");
+            setStatusMsg(
+              "Transaction broadcast! Waiting for BSC block confirmation…",
+            );
           }
         },
       );
@@ -90,7 +94,9 @@ export default function BundleModal({
       onClose();
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Batch transaction failed or was rejected.";
+        err instanceof Error
+          ? err.message
+          : "Batch transaction failed or was rejected.";
       setErrorMsg(msg);
       setStatusMsg(null);
     } finally {
@@ -132,8 +138,9 @@ export default function BundleModal({
 
         <div className={styles.body}>
           <p className={styles.subtitle}>
-            All {buildings.length} buildings have been placed on your island. Sign once
-            to mint and permanently unlock all positions on BNB Smart Chain.
+            All {buildings.length} buildings have been placed on your island.
+            Sign once to mint and permanently unlock all positions on BNB Smart
+            Chain.
           </p>
 
           <div className={styles.buildingList}>
@@ -167,8 +174,12 @@ export default function BundleModal({
 
           <div className={styles.summaryBox}>
             <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Total Bundle Investment:</span>
-              <span className={styles.summaryTotal}>{money(totalCost)} mUSD</span>
+              <span className={styles.summaryLabel}>
+                Total Bundle Investment:
+              </span>
+              <span className={styles.summaryTotal}>
+                {money(totalCost)} mUSD
+              </span>
             </div>
             <div className={styles.summaryRow}>
               <span className={styles.summaryLabel}>Settlement Network:</span>
@@ -178,7 +189,9 @@ export default function BundleModal({
             </div>
             <div className={styles.summaryHighlight}>
               <CheckCircle2 size={13} />
-              <span>Zero redundant gas · Instant single-tx batch confirmation</span>
+              <span>
+                Zero redundant gas · Instant single-tx batch confirmation
+              </span>
             </div>
           </div>
 

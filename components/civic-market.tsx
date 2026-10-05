@@ -342,9 +342,13 @@ function BundleBuilder({
   function toggleSectorBasket(secKey: SectorBuildingKind) {
     const secDef = defForSector(secKey);
     if (!secDef) return;
-    const unbuilt = secDef.stocks.filter((ticker) => available.includes(ticker));
+    const unbuilt = secDef.stocks.filter((ticker) =>
+      available.includes(ticker),
+    );
     if (!unbuilt.length) {
-      setMessage(`All stocks in ${secDef.name} are already built on your island.`);
+      setMessage(
+        `All stocks in ${secDef.name} are already built on your island.`,
+      );
       return;
     }
     const allSelected = unbuilt.every((ticker) => selected.includes(ticker));
@@ -355,11 +359,11 @@ function BundleBuilder({
       setSelected((prev) => [...new Set([...prev, ...unbuilt])]);
       setAmounts((prev) => ({
         ...prev,
-        ...Object.fromEntries(
-          unbuilt.map((t) => [t, prev[t] ?? "500"]),
-        ),
+        ...Object.fromEntries(unbuilt.map((t) => [t, prev[t] ?? "500"])),
       }));
-      setMessage(`Added ${unbuilt.length} stocks from ${secDef.name} to basket.`);
+      setMessage(
+        `Added ${unbuilt.length} stocks from ${secDef.name} to basket.`,
+      );
     }
   }
 
@@ -391,7 +395,9 @@ function BundleBuilder({
       ...prev,
       ...Object.fromEntries(selected.map((t) => [t, String(perStock)])),
     }));
-    setMessage(`Distributed ${money(total)} evenly (${money(perStock)} per company).`);
+    setMessage(
+      `Distributed ${money(total)} evenly (${money(perStock)} per company).`,
+    );
   }
 
   const activeSectorDef =
@@ -402,7 +408,9 @@ function BundleBuilder({
   const unbuiltInActiveSector = activeSectorDef
     ? activeSectorDef.stocks.filter((t) => available.includes(t))
     : selectedSector === "hero"
-      ? assets.filter((a) => isHeroTicker(a.ticker) && available.includes(a.ticker)).map((a) => a.ticker)
+      ? assets
+          .filter((a) => isHeroTicker(a.ticker) && available.includes(a.ticker))
+          .map((a) => a.ticker)
       : [];
 
   const allActiveSectorSelected =
@@ -415,24 +423,36 @@ function BundleBuilder({
         <div>
           <h3>City Baskets & Sector Bundles</h3>
           <p>
-            Assemble multi-stock baskets by sector or hand-pick individual companies.
-            Place your building drafts on the island, then confirm together in one transaction on BNB Smart Chain.
+            Assemble multi-stock baskets by sector or hand-pick individual
+            companies. Place your building drafts on the island, then confirm
+            together in one transaction on BNB Smart Chain.
           </p>
         </div>
         <span className={styles.statusBadge}>{money(city.cash)} city cash</span>
       </div>
 
       {/* 1-Click Sector Baskets Carousel */}
-      <section className={styles.sectorBasketsSection} aria-label="1-Click Sector Baskets">
+      <section
+        className={styles.sectorBasketsSection}
+        aria-label="1-Click Sector Baskets"
+      >
         <div className={styles.sectionHeading}>
           <h4>1-Click Sector Baskets</h4>
           <span>10 industry sectors</span>
         </div>
         <div className={styles.sectorPresetsRow}>
           {SECTOR_DEFINITIONS.map((sec) => {
-            const unbuiltCount = sec.stocks.filter((t) => available.includes(t)).length;
-            const selectedCount = sec.stocks.filter((t) => selected.includes(t)).length;
-            const isAllSelected = unbuiltCount > 0 && sec.stocks.filter((t) => available.includes(t)).every((t) => selected.includes(t));
+            const unbuiltCount = sec.stocks.filter((t) =>
+              available.includes(t),
+            ).length;
+            const selectedCount = sec.stocks.filter((t) =>
+              selected.includes(t),
+            ).length;
+            const isAllSelected =
+              unbuiltCount > 0 &&
+              sec.stocks
+                .filter((t) => available.includes(t))
+                .every((t) => selected.includes(t));
             return (
               <button
                 key={sec.key}
@@ -453,10 +473,15 @@ function BundleBuilder({
                   >
                     {sec.badge}
                   </span>
-                  {isAllSelected && <Check size={14} style={{ color: "var(--accent)" }} />}
+                  {isAllSelected && (
+                    <Check size={14} style={{ color: "var(--accent)" }} />
+                  )}
                 </div>
                 <span className={styles.sectorPresetName}>
-                  {sec.name.replace(/ Tower| Complex| Plaza| Grid & Terminal| Works| Network Hub| Pavilion| Conglomerate| Foundry| Exchange/, "")}
+                  {sec.name.replace(
+                    / Tower| Complex| Plaza| Grid & Terminal| Works| Network Hub| Pavilion| Conglomerate| Foundry| Exchange/,
+                    "",
+                  )}
                 </span>
                 <span className={styles.sectorPresetCount}>
                   {selectedCount > 0
@@ -495,7 +520,8 @@ function BundleBuilder({
             <span>{available.length} of 100 available</span>
           </div>
           <p className={styles.caption}>
-            Pick companies one by one or filter by sector. One building per company.
+            Pick companies one by one or filter by sector. One building per
+            company.
           </p>
 
           {/* Quick Thematic Presets */}
@@ -520,7 +546,8 @@ function BundleBuilder({
               onClick={() =>
                 preset(
                   SECTOR_DEFINITIONS.map(
-                    (sec) => sec.stocks.find((t) => available.includes(t)) ?? "",
+                    (sec) =>
+                      sec.stocks.find((t) => available.includes(t)) ?? "",
                   ).filter(Boolean),
                 )
               }
@@ -540,7 +567,11 @@ function BundleBuilder({
           </div>
 
           {/* Sector Filter Tabs */}
-          <div className={styles.sectorFilterTabs} role="tablist" aria-label="Filter stocks by sector">
+          <div
+            className={styles.sectorFilterTabs}
+            role="tablist"
+            aria-label="Filter stocks by sector"
+          >
             <button
               type="button"
               className={`${styles.sectorFilterTab} ${selectedSector === "all" ? styles.sectorFilterTabActive : ""}`}
@@ -582,7 +613,9 @@ function BundleBuilder({
                   >
                     {activeSectorDef?.badge ?? "HERO"}
                   </span>
-                  <span>{activeSectorDef?.name ?? "Bespoke Corporate Headquarters"}</span>
+                  <span>
+                    {activeSectorDef?.name ?? "Bespoke Corporate Headquarters"}
+                  </span>
                 </div>
                 <p className={styles.sectorBannerDesc}>
                   {activeSectorDef?.description ??
@@ -595,13 +628,20 @@ function BundleBuilder({
                   className={styles.sectorBannerBtn}
                   onClick={() => {
                     if (allActiveSectorSelected) {
-                      setSelected((prev) => prev.filter((t) => !unbuiltInActiveSector.includes(t)));
+                      setSelected((prev) =>
+                        prev.filter((t) => !unbuiltInActiveSector.includes(t)),
+                      );
                     } else {
-                      setSelected((prev) => [...new Set([...prev, ...unbuiltInActiveSector])]);
+                      setSelected((prev) => [
+                        ...new Set([...prev, ...unbuiltInActiveSector]),
+                      ]);
                       setAmounts((prev) => ({
                         ...prev,
                         ...Object.fromEntries(
-                          unbuiltInActiveSector.map((t) => [t, prev[t] ?? "500"]),
+                          unbuiltInActiveSector.map((t) => [
+                            t,
+                            prev[t] ?? "500",
+                          ]),
                         ),
                       }));
                     }
@@ -649,9 +689,17 @@ function BundleBuilder({
               const isAvailable = available.includes(asset.ticker);
               const isSelected = selected.includes(asset.ticker);
               const price = priceOf(asset.ticker, prices);
-              const secDef = definition.sectorKey ? defForSector(definition.sectorKey) : null;
-              const badgeColor = secDef?.color ?? (isHeroTicker(asset.ticker) ? "#f0b90b" : "#38bdf8");
-              const badgeText = secDef?.badge ?? (isHeroTicker(asset.ticker) ? "HERO" : asset.sector.slice(0, 4).toUpperCase());
+              const secDef = definition.sectorKey
+                ? defForSector(definition.sectorKey)
+                : null;
+              const badgeColor =
+                secDef?.color ??
+                (isHeroTicker(asset.ticker) ? "#f0b90b" : "#38bdf8");
+              const badgeText =
+                secDef?.badge ??
+                (isHeroTicker(asset.ticker)
+                  ? "HERO"
+                  : asset.sector.slice(0, 4).toUpperCase());
 
               return (
                 <button
@@ -680,12 +728,12 @@ function BundleBuilder({
                       {badgeText}
                     </span>
                   </div>
-                  {isSelected && <Check size={18} style={{ color: "var(--accent)" }} />}
+                  {isSelected && (
+                    <Check size={18} style={{ color: "var(--accent)" }} />
+                  )}
                   <strong>{asset.ticker}</strong>
                   <small>
-                    {isAvailable
-                      ? asset.name
-                      : "Already on island"}
+                    {isAvailable ? asset.name : "Already on island"}
                   </small>
                   <div className={styles.bundleCardPrice}>
                     <span>Price</span>
@@ -698,7 +746,8 @@ function BundleBuilder({
 
           {!filteredOptions.length && (
             <p className={styles.notice}>
-              No companies match your filters. Try clearing the search or choosing another sector tab.
+              No companies match your filters. Try clearing the search or
+              choosing another sector tab.
             </p>
           )}
         </section>
@@ -710,7 +759,9 @@ function BundleBuilder({
             <button
               className={styles.textButton}
               type="button"
-              onClick={() => chooser.current?.scrollIntoView({ block: "start" })}
+              onClick={() =>
+                chooser.current?.scrollIntoView({ block: "start" })
+              }
             >
               Pick more
             </button>
@@ -779,10 +830,21 @@ function BundleBuilder({
                   return (
                     <div className={styles.field} key={ticker}>
                       <span className={styles.bundleAmountLabel}>
-                        <label htmlFor={`bundle-${ticker}`} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <label
+                          htmlFor={`bundle-${ticker}`}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                          }}
+                        >
                           <StockLogo ticker={ticker} size={18} shape="circle" />
                           <strong>{ticker}</strong>
-                          <span style={{ fontSize: "11px", color: "var(--subtle)" }}>· USD</span>
+                          <span
+                            style={{ fontSize: "11px", color: "var(--subtle)" }}
+                          >
+                            · USD
+                          </span>
                         </label>
                         <button
                           type="button"
@@ -842,14 +904,16 @@ function BundleBuilder({
             <strong>{money(validation.total)}</strong>
           </div>
           <p className={styles.caption}>
-            {money(Math.max(0, city.cash - validation.total))} city cash after placement.
+            {money(Math.max(0, city.cash - validation.total))} city cash after
+            placement.
           </p>
 
           {selected.some(
             (ticker) => feed.quotes[ticker]?.status !== "live",
           ) && (
             <p className={styles.warning}>
-              Some estimates use stale or illustrative city quotes. Refresh market data before continuing.
+              Some estimates use stale or illustrative city quotes. Refresh
+              market data before continuing.
             </p>
           )}
 
@@ -873,7 +937,8 @@ function BundleBuilder({
             </p>
           )}
           <p className={styles.caption}>
-            No transaction is sent here. Place buildings on your island, then confirm together in 1 transaction on BNB Smart Chain.
+            No transaction is sent here. Place buildings on your island, then
+            confirm together in 1 transaction on BNB Smart Chain.
           </p>
         </aside>
       </form>

@@ -61,7 +61,10 @@ test("simulation traverses sprite tiers without changing market prices or positi
     "nvidia",
     { r: 1, c: 1 },
     500,
-    constructBuilding("exchange", { r: -6, c: 0 }, 400, { ...newCity(), cash: 10000 }).state,
+    constructBuilding("exchange", { r: -6, c: 0 }, 400, {
+      ...newCity(),
+      cash: 10000,
+    }).state,
     { NVDA: 100 },
   ).state;
   const b = city.buildings.at(-1),
@@ -108,7 +111,10 @@ test("a new game has no buildings, roads, holdings, or traffic", () => {
 test("a brand new city starts with 0 cash and cannot build without faucet funding", () => {
   const city = newCity();
   assert.equal(city.cash, 0);
-  const roadResult = constructRoad(roadLine({ r: 0, c: -1 }, { r: 0, c: 1 }), city);
+  const roadResult = constructRoad(
+    roadLine({ r: 0, c: -1 }, { r: 0, c: 1 }),
+    city,
+  );
   assert.equal(roadResult.error, "Not enough funds");
   const buildResult = constructBuilding("exchange", { r: -6, c: 0 }, 400, city);
   assert.equal(buildResult.error, "Not enough funds");
@@ -126,7 +132,10 @@ test("the first road can start on bare ground and is one atomic purchase", () =>
   assert.equal(repeat.state.roads.length, 7);
 });
 const tradingCity = () =>
-  constructBuilding("exchange", { r: -6, c: 0 }, 400, { ...newCity(), cash: 10000 }).state;
+  constructBuilding("exchange", { r: -6, c: 0 }, 400, {
+    ...newCity(),
+    cash: 10000,
+  }).state;
 
 test("every building is manually purchased and reserves all four footprint tiles", () => {
   const city = constructRoad(
@@ -408,16 +417,28 @@ test("building placement is strictly limited to 1 per service and 1 per company"
   assert.equal(dupHall.state, hall.state);
 
   // 2. Company building duplicate rejection
-  const nvda1 = constructBuilding("nvidia", { r: 1, c: 1 }, 500, hall.state, { NVDA: 100 });
+  const nvda1 = constructBuilding("nvidia", { r: 1, c: 1 }, 500, hall.state, {
+    NVDA: 100,
+  });
   assert.equal(nvda1.error, "");
-  const dupNvda = constructBuilding("nvidia", { r: 1, c: 4 }, 500, nvda1.state, { NVDA: 100 });
+  const dupNvda = constructBuilding(
+    "nvidia",
+    { r: 1, c: 4 },
+    500,
+    nvda1.state,
+    { NVDA: 100 },
+  );
   assert.match(dupNvda.error, /already built/i);
   assert.equal(dupNvda.state, nvda1.state);
 });
 test("catalogue contains 30 hero bespoke stocks, 10 sector templates, 70 sector companies, 5 civic services, and 100 S&P 100 assets", () => {
-  const heroDefs = catalogue.filter((d) => d.category === "companies" && d.ticker);
+  const heroDefs = catalogue.filter(
+    (d) => d.category === "companies" && d.ticker,
+  );
   assert.equal(heroDefs.length, 30);
-  const sectorCompanyDefs = catalogue.filter((d) => d.category === "sectors" && d.ticker);
+  const sectorCompanyDefs = catalogue.filter(
+    (d) => d.category === "sectors" && d.ticker,
+  );
   assert.equal(sectorCompanyDefs.length, 70);
   const companyDefs = catalogue.filter((d) => d.ticker);
   assert.equal(companyDefs.length, 100);
@@ -426,12 +447,7 @@ test("catalogue contains 30 hero bespoke stocks, 10 sector templates, 70 sector 
   assert.equal(HERO_TICKERS.length, 30);
   for (const def of catalogue) {
     const baseCity = def.ticker ? tradingCity() : { ...newCity(), cash: 10000 };
-    const built = constructBuilding(
-      def.kind,
-      { r: 1, c: 1 },
-      100,
-      baseCity,
-    );
+    const built = constructBuilding(def.kind, { r: 1, c: 1 }, 100, baseCity);
     assert.equal(built.error, "");
     assert.ok(isSavedCity(built.state));
     const path = buildingImage(built.state.buildings.at(-1));
@@ -523,7 +539,10 @@ test("sector towers support multi-deployment of the same sector for different co
   assert.ok(healthDef.stocks.includes("JNJ"));
   assert.ok(healthDef.stocks.includes("LLY"));
 
-  const baseCity = constructBuilding("exchange", { r: -6, c: 0 }, 400, { ...newCity(), cash: 10000 }).state;
+  const baseCity = constructBuilding("exchange", { r: -6, c: 0 }, 400, {
+    ...newCity(),
+    cash: 10000,
+  }).state;
 
   // 2. Build JNJ Healthcare Tower
   const b1 = constructBuilding("jnj", { r: 1, c: 1 }, 500, baseCity);
@@ -546,4 +565,3 @@ test("sector towers support multi-deployment of the same sector for different co
   assert.match(bDuplicate.error, /already built/i);
   assert.equal(bDuplicate.state.buildings.length, 3);
 });
-

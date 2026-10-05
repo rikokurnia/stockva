@@ -134,8 +134,14 @@ export default function ObservedChart({
     () => ohlcBars.map((b) => ({ time: b.time, value: b.close })),
     [ohlcBars],
   );
-  const ma10Series = useMemo(() => movingAverage(closeSeries, 10), [closeSeries]);
-  const ma20Series = useMemo(() => movingAverage(closeSeries, 20), [closeSeries]);
+  const ma10Series = useMemo(
+    () => movingAverage(closeSeries, 10),
+    [closeSeries],
+  );
+  const ma20Series = useMemo(
+    () => movingAverage(closeSeries, 20),
+    [closeSeries],
+  );
 
   const latestMA10 = ma10Series.at(-1)?.value;
   const latestMA20 = ma20Series.at(-1)?.value;
@@ -179,7 +185,8 @@ export default function ObservedChart({
     const spanSec =
       targetRange === "1h" ? 3600 : targetRange === "1d" ? 86400 : 7 * 86400;
     const fromSec = Math.max(0, latestSec - spanSec) as UTCTimestamp;
-    const toSec = (latestSec + (targetRange === "1h" ? 60 : 300)) as UTCTimestamp;
+    const toSec = (latestSec +
+      (targetRange === "1h" ? 60 : 300)) as UTCTimestamp;
     chart.timeScale().setVisibleRange({ from: fromSec, to: toSec });
   };
 
@@ -344,23 +351,19 @@ export default function ObservedChart({
         : undefined;
       const aVal = areaSeriesRef.current
         ? (event.seriesData.get(areaSeriesRef.current) as
-            | { value?: number }
-            | undefined)
+            { value?: number } | undefined)
         : undefined;
       const volVal = volumeSeriesRef.current
         ? (event.seriesData.get(volumeSeriesRef.current) as
-            | { value?: number }
-            | undefined)
+            { value?: number } | undefined)
         : undefined;
       const m10Val = ma10Ref.current
         ? (event.seriesData.get(ma10Ref.current) as
-            | { value?: number }
-            | undefined)
+            { value?: number } | undefined)
         : undefined;
       const m20Val = ma20Ref.current
         ? (event.seriesData.get(ma20Ref.current) as
-            | { value?: number }
-            | undefined)
+            { value?: number } | undefined)
         : undefined;
 
       const parts: string[] = [];
@@ -409,12 +412,7 @@ export default function ObservedChart({
       ma20Ref.current = null;
       chart.remove();
     };
-  }, [
-    ohlcBars,
-    benchmarkSeries,
-    compare,
-    actualSource,
-  ]);
+  }, [ohlcBars, benchmarkSeries, compare, actualSource]);
 
   // Adjust visible range when user clicks 1H, 1D, or 1W
   useEffect(() => {
@@ -466,7 +464,11 @@ export default function ObservedChart({
     if (actualSource !== "Token") return;
     try {
       const sec = Math.floor(Date.now() / 1000) as UTCTimestamp;
-      if (chartType === "candles" && candleSeriesRef.current && ohlcBars.length) {
+      if (
+        chartType === "candles" &&
+        candleSeriesRef.current &&
+        ohlcBars.length
+      ) {
         const lastBar = ohlcBars[ohlcBars.length - 1];
         candleSeriesRef.current.update({
           time: Math.floor(lastBar.time / 1000) as UTCTimestamp,
@@ -496,7 +498,16 @@ export default function ObservedChart({
     } catch {
       // Ignore if timestamps exceed client clock
     }
-  }, [livePrice, chartType, showMA10, showMA20, latestMA10, latestMA20, ohlcBars, actualSource]);
+  }, [
+    livePrice,
+    chartType,
+    showMA10,
+    showMA20,
+    latestMA10,
+    latestMA20,
+    ohlcBars,
+    actualSource,
+  ]);
 
   return (
     <>
@@ -655,8 +666,8 @@ export default function ObservedChart({
             }}
           />
           {actualSource === "Token"
-            ? (history.tokenSource || "Token Price")
-            : (history.benchmarkSource || "Underlying Stock")}
+            ? history.tokenSource || "Token Price"
+            : history.benchmarkSource || "Underlying Stock"}
         </span>
         {comparable && (
           <span>
@@ -703,8 +714,8 @@ export default function ObservedChart({
       )}
       {!compare && !fullyIllustrative && (
         <p className={styles.caption}>
-          Periods without observations (e.g. market closed) are bridged with
-          an illustrative path to the live price. Volume bars are estimates.
+          Periods without observations (e.g. market closed) are bridged with an
+          illustrative path to the live price. Volume bars are estimates.
         </p>
       )}
     </>

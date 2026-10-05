@@ -72,8 +72,10 @@ export default function TradingChart({
         // High-frequency 1-hour view: 30 data points spaced 2 minutes apart leading to live price
         for (let i = 30; i >= 0; i--) {
           const t = (nowSec - i * 120) as UTCTimestamp;
-          const noise = Math.sin(i * 0.45) * 0.0025 + Math.cos(i * 0.2) * 0.0015;
-          const trendDrift = ((30 - i) / 30) * ((liveChange ?? 0.5) / 100) * 0.25;
+          const noise =
+            Math.sin(i * 0.45) * 0.0025 + Math.cos(i * 0.2) * 0.0015;
+          const trendDrift =
+            ((30 - i) / 30) * ((liveChange ?? 0.5) / 100) * 0.25;
           const val = Number((basePrice * (1 - trendDrift + noise)).toFixed(2));
           tokenSeries.push({ time: t, value: val });
           if (compare) {
@@ -131,7 +133,8 @@ export default function TradingChart({
           const count = timeframe === "1d" ? 36 : 168;
           for (let i = count; i >= 0; i--) {
             const t = (nowSec - i * 3600) as UTCTimestamp;
-            const wave = Math.sin(i * 0.12) * 0.012 + Math.cos(i * 0.06) * 0.008;
+            const wave =
+              Math.sin(i * 0.12) * 0.012 + Math.cos(i * 0.06) * 0.008;
             const trend = ((count - i) / count) * ((liveChange ?? 0.8) / 100);
             const val = Number((basePrice * (1 - trend + wave)).toFixed(2));
             tokenSeries.push({ time: t, value: val });
@@ -149,9 +152,14 @@ export default function TradingChart({
         if (tokenSeries.length > 0 && activePrice > 0) {
           const lastPoint = tokenSeries[tokenSeries.length - 1];
           if (nowSec > lastPoint.time) {
-            tokenSeries.push({ time: nowSec, value: Number(activePrice.toFixed(2)) });
+            tokenSeries.push({
+              time: nowSec,
+              value: Number(activePrice.toFixed(2)),
+            });
           } else {
-            tokenSeries[tokenSeries.length - 1].value = Number(activePrice.toFixed(2));
+            tokenSeries[tokenSeries.length - 1].value = Number(
+              activePrice.toFixed(2),
+            );
           }
         }
       }
@@ -159,7 +167,8 @@ export default function TradingChart({
       const first = tokenSeries[0]?.value ?? basePrice;
       const last = tokenSeries[tokenSeries.length - 1]?.value ?? basePrice;
       const calculatedChange = first > 0 ? ((last - first) / first) * 100 : 0;
-      const finalChange = liveChange !== undefined ? liveChange : calculatedChange;
+      const finalChange =
+        liveChange !== undefined ? liveChange : calculatedChange;
 
       return {
         tokenData: tokenSeries,
@@ -172,7 +181,8 @@ export default function TradingChart({
 
   // Real-time update streaming: when livePrice changes, update the last bar
   useEffect(() => {
-    if (!tokenSeriesRef.current || !activePrice || Number.isNaN(activePrice)) return;
+    if (!tokenSeriesRef.current || !activePrice || Number.isNaN(activePrice))
+      return;
     const nowSec = Math.floor(Date.now() / 1000) as UTCTimestamp;
     try {
       tokenSeriesRef.current.update({
@@ -323,12 +333,10 @@ export default function TradingChart({
         setHoverData(null);
       } else {
         const tokenVal = param.seriesData.get(tokenSeries) as
-          | { value?: number }
-          | undefined;
+          { value?: number } | undefined;
         const benchVal = benchmarkSeriesRef.current
           ? (param.seriesData.get(benchmarkSeriesRef.current) as
-              | { value?: number }
-              | undefined)
+              { value?: number } | undefined)
           : undefined;
 
         const timeNum = typeof param.time === "number" ? param.time * 1000 : 0;
@@ -457,9 +465,7 @@ export default function TradingChart({
         {tokenData.length > 0 ? (
           <div ref={containerRef} className={styles.chartCanvas} />
         ) : (
-          <div className={styles.emptyOverlay}>
-            Loading live price history…
-          </div>
+          <div className={styles.emptyOverlay}>Loading live price history…</div>
         )}
       </div>
 

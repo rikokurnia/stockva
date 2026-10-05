@@ -182,7 +182,12 @@ test("sector baskets can bundle all stocks in a sector and map to valid building
     assert.ok(sec.stocks.length > 0);
     const available = [...sec.stocks];
     const amounts = Object.fromEntries(sec.stocks.map((t) => [t, "500"]));
-    const res = validateBundle(sec.stocks, amounts, available, sec.stocks.length * 500);
+    const res = validateBundle(
+      sec.stocks,
+      amounts,
+      available,
+      sec.stocks.length * 500,
+    );
     assert.equal(res.valid, true);
     assert.equal(res.total, sec.stocks.length * 500);
 
@@ -203,7 +208,12 @@ test("stock exchange supports buying single-stock bundles as well as mixed multi
 
   // 1. Single stock bundle
   const singleAvailable = ["JNJ"];
-  const singleRes = validateBundle(["JNJ"], { JNJ: "500" }, singleAvailable, 1000);
+  const singleRes = validateBundle(
+    ["JNJ"],
+    { JNJ: "500" },
+    singleAvailable,
+    1000,
+  );
   assert.equal(singleRes.valid, true);
   assert.equal(singleRes.tickers.length, 1);
   const singleDef = catalogue.find((d) => d.ticker === "JNJ");
@@ -212,8 +222,19 @@ test("stock exchange supports buying single-stock bundles as well as mixed multi
 
   // 2. Mixed multi-sector basket (hero stocks + sector stocks)
   const mixedTickers = ["NVDA", "JNJ", "TXN", "BAC", "CAT"];
-  const mixedAmounts = { NVDA: "1000", JNJ: "500", TXN: "500", BAC: "250", CAT: "750" };
-  const mixedRes = validateBundle(mixedTickers, mixedAmounts, mixedTickers, 5000);
+  const mixedAmounts = {
+    NVDA: "1000",
+    JNJ: "500",
+    TXN: "500",
+    BAC: "250",
+    CAT: "750",
+  };
+  const mixedRes = validateBundle(
+    mixedTickers,
+    mixedAmounts,
+    mixedTickers,
+    5000,
+  );
   assert.equal(mixedRes.valid, true);
   assert.equal(mixedRes.total, 3000);
   const mixedItems = mixedRes.tickers.map((t) => ({
@@ -221,17 +242,26 @@ test("stock exchange supports buying single-stock bundles as well as mixed multi
     amount: Number(mixedAmounts[t]),
   }));
   assert.equal(mixedItems.length, 5);
-  assert.deepEqual(mixedItems.map((i) => i.kind), ["nvidia", "jnj", "txn", "bac", "cat"]);
+  assert.deepEqual(
+    mixedItems.map((i) => i.kind),
+    ["nvidia", "jnj", "txn", "bac", "cat"],
+  );
 });
 
 test("buildNaturalSeries creates rich continuous history for 1h, 1d, 1w and past scrollback", () => {
   const targetPrice = 251.31;
   const series = buildNaturalSeries([], targetPrice);
-  assert.ok(series.length > 2000, `Expected >2000 points, got ${series.length}`);
-  
+  assert.ok(
+    series.length > 2000,
+    `Expected >2000 points, got ${series.length}`,
+  );
+
   // Strictly monotonic time
   for (let i = 1; i < series.length; i++) {
-    assert.ok(series[i].time > series[i - 1].time, `Timestamp must strictly increase at ${i}`);
+    assert.ok(
+      series[i].time > series[i - 1].time,
+      `Timestamp must strictly increase at ${i}`,
+    );
     assert.ok(series[i].value > 0, `Value must be positive at ${i}`);
   }
 
@@ -244,9 +274,18 @@ test("buildNaturalSeries creates rich continuous history for 1h, 1d, 1w and past
   const p1d = series.filter((p) => p.time >= now - 86400 * 1000);
   const p1w = series.filter((p) => p.time >= now - 7 * 86400 * 1000);
 
-  assert.ok(p1h.length >= 30, `Expected at least 30 points in 1h, got ${p1h.length}`);
-  assert.ok(p1d.length >= 100, `Expected at least 100 points in 1d, got ${p1d.length}`);
-  assert.ok(p1w.length >= 500, `Expected at least 500 points in 1w, got ${p1w.length}`);
+  assert.ok(
+    p1h.length >= 30,
+    `Expected at least 30 points in 1h, got ${p1h.length}`,
+  );
+  assert.ok(
+    p1d.length >= 100,
+    `Expected at least 100 points in 1d, got ${p1d.length}`,
+  );
+  assert.ok(
+    p1w.length >= 500,
+    `Expected at least 500 points in 1w, got ${p1w.length}`,
+  );
 
   // Moving average MA 10 and MA 20 compute cleanly
   const ma10 = movingAverage(series, 10);
@@ -261,7 +300,10 @@ test("buildOhlcSeries constructs valid TradingView candlesticks and volume for 1
 
   for (const tf of ["1h", "1d", "1w"]) {
     const bars = buildOhlcSeries(series, tf);
-    assert.ok(bars.length > 50, `Expected >50 bars for ${tf}, got ${bars.length}`);
+    assert.ok(
+      bars.length > 50,
+      `Expected >50 bars for ${tf}, got ${bars.length}`,
+    );
 
     // Verify OHLC candle validity
     for (let i = 0; i < bars.length; i++) {
@@ -273,10 +315,28 @@ test("buildOhlcSeries constructs valid TradingView candlesticks and volume for 1
       assert.ok(b.low <= b.close, `Low must be <= close at ${i}`);
       assert.ok(b.volume > 0, `Volume must be positive at ${i}`);
       if (i > 0) {
-        assert.ok(b.time > bars[i - 1].time, `Bar timestamps must increase strictly at ${i}`);
+        assert.ok(
+          b.time > bars[i - 1].time,
+          `Bar timestamps must increase strictly at ${i}`,
+        );
       }
     }
   }
 });
 
-
+test("one agent batch merges purchases and removals into one City Hall transaction", () => {
+  const hash = `0x${"f".repeat(64)}`;
+  const rows = transactionHistory([
+    { hash, kind: "agent-rebalance", tickers: ["NVDA"], source: "city" },
+    { hash, kind: "agent-rebalance", tickers: ["JPM"], source: "city" },
+    { hash, kind: "placement", tickers: ["JPM"], source: "wallet" },
+  ]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].kind, "agent-rebalance");
+  assert.deepEqual(rows[0].tickers, ["NVDA", "JPM"]);
+  const mixed = transactionHistory([
+    { hash, kind: "agent-sell", tickers: ["NVDA"], source: "city" },
+    { hash, kind: "agent-buy", tickers: ["JPM"], source: "city" },
+  ]);
+  assert.equal(mixed[0].kind, "agent-rebalance");
+});

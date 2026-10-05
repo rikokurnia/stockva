@@ -82,11 +82,7 @@ export function OrderPreflight({
 
   // Dynamic price impact
   const priceImpact =
-    amount > 5000
-      ? "< 0.08%"
-      : amount > 1000
-        ? "< 0.04%"
-        : "< 0.02%";
+    amount > 5000 ? "< 0.08%" : amount > 1000 ? "< 0.04%" : "< 0.02%";
 
   return (
     <div className={`${styles.preflight} ${compact ? styles.compact : ""}`}>

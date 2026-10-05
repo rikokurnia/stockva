@@ -6,9 +6,7 @@ import confetti from "canvas-confetti";
 import styles from "./construction-progress.module.css";
 
 export type ConstructionState =
-  | "Drafting Site..."
-  | "Constructing on BSC..."
-  | "100% Completed!";
+  "Drafting Site..." | "Constructing on BSC..." | "100% Completed!";
 
 type Props = {
   buildingId: string;
@@ -27,8 +25,14 @@ export function fireCelebrationParticles(element: HTMLElement | null) {
   if (element && typeof window !== "undefined") {
     const rect = element.getBoundingClientRect();
     origin = {
-      x: Math.min(0.95, Math.max(0.05, (rect.left + rect.width / 2) / window.innerWidth)),
-      y: Math.min(0.95, Math.max(0.05, (rect.top + rect.height / 2) / window.innerHeight)),
+      x: Math.min(
+        0.95,
+        Math.max(0.05, (rect.left + rect.width / 2) / window.innerWidth),
+      ),
+      y: Math.min(
+        0.95,
+        Math.max(0.05, (rect.top + rect.height / 2) / window.innerHeight),
+      ),
     };
   }
 
@@ -109,7 +113,10 @@ export default function ConstructionProgressBar({
         currentProgress = 1.0;
       }
 
-      const currentPercent = Math.min(100, Math.max(0, Math.round(currentProgress * 100)));
+      const currentPercent = Math.min(
+        100,
+        Math.max(0, Math.round(currentProgress * 100)),
+      );
       setPercent(currentPercent);
 
       if (currentPercent >= 100) {
@@ -132,7 +139,13 @@ export default function ConstructionProgressBar({
 
     animId = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(animId);
-  }, [buildingId, durationMs, isConfirmingOnchain, isConfirmedOnchain, onComplete]);
+  }, [
+    buildingId,
+    durationMs,
+    isConfirmingOnchain,
+    isConfirmedOnchain,
+    onComplete,
+  ]);
 
   if (hidden) return null;
 

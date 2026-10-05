@@ -1,6 +1,6 @@
 export type CityTransaction = {
   hash: string;
-  kind: "placement" | "faucet" | "agent-buy" | "agent-sell";
+  kind: "placement" | "faucet" | "agent-buy" | "agent-sell" | "agent-rebalance";
   tickers: string[];
   at?: number;
   source: "wallet" | "city";
@@ -24,7 +24,16 @@ export function transactionHistory(rows: CityTransaction[]): CityTransaction[] {
       previous = map.get(key);
     map.set(key, {
       ...row,
-      kind: previous?.kind.startsWith("agent-") ? previous.kind : row.kind,
+      kind:
+        previous?.kind === "agent-rebalance" ||
+        row.kind === "agent-rebalance" ||
+        (previous?.kind.startsWith("agent-") &&
+          row.kind.startsWith("agent-") &&
+          previous.kind !== row.kind)
+          ? "agent-rebalance"
+          : previous?.kind.startsWith("agent-")
+            ? previous.kind
+            : row.kind,
       hash: key,
       tickers: [...new Set([...(previous?.tickers ?? []), ...row.tickers])],
       at: previous?.at ?? row.at,

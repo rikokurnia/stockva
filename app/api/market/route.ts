@@ -45,9 +45,8 @@ async function yahooUnderlying(
     const data = await response.json();
     const result = data?.chart?.result?.[0];
     const meta = result?.meta;
-    const closes = (result?.indicators?.quote?.[0]?.close as unknown) as
-      | number[]
-      | undefined;
+    const closes = result?.indicators?.quote?.[0]?.close as unknown as
+      number[] | undefined;
     const price = Number(meta?.regularMarketPrice);
     const prev = Number(meta?.chartPreviousClose);
     if (!Number.isFinite(price) || price <= 0) {

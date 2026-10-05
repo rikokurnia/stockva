@@ -224,9 +224,7 @@ export default function CivicResearch(props: Props) {
               <div className={styles.technicalStats}>
                 <Indicator
                   label="MA 10 · moving average"
-                  value={
-                    indicators.ma10 == null ? "—" : money(indicators.ma10)
-                  }
+                  value={indicators.ma10 == null ? "—" : money(indicators.ma10)}
                 />
                 <Indicator
                   label="MA 20 · moving average"
@@ -473,7 +471,8 @@ export default function CivicResearch(props: Props) {
             {held > 0
               ? `Your city holds ${held.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${ticker} units. Manage holdings in City Hall. `
               : ""}
-            Buy and place directly on the island, or add to a sector basket to confirm together on BNB Smart Chain.
+            Buy and place directly on the island, or add to a sector basket to
+            confirm together on BNB Smart Chain.
           </p>
         </>
       )}
@@ -787,11 +786,7 @@ function TokenInspection({
         {historyLoading && !history ? (
           <Loading label="Retrieving independent price histories…" />
         ) : history ? (
-          <ObservedChart
-            history={history}
-            livePrice={tokenPrice}
-            compare
-          />
+          <ObservedChart history={history} livePrice={tokenPrice} compare />
         ) : (
           <p className={styles.notice}>Price history is unavailable.</p>
         )}

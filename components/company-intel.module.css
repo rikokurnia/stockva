@@ -719,9 +719,19 @@
   flex-shrink: 0;
 }
 @keyframes liveDotPulseAnim {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 9px #4ade80; }
-  100% { transform: scale(0.9); opacity: 0.7; }
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+    box-shadow: 0 0 9px #4ade80;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
 }
 .liveIndicator {
   display: flex;
@@ -757,4 +767,3 @@
   border: 1px solid #85530a;
   text-transform: uppercase;
 }
-

@@ -226,7 +226,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .worksite *, .confirmedBuilding {
+  .worksite *,
+  .confirmedBuilding {
     animation: none !important;
     transition: none !important;
   }

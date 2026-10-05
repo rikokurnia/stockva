@@ -116,7 +116,11 @@ export default function BuildingSimulation(props: Props) {
             className={styles.start}
             onClick={props.onSwitchToSimulation}
             disabled={!props.count}
-            title={props.count ? "Switch to Simulation Mode" : "Place a company to simulate"}
+            title={
+              props.count
+                ? "Switch to Simulation Mode"
+                : "Place a company to simulate"
+            }
           >
             <Sparkles size={14} /> Start
           </button>
@@ -149,7 +153,9 @@ export default function BuildingSimulation(props: Props) {
           }}
         >
           <div className={styles.sectionLabel}>
-            {isLive ? "PREVIEW / CUSTOMIZE THRESHOLDS" : "SET THE TURNING POINTS"}
+            {isLive
+              ? "PREVIEW / CUSTOMIZE THRESHOLDS"
+              : "SET THE TURNING POINTS"}
           </div>
 
           <div className={styles.thresholdInputs}>

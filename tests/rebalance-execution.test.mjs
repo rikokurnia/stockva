@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   applyRebalanceReceipt,
+  applyRebalanceBatch,
+  hasPendingRebalance,
   recoverRebalanceExecution,
 } from "../lib/rebalance-execution.ts";
 
@@ -480,4 +482,105 @@ test("a fully closed position with zero actual testnet payout records its receip
   assert.equal(next.realizedPnl, -500);
   assert.equal(next.buildings.length, 0);
   assert.equal(next.agentReceipts[0].hash, hash);
+});
+
+test("atomic settlement records every building with the same hash and applies once", () => {
+  const buyStep = {
+    id: "buy",
+    action: "buy",
+    ticker: "JPM",
+    kind: "jpmorgan",
+    buildingId: "new",
+    cell: { r: 4, c: 2 },
+  };
+  const batchPlan = { ...plan, steps: [sell, buyStep] };
+  const bought = {
+    ...receipt,
+    positionId: `0x${"d".repeat(64)}`,
+    ticker: "JPM",
+    amount: 400,
+    quantity: 2,
+    entryPrice: 200,
+    fullyClosed: false,
+  };
+  const next = applyRebalanceBatch(city, batchPlan, [receipt, bought]);
+  assert.equal(next.cash, 150);
+  assert.equal(next.buildings.length, 1);
+  assert.equal(next.buildings[0].id, "new");
+  assert.equal(next.buildings[0].vaultTx, hash);
+  assert.equal(next.agentReceipts.length, 2);
+  assert.ok(next.agentReceipts.every((r) => r.hash === hash && r.batch));
+  assert.deepEqual(
+    next.agentReceipts.map((r) => r.action),
+    ["sell", "buy"],
+  );
+  assert.equal(applyRebalanceBatch(next, batchPlan, [receipt, bought]), next);
+  assert.equal(city.buildings[0].id, "old");
+});
+
+test("an incomplete or invalid batch cannot partially apply a sale", () => {
+  const buyStep = {
+    id: "buy",
+    action: "buy",
+    ticker: "JPM",
+    kind: "jpmorgan",
+    buildingId: "new",
+    cell: { r: 4, c: 2 },
+  };
+  const batchPlan = { ...plan, steps: [sell, buyStep] };
+  const bought = {
+    ...receipt,
+    ticker: "JPM",
+    amount: 99999,
+    quantity: 2,
+    entryPrice: 200,
+    fullyClosed: false,
+  };
+  assert.throws(
+    () => applyRebalanceBatch(city, batchPlan, [receipt]),
+    /all building receipts/,
+  );
+  assert.throws(
+    () => applyRebalanceBatch(city, batchPlan, [receipt, bought]),
+    /cash/,
+  );
+  assert.throws(
+    () =>
+      applyRebalanceBatch(city, batchPlan, [
+        receipt,
+        { ...bought, hash: `0x${"f".repeat(64)}` },
+      ]),
+    /one transaction/,
+  );
+  assert.equal(city.cash, 100);
+  assert.equal(city.buildings.length, 1);
+  assert.equal(city.agentReceipts, undefined);
+});
+
+test("a saved atomic batch with no transaction hash stays locked and can be recovered", () => {
+  const saved = savedExecution();
+  saved.mode = "atomic";
+  saved.batchId = `0x${"f".repeat(64)}`;
+  saved.batchStatus = "pending";
+  saved.steps = saved.steps.map((s) => ({
+    stepId: s.stepId,
+    status: "submitted",
+  }));
+  assert.equal(recoverRebalanceExecution(saved, supportedKinds), saved);
+  assert.equal(hasPendingRebalance(saved), true);
+  saved.batchStatus = "wallet";
+  saved.steps = saved.steps.map((s) => ({ ...s, status: "error" }));
+  assert.equal(
+    hasPendingRebalance(saved),
+    true,
+    "a lost wallet response is not safe to resubmit",
+  );
+  saved.batchStatus = "failed";
+  assert.equal(
+    hasPendingRebalance(saved),
+    false,
+    "a definite atomic revert can be cleared",
+  );
+  saved.batchId = undefined;
+  assert.equal(recoverRebalanceExecution(saved, supportedKinds), null);
 });

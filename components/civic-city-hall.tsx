@@ -194,7 +194,11 @@ export default function CivicCityHall(
       )
       .map((receipt): CityTransaction => ({
         hash: receipt.hash,
-        kind: receipt.action === "buy" ? "agent-buy" : "agent-sell",
+        kind: receipt.batch
+          ? "agent-rebalance"
+          : receipt.action === "buy"
+            ? "agent-buy"
+            : "agent-sell",
         tickers: [receipt.ticker],
         at: receipt.at,
         source: "city",
@@ -707,7 +711,14 @@ export default function CivicCityHall(
                     : "Claim 10,000 mUSD"}
                 </button>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    width: "100%",
+                  }}
+                >
                   <button
                     type="button"
                     className={styles.primary}
@@ -718,8 +729,15 @@ export default function CivicCityHall(
                     <Wallet size={15} />
                     Connect wallet to claim faucet
                   </button>
-                  <span style={{ fontSize: "0.76rem", color: "#94a3b8", textAlign: "center" }}>
-                    Sign in with your wallet first to claim 10,000 $mUSD from the municipal faucet.
+                  <span
+                    style={{
+                      fontSize: "0.76rem",
+                      color: "#94a3b8",
+                      textAlign: "center",
+                    }}
+                  >
+                    Sign in with your wallet first to claim 10,000 $mUSD from
+                    the municipal faucet.
                   </span>
                 </div>
               )}
@@ -888,13 +906,15 @@ export default function CivicCityHall(
                 <strong>
                   {transaction.kind === "faucet"
                     ? "Faucet claim"
-                    : transaction.kind === "agent-sell"
-                      ? "Agent · building removed"
-                      : transaction.kind === "agent-buy"
-                        ? "Agent · building constructed"
-                        : transaction.tickers.length > 1
-                          ? "Building batch"
-                          : "Building placement"}
+                    : transaction.kind === "agent-rebalance"
+                      ? "Agent · city rebalance"
+                      : transaction.kind === "agent-sell"
+                        ? "Agent · building removed"
+                        : transaction.kind === "agent-buy"
+                          ? "Agent · building constructed"
+                          : transaction.tickers.length > 1
+                            ? "Building batch"
+                            : "Building placement"}
                 </strong>
                 <small>
                   {transaction.tickers.join(" · ") || "Testnet mUSD"} ·{" "}
@@ -973,7 +993,13 @@ function Metric({
 }) {
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <span>{label}</span>
         {action}
       </div>

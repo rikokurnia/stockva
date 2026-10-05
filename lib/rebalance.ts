@@ -447,7 +447,7 @@ export function buildRebalancePrompt(input: RebalanceInput): string {
     "Choose 2-5 target stocks where practical; weights are positive percentages summing to 100 of MAPPED stock value plus the additional cash budget. Exclude treasury cash from percentages.",
     "Use only listed allowed stock tickers and quoted city prices. Quotes are client-supplied, not independently verified market research. Never claim live analysis, future returns, executed trades, or wallet access.",
     "Default goal: visibly diversify concentrated exposure across sectors. Consider adding at least one new stock and completely exiting one current holding when there are at least two holdings and it improves diversification; for one holding, trim concentration by adding complementary sectors. Explain each retained or new holding. Do not rotate merely to create activity if current diversification is appropriate.",
-    "All changed positions are fully closed and rebuilt to preserve one vault position per building. Wallet signatures and confirmed on-chain receipts are required later; this request only prepares an unexecuted plan.",
+    "All changed positions are fully closed and rebuilt to preserve one vault position per building. One atomic wallet approval and confirmed on-chain receipts are required later; this request only prepares an unexecuted plan.",
     `Mapped holdings: ${JSON.stringify(holdings.map((h) => ({ ticker: h.ticker, sector: assets.find((a) => a.ticker === h.ticker)!.sector, value: h.value, quantity: h.quantity, price: h.price })))}`,
     `Additional mUSD cash budget: ${input.budget}. Available wallet cash: ${input.walletCash}. No unmapped holdings may be traded.`,
     `Allowed stocks: ${JSON.stringify(allowed.map((a) => ({ ticker: a.ticker, sector: a.sector, price: input.prices[a.ticker] })))}`,
@@ -610,7 +610,7 @@ export function buildRebalancePlan(
     fingerprint: rebalanceFingerprint(input.city),
     summary: proposal.summary,
     quoteNote:
-      "Quoted city prices are estimates. Each change needs a BNB Testnet wallet signature; cash and holdings change only after a confirmed receipt. Unmapped and draft holdings are excluded.",
+      "Quoted city prices are estimates. One atomic BNB Testnet wallet approval covers all changes; cash and holdings update together after confirmation. Unmapped and draft holdings are excluded.",
     budget: input.budget,
     targets: proposal.targets,
     before,

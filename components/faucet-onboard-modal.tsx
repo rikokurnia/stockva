@@ -75,30 +75,34 @@ export default function FaucetOnboardModal({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
-  const activeWallet = walletAddress || (authenticated && (user?.wallet?.address || wallets?.[0]?.address) as `0x${string}`);
+  const activeWallet =
+    walletAddress ||
+    (authenticated &&
+      ((user?.wallet?.address || wallets?.[0]?.address) as `0x${string}`));
 
   const handleConnect = async () => {
     setConnecting(true);
     setError(null);
     try {
+      if (typeof window !== "undefined" && window.ethereum) {
+        try {
+          const acc = await connectInjectedWallet();
+          if (acc) {
+            onWalletConnected(acc);
+            setConnecting(false);
+            return;
+          }
+        } catch {
+          // fallback to Privy login below
+        }
+      }
       if (login) {
         login({ loginMethods: ["wallet"] });
-      } else {
-        const acc = await connectInjectedWallet();
-        onWalletConnected(acc);
       }
     } catch (err: unknown) {
-      // Fallback to direct injected wallet
-      try {
-        const acc = await connectInjectedWallet();
-        onWalletConnected(acc);
-      } catch (injectedErr: unknown) {
-        setError(
-          injectedErr instanceof Error
-            ? injectedErr.message
-            : "Failed to connect wallet",
-        );
-      }
+      const msg =
+        err instanceof Error ? err.message : "Failed to connect wallet";
+      setError(msg);
     } finally {
       setConnecting(false);
     }
@@ -141,7 +145,9 @@ export default function FaucetOnboardModal({
         setError("Transaction cancelled in wallet.");
         setClaimStatus("");
       } else if (msg.includes("cooldown")) {
-        setError("Faucet cooldown active on-chain. Faucet can be claimed once per cooldown period.");
+        setError(
+          "Faucet cooldown active on-chain. Faucet can be claimed once per cooldown period.",
+        );
         setClaimStatus("");
       } else {
         // In testnet sandbox mode, if RPC timeout or tBNB gas is missing:
@@ -196,14 +202,17 @@ export default function FaucetOnboardModal({
               <span className={styles.badgeTag}>BSC Testnet</span>
             </h2>
             <p className={styles.subtitle}>
-              Starting funds begin at $0. Connect your Web3 wallet to claim the 10,000 $mUSD municipal faucet.
+              Starting funds begin at $0. Connect your Web3 wallet to claim the
+              10,000 $mUSD municipal faucet.
             </p>
           </div>
         </div>
 
         <div className={styles.treasuryCard}>
           <div>
-            <span className={styles.treasuryLabel}>Current Treasury Balance</span>
+            <span className={styles.treasuryLabel}>
+              Current Treasury Balance
+            </span>
             <div className={styles.treasuryAmount}>{money(currentCash)}</div>
           </div>
           <span
@@ -234,11 +243,14 @@ export default function FaucetOnboardModal({
                   activeWallet ? styles.connected : styles.unconnected
                 }`}
               >
-                {activeWallet ? `Connected (${shorten(activeWallet)})` : "Not Signed In"}
+                {activeWallet
+                  ? `Connected (${shorten(activeWallet)})`
+                  : "Not Signed In"}
               </span>
             </div>
             <p className={styles.stepDesc}>
-              Connect with MetaMask, Binance Web3 Wallet, Coinbase, or any EVM wallet.
+              Connect with MetaMask, Binance Web3 Wallet, Coinbase, or any EVM
+              wallet.
             </p>
             {!activeWallet ? (
               <button
@@ -304,7 +316,8 @@ export default function FaucetOnboardModal({
               </span>
             </div>
             <p className={styles.stepDesc}>
-              Mints 10,000 testnet USD ($mUSD) on BNB Smart Chain to fund road construction and initial stock investments.
+              Mints 10,000 testnet USD ($mUSD) on BNB Smart Chain to fund road
+              construction and initial stock investments.
             </p>
 
             {claimed || currentCash >= 10000 ? (
@@ -320,7 +333,9 @@ export default function FaucetOnboardModal({
                     rel="noopener noreferrer"
                     className={styles.txLink}
                   >
-                    <span>View transaction on BscScan: {shorten(claimTxHash)}</span>
+                    <span>
+                      View transaction on BscScan: {shorten(claimTxHash)}
+                    </span>
                     <ExternalLink size={12} />
                   </a>
                 )}
@@ -339,7 +354,11 @@ export default function FaucetOnboardModal({
                   className={styles.primaryBtn}
                   disabled={!activeWallet || claiming}
                   onClick={handleClaim}
-                  title={!activeWallet ? "Connect your wallet first" : "Claim 10,000 $mUSD"}
+                  title={
+                    !activeWallet
+                      ? "Connect your wallet first"
+                      : "Claim 10,000 $mUSD"
+                  }
                 >
                   {claiming ? (
                     <>

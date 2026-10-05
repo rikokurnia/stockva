@@ -33,7 +33,7 @@ export default function LandingHero({ appId }: { appId: string }) {
       if (preference.matches) {
         video.current?.pause();
       } else {
-        void video.current?.play().catch(() => { });
+        void video.current?.play().catch(() => {});
       }
     };
     sync();
@@ -72,8 +72,13 @@ export default function LandingHero({ appId }: { appId: string }) {
         </Link>
 
         <nav className={styles.nav} aria-label="Main navigation">
-          <Link href="/city" className={styles.exploreBtn} aria-label="Explore the city">
-            Explore the city <ArrowUpRight size={14} className={styles.exploreIcon} />
+          <Link
+            href="/city"
+            className={styles.exploreBtn}
+            aria-label="Explore the city"
+          >
+            Explore the city{" "}
+            <ArrowUpRight size={14} className={styles.exploreIcon} />
           </Link>
         </nav>
 
@@ -92,8 +97,8 @@ export default function LandingHero({ appId }: { appId: string }) {
 
       <aside className={styles.bottomLeft} aria-label="About Stockva">
         <p className={styles.description}>
-          Turn real-world equities into a living, breathing metropolis.
-          Lay roads, place company headquarters, and watch your island thrive.
+          Turn real-world equities into a living, breathing metropolis. Lay
+          roads, place company headquarters, and watch your island thrive.
         </p>
       </aside>
     </main>

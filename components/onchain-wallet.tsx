@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { getAddress } from "viem";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { ExternalLink, LogOut, Check, Copy } from "lucide-react";
-import {
-  bscAddressLink,
-  connectInjectedWallet,
-} from "../lib/contracts";
+import { bscAddressLink, connectInjectedWallet } from "../lib/contracts";
 
 type Props = {
   address: `0x${string}` | null;

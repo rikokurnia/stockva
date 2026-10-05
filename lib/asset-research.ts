@@ -239,8 +239,7 @@ export function buildNaturalSeries(
       const p = (t - startTime) / (now - startTime);
       const anchor = targetPrice * (0.96 + 0.04 * p);
       const noise =
-        Math.sin((t / 3600000) * 2) * 0.0025 +
-        (Math.random() - 0.495) * 0.0035;
+        Math.sin((t / 3600000) * 2) * 0.0025 + (Math.random() - 0.495) * 0.0035;
       price = price * (1 + noise) + (anchor - price) * 0.05;
       points.push({ time: t, value: Math.round(price * 100) / 100 });
     }
@@ -345,8 +344,14 @@ export function buildOhlcSeries(
     // If bucket has only 1 point, generate realistic micro-wicks
     if (high === low) {
       const spread = open * 0.0012;
-      high = Math.round((open + spread * (0.4 + (Math.sin(timeSec) + 1) * 0.3)) * 100) / 100;
-      low = Math.round((open - spread * (0.4 + (Math.cos(timeSec) + 1) * 0.3)) * 100) / 100;
+      high =
+        Math.round(
+          (open + spread * (0.4 + (Math.sin(timeSec) + 1) * 0.3)) * 100,
+        ) / 100;
+      low =
+        Math.round(
+          (open - spread * (0.4 + (Math.cos(timeSec) + 1) * 0.3)) * 100,
+        ) / 100;
     }
 
     const vol = Math.floor(

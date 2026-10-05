@@ -435,7 +435,8 @@ export default function StockCity() {
           error:
             execution.status === "completed"
               ? undefined
-              : "Execution paused after reload. Reconnect the same wallet to check saved receipts and continue.",
+              : (execution.error ??
+                "Execution paused after reload. Reconnect the same wallet to check saved batch confirmation without signing again."),
         };
         executionRef.current = recovered;
         setAgentExecution(recovered);
@@ -597,9 +598,9 @@ export default function StockCity() {
     notify("Construction action restored.");
   };
   const saveAgentExecution = (execution: RebalanceExecution) => {
+    localStorage.setItem(REBALANCE_STORAGE, JSON.stringify(execution));
     executionRef.current = execution;
     setAgentExecution(execution);
-    localStorage.setItem(REBALANCE_STORAGE, JSON.stringify(execution));
   };
   const saveConfirmedCity = (next: CityState) => {
     localStorage.setItem(STORAGE, JSON.stringify(next));
@@ -610,44 +611,133 @@ export default function StockCity() {
   };
   const executeRebalance = async (plan: RebalancePlan) => {
     if (agentRunning.current) return;
-    if (executionRef.current?.plan.id !== plan.id && hasPendingRebalance(executionRef.current)) {
-      notify("Check the saved batch in Agent Hall before starting another plan.", true);
+    if (
+      executionRef.current?.plan.id !== plan.id &&
+      hasPendingRebalance(executionRef.current)
+    ) {
+      notify(
+        "Check the saved batch in Agent Hall before starting another plan.",
+        true,
+      );
       return;
     }
     agentRunning.current = true;
-    let run: RebalanceExecution = executionRef.current?.plan.id === plan.id
-      ? { ...executionRef.current, status: "running", error: undefined }
-      : { plan, mode: "atomic", status: "running", fingerprint: plan.fingerprint,
-          steps: plan.steps.map((step) => ({ stepId: step.id, status: "queued" })) };
-    const focus = (step: RebalancePlan["steps"][number], phase: AgentMapActivity["phase"], detail: string, hash?: `0x${string}`) => {
+    let run: RebalanceExecution =
+      executionRef.current?.plan.id === plan.id
+        ? { ...executionRef.current, status: "running", error: undefined }
+        : {
+            plan,
+            mode: "atomic",
+            status: "running",
+            fingerprint: plan.fingerprint,
+            steps: plan.steps.map((step) => ({
+              stepId: step.id,
+              status: "queued",
+            })),
+          };
+    let createdBatch = false;
+    let sendAttempted = false;
+    const tourBefore = simulationLatest.current.city;
+    const focus = (
+      step: RebalancePlan["steps"][number],
+      phase: AgentMapActivity["phase"],
+      detail: string,
+      hash?: `0x${string}`,
+    ) => {
       setFocusTarget({ ...step.cell, nonce: Date.now() });
       setZoom(1.7);
       setSelected(step.action === "sell" ? step.buildingId : null);
-      setAgentActivity({ buildingId: step.buildingId, ...step.cell, ticker: step.ticker, kind: step.action, phase, detail, hash });
+      const original = tourBefore.buildings.find(
+        (b) => b.id === step.buildingId,
+      );
+      setAgentActivity({
+        originalImage: original
+          ? sprite(buildingImage(original, prices, thresholds))
+          : undefined,
+        buildingId: step.buildingId,
+        ...step.cell,
+        ticker: step.ticker,
+        kind: step.action,
+        phase,
+        detail,
+        hash,
+      });
     };
     try {
       if (!wallet || wallet.toLowerCase() !== plan.walletAddress.toLowerCase())
         throw new Error("Connect the wallet that reviewed this blueprint.");
       // Old per-step runs must reconcile their already-signed receipts, then
       // replan the remaining city. Never replay the original sales as a batch.
-      if (!run.mode && run.steps.some((s) => s.hash || s.status === "confirmed")) {
+      if (
+        !run.mode &&
+        run.steps.some((s) => s.hash || s.status === "confirmed")
+      ) {
         saveAgentExecution(run);
         for (const step of plan.steps) {
           const progress = run.steps.find((p) => p.stepId === step.id)!;
-          if (!progress.hash || progress.reverted || progress.status === "confirmed") continue;
+          if (
+            !progress.hash ||
+            progress.reverted ||
+            progress.status === "confirmed"
+          )
+            continue;
           try {
-            const receipt = await confirmedRebalanceReceipt(plan.walletAddress, progress.hash, step.action,
+            const receipt = await confirmedRebalanceReceipt(
+              plan.walletAddress,
+              progress.hash,
+              step.action,
               (hash) => {
-                run = { ...run, steps: run.steps.map((p) => p.stepId === step.id ? { ...p, hash } : p) };
+                run = {
+                  ...run,
+                  steps: run.steps.map((p) =>
+                    p.stepId === step.id ? { ...p, hash } : p,
+                  ),
+                };
                 saveAgentExecution(run);
-              });
-            const next = applyRebalanceReceipt(simulationLatest.current.city, plan, step, receipt);
+              },
+            );
+            const next = applyRebalanceReceipt(
+              simulationLatest.current.city,
+              plan,
+              step,
+              receipt,
+            );
             saveConfirmedCity(next);
-            run = { ...run, fingerprint: rebalanceFingerprint(next), steps: run.steps.map((p) => p.stepId === step.id ? { ...p, status: "confirmed", hash: receipt.hash, error: undefined } : p) };
+            run = {
+              ...run,
+              fingerprint: rebalanceFingerprint(next),
+              steps: run.steps.map((p) =>
+                p.stepId === step.id
+                  ? {
+                      ...p,
+                      status: "confirmed",
+                      hash: receipt.hash,
+                      error: undefined,
+                    }
+                  : p,
+              ),
+            };
             saveAgentExecution(run);
           } catch (error) {
-            if (error instanceof Error && /transaction reverted|replaced or cancelled on-chain/i.test(error.message)) {
-              run = { ...run, steps: run.steps.map((p) => p.stepId === step.id ? { ...p, status: "error", reverted: true, error: error.message } : p) };
+            if (
+              error instanceof Error &&
+              /transaction reverted|replaced or cancelled on-chain/i.test(
+                error.message,
+              )
+            ) {
+              run = {
+                ...run,
+                steps: run.steps.map((p) =>
+                  p.stepId === step.id
+                    ? {
+                        ...p,
+                        status: "error",
+                        reverted: true,
+                        error: error.message,
+                      }
+                    : p,
+                ),
+              };
               saveAgentExecution(run);
             }
             throw error;
@@ -659,30 +749,63 @@ export default function StockCity() {
           notify("Saved rebalance receipts reconciled in City Hall.");
           return;
         }
-        throw new Error("Saved transactions are reconciled. Keep confirmed changes and request a fresh blueprint to use one approval for the remainder.");
+        throw new Error(
+          "Saved transactions are reconciled. Keep confirmed changes and request a fresh blueprint to use one approval for the remainder.",
+        );
       }
       run = { ...run, mode: "atomic" };
       const latest = simulationLatest.current.city;
-      const applied = latest.agentReceipts?.filter((r) => r.planId === plan.id) ?? [];
-      if (applied.length === plan.steps.length && plan.steps.every((s) => applied.some((r) => r.stepId === s.id))) {
-        run = { ...run, status: "completed", batchStatus: "confirmed", steps: run.steps.map((p) => ({ ...p, status: "confirmed", error: undefined, hash: applied.find((r) => r.stepId === p.stepId)!.hash })), fingerprint: rebalanceFingerprint(latest) };
+      const applied =
+        latest.agentReceipts?.filter((r) => r.planId === plan.id) ?? [];
+      if (
+        applied.length === plan.steps.length &&
+        plan.steps.every((s) => applied.some((r) => r.stepId === s.id))
+      ) {
+        run = {
+          ...run,
+          status: "completed",
+          batchStatus: "confirmed",
+          steps: run.steps.map((p) => ({
+            ...p,
+            status: "confirmed",
+            error: undefined,
+            hash: applied.find((r) => r.stepId === p.stepId)!.hash,
+          })),
+          fingerprint: rebalanceFingerprint(latest),
+        };
         saveAgentExecution(run);
         notify("Your confirmed rebalance is already saved in City Hall.");
         return;
       }
       if (run.batchStatus === "failed")
-        throw new Error("This batch was rejected or reverted. Request a fresh blueprint before signing again.");
+        throw new Error(
+          "This batch was rejected or reverted. Request a fresh blueprint before signing again.",
+        );
       if (!run.batchId && Date.now() > plan.expiresAt)
-        throw new Error("This quote expired. Ask the agent for a fresh blueprint before signing.");
-      if (rebalanceFingerprint(latest) !== (run.fingerprint ?? plan.fingerprint))
-        throw new Error("Your city changed since this blueprint. Keep any pending batch ID and reconcile it before generating a new plan.");
-      if (Object.keys(confirmingBuildings).length || latest.buildings.some((b) => b.locked))
-        throw new Error("Finish pending building purchases before rebalancing.");
-      const connected = wallets.find((w) => w.address.toLowerCase() === plan.walletAddress.toLowerCase());
-      const provider: BatchProvider | undefined = connected
+        throw new Error(
+          "This quote expired. Ask the agent for a fresh blueprint before signing.",
+        );
+      if (
+        rebalanceFingerprint(latest) !== (run.fingerprint ?? plan.fingerprint)
+      )
+        throw new Error(
+          "Your city changed since this blueprint. Keep any pending batch ID and reconcile it before generating a new plan.",
+        );
+      if (
+        Object.keys(confirmingBuildings).length ||
+        latest.buildings.some((b) => b.locked)
+      )
+        throw new Error(
+          "Finish pending building purchases before rebalancing.",
+        );
+      const connected = wallets.find(
+        (w) => w.address.toLowerCase() === plan.walletAddress.toLowerCase(),
+      );
+      const provider = (connected
         ? await connected.getEthereumProvider()
-        : window.ethereum;
-      if (!provider) throw new Error("Connect your wallet to approve or check this batch.");
+        : window.ethereum) as unknown as BatchProvider | undefined;
+      if (!provider)
+        throw new Error("Connect your wallet to approve or check this batch.");
       setSimulationRunning(false);
       setSimulationReturns(null);
       setGameMode("live");
@@ -693,64 +816,219 @@ export default function StockCity() {
         let sites = latest;
         for (const step of plan.steps) {
           if (step.action === "sell") {
-            const building = sites.buildings.find((b) => b.id === step.buildingId);
-            if (!building || building.vaultId?.toLowerCase() !== step.positionId.toLowerCase())
-              throw new Error("A reviewed building changed. Ask for a fresh blueprint.");
-            sites = { ...sites, buildings: sites.buildings.filter((b) => b.id !== step.buildingId) };
+            const building = sites.buildings.find(
+              (b) => b.id === step.buildingId,
+            );
+            if (
+              !building ||
+              building.vaultId?.toLowerCase() !== step.positionId.toLowerCase()
+            )
+              throw new Error(
+                "A reviewed building changed. Ask for a fresh blueprint.",
+              );
+            sites = {
+              ...sites,
+              buildings: sites.buildings.filter(
+                (b) => b.id !== step.buildingId,
+              ),
+            };
           } else {
+            if (defFor(step.kind).ticker !== step.ticker)
+              throw new Error(
+                "The building type does not match the reviewed stock. Request a fresh blueprint.",
+              );
             const error = placementError(step.cell, sites);
-            if (error || !hasRoad(step.cell, sites.roads) || sites.buildings.some((b) => defFor(b.kind).ticker === step.ticker))
-              throw new Error(error || "A construction site changed. Ask for a fresh blueprint.");
-            sites = { ...sites, buildings: [...sites.buildings, { id: step.buildingId, kind: step.kind, ...step.cell, quantity: step.quantity, entry: step.price, cost: step.amount, builtAt: 0 }] };
+            if (
+              error ||
+              !hasRoad(step.cell, sites.roads) ||
+              sites.buildings.some((b) => defFor(b.kind).ticker === step.ticker)
+            )
+              throw new Error(
+                error ||
+                  "A construction site changed. Ask for a fresh blueprint.",
+              );
+            sites = {
+              ...sites,
+              buildings: [
+                ...sites.buildings,
+                {
+                  id: step.buildingId,
+                  kind: step.kind,
+                  ...step.cell,
+                  quantity: step.quantity,
+                  entry: step.price,
+                  cost: step.amount,
+                  builtAt: 0,
+                },
+              ],
+            };
           }
         }
         const calls = await prepareRebalanceBatch(provider, plan);
-        if (Date.now() > plan.expiresAt || rebalanceFingerprint(simulationLatest.current.city) !== plan.fingerprint)
-          throw new Error("The blueprint expired or your city changed during wallet checks. Request a fresh blueprint.");
+        if (
+          Date.now() > plan.expiresAt ||
+          rebalanceFingerprint(simulationLatest.current.city) !==
+            plan.fingerprint
+        )
+          throw new Error(
+            "The blueprint expired or your city changed during wallet checks. Request a fresh blueprint.",
+          );
         // Save the ID BEFORE opening the wallet. An interrupted request must be
         // polled, never resubmitted, even if the wallet response was lost.
-        run = { ...run, batchId: newRebalanceBatchId(), batchStatus: "wallet", steps: run.steps.map((p) => ({ ...p, status: "wallet", error: undefined })) };
+        createdBatch = true;
+        run = {
+          ...run,
+          batchId: newRebalanceBatchId(),
+          batchStatus: "wallet",
+          steps: run.steps.map((p) => ({
+            ...p,
+            status: "wallet",
+            error: undefined,
+          })),
+        };
         saveAgentExecution(run);
-        focus(plan.steps[0], "wallet", "One wallet approval for the complete rebalance");
+        focus(
+          plan.steps[0],
+          "wallet",
+          "One wallet approval for the complete rebalance",
+        );
         notify("Agent: approve the whole rebalance once in your wallet.");
-        const id = await sendRebalanceBatch(provider, plan, calls, run.batchId!);
-        run = { ...run, batchId: id, batchStatus: "pending", steps: run.steps.map((p) => ({ ...p, status: "submitted" })) };
+        sendAttempted = true;
+        const id = await sendRebalanceBatch(
+          provider,
+          plan,
+          calls,
+          run.batchId!,
+        );
+        run = {
+          ...run,
+          batchId: id,
+          batchStatus: "pending",
+          steps: run.steps.map((p) => ({ ...p, status: "submitted" })),
+        };
         saveAgentExecution(run);
       } else {
-        run = { ...run, batchStatus: "pending", steps: run.steps.map((p) => ({ ...p, status: "submitted", error: undefined })) };
+        run = {
+          ...run,
+          batchStatus: "pending",
+          steps: run.steps.map((p) => ({
+            ...p,
+            status: "submitted",
+            error: undefined,
+          })),
+        };
         saveAgentExecution(run);
       }
-      focus(plan.steps[0], "submitted", "Checking the atomic batch · no additional signatures");
-      const receipts = await confirmRebalanceBatch(provider, plan, run.batchId!);
-      const next = applyRebalanceBatch(simulationLatest.current.city, plan, receipts);
+      focus(
+        plan.steps[0],
+        "submitted",
+        "Checking the atomic batch · no additional signatures",
+      );
+      const receipts = await confirmRebalanceBatch(
+        provider,
+        plan,
+        run.batchId!,
+        (hash) => {
+          run = { ...run, steps: run.steps.map((p) => ({ ...p, hash })) };
+          saveAgentExecution(run);
+          focus(
+            plan.steps[0],
+            "submitted",
+            "One transaction · verifying all building receipts",
+            hash,
+          );
+        },
+      );
+      const next = applyRebalanceBatch(
+        simulationLatest.current.city,
+        plan,
+        receipts,
+      );
       // Persist all effects together. Every building references the same mined
       // transaction, and a reload cannot replay part of the signed rebalance.
       saveConfirmedCity(next);
-      run = { ...run, batchStatus: "confirmed", fingerprint: rebalanceFingerprint(next), steps: run.steps.map((p, i) => ({ ...p, status: "confirmed", hash: receipts[i].hash, error: undefined })) };
+      run = {
+        ...run,
+        batchStatus: "confirmed",
+        fingerprint: rebalanceFingerprint(next),
+        steps: run.steps.map((p, i) => ({
+          ...p,
+          status: "confirmed",
+          hash: receipts[i].hash,
+          error: undefined,
+        })),
+      };
       saveAgentExecution(run);
       notify("Batch confirmed. All building changes are saved in City Hall.");
       // A receipt-driven tour highlights the already-settled changes.
       for (const step of plan.steps) {
-        focus(step, "confirmed", step.action === "sell" ? "Removal confirmed in the batch" : "Construction confirmed in the batch", receipts[0].hash);
-        setUpgrades((previous) => ({ ...previous, [step.buildingId]: Date.now() }));
-        if (motion && !paused) await new Promise<void>((resolve) => setTimeout(resolve, 500));
+        focus(
+          step,
+          "confirmed",
+          step.action === "sell"
+            ? "Removal confirmed in the batch"
+            : "Construction confirmed in the batch",
+          receipts[0].hash,
+        );
+        setUpgrades((previous) => ({
+          ...previous,
+          [step.buildingId]: Date.now(),
+        }));
+        if (motion && !paused)
+          await new Promise<void>((resolve) => setTimeout(resolve, 500));
       }
       run = { ...run, status: "completed", error: undefined };
       saveAgentExecution(run);
-      notify("Agent rebalance complete. One approval, one transaction, every building recorded in City Hall.");
+      notify(
+        "Agent rebalance complete. One approval, one transaction, every building recorded in City Hall.",
+      );
     } catch (error) {
+      if (createdBatch && !sendAttempted) {
+        // Saving failed before the signing RPC. There is no request to recover.
+        run = { ...run, batchId: undefined, batchStatus: undefined };
+      }
       const rejected = error instanceof RebalanceBatchRejected;
-      const message = error instanceof Error ? error.message : "The wallet request could not finish. Check its saved batch ID before retrying.";
-      run = { ...run, status: "paused", error: message,
+      const message =
+        error instanceof Error
+          ? error.message
+          : "The wallet request could not finish. Check its saved batch ID before retrying.";
+      run = {
+        ...run,
+        status: "paused",
+        error: message,
         ...(rejected ? { batchStatus: "failed" as const } : {}),
-        steps: run.steps.map((p) => p.status === "confirmed" ? p : { ...p, status: "error", error: message, ...(rejected ? { reverted: true } : {}) }) };
-      try { saveAgentExecution(run); }
-      catch {
-        run = { ...run, error: `${message} Browser saving is unavailable. Keep this page open and save the displayed batch ID.` };
+        steps: run.steps.map((p) =>
+          p.status === "confirmed"
+            ? p
+            : {
+                ...p,
+                status: "error",
+                error: message,
+                ...(rejected ? { reverted: true } : {}),
+              },
+        ),
+      };
+      try {
+        saveAgentExecution(run);
+      } catch {
+        run = {
+          ...run,
+          error: `${message} Browser saving is unavailable. Keep this page open and save the displayed batch ID.`,
+        };
         executionRef.current = run;
         setAgentExecution(run);
       }
-      setAgentActivity((activity) => activity ? { ...activity, phase: "error", detail: rejected ? "Batch rejected · city unchanged" : "Agent paused · check the saved batch" } : null);
+      setAgentActivity((activity) =>
+        activity
+          ? {
+              ...activity,
+              phase: "error",
+              detail: rejected
+                ? "Batch rejected · city unchanged"
+                : "Agent paused · check the saved batch",
+            }
+          : null,
+      );
       notify(`Agent paused: ${message}`, true);
     } finally {
       agentRunning.current = false;
@@ -758,7 +1036,10 @@ export default function StockCity() {
   };
   const setTool = (next: Tool) => {
     if (cityMutationLocked && next !== "inspect") {
-      notify("The agent is settling a signed plan. You can move the camera while its transactions finish.", true);
+      notify(
+        "The agent is settling a signed plan. You can move the camera while its transactions finish.",
+        true,
+      );
       return;
     }
     setPortfolioView(false);
@@ -920,7 +1201,10 @@ export default function StockCity() {
     const result = constructBuilding(kind, cell, amount, city, prices);
     if (result.error) {
       if (result.error === "Not enough funds" && city.cash === 0) {
-        notify("Treasury is $0. Sign in your wallet to claim the 10,000 $mUSD faucet!", true);
+        notify(
+          "Treasury is $0. Sign in your wallet to claim the 10,000 $mUSD faucet!",
+          true,
+        );
         if (!wallet) setOnboardOpen(true);
       } else {
         notify(result.error, true);
@@ -1077,7 +1361,10 @@ export default function StockCity() {
     const result = constructRoad(cells, city);
     if (result.error) {
       if (result.error === "Not enough funds" && city.cash === 0) {
-        notify("Treasury is $0. Sign in your wallet to claim the 10,000 $mUSD faucet!", true);
+        notify(
+          "Treasury is $0. Sign in your wallet to claim the 10,000 $mUSD faucet!",
+          true,
+        );
         if (!wallet) setOnboardOpen(true);
       } else {
         notify(result.error, true);
@@ -1452,7 +1739,9 @@ export default function StockCity() {
           <img src={sprite("buttons/settings")} alt="" />
         </button>
         <div className="header-resources">
-          <div className={`cash-resource-container ${city.cash === 0 ? "needs-funds" : ""}`}>
+          <div
+            className={`cash-resource-container ${city.cash === 0 ? "needs-funds" : ""}`}
+          >
             <button
               className="cash-resource"
               onClick={() => {
@@ -1481,7 +1770,10 @@ export default function StockCity() {
               onClick={(e) => {
                 e.stopPropagation();
                 if (!wallet) {
-                  notify("Sign in with your wallet first to claim the faucet!", true);
+                  notify(
+                    "Sign in with your wallet first to claim the faucet!",
+                    true,
+                  );
                   setOnboardOpen(true);
                   return;
                 }
@@ -1587,7 +1879,9 @@ export default function StockCity() {
             role="status"
           >
             <span className="step-number">
-              {city.cash === 0 ? "0/3" : `${steps.filter(Boolean).length + 1}/3`}
+              {city.cash === 0
+                ? "0/3"
+                : `${steps.filter(Boolean).length + 1}/3`}
             </span>
             {!guideHidden && (
               <span>
@@ -2570,8 +2864,8 @@ export default function StockCity() {
             <h2 id="reset-title">Start a new city?</h2>
             <p>
               This clears your saved buildings and roads. You’ll start on an
-              empty island with $0 in treasury funds. Sign in with your wallet to claim
-              the 10,000 $mUSD faucet grant.
+              empty island with $0 in treasury funds. Sign in with your wallet
+              to claim the 10,000 $mUSD faucet grant.
             </p>
             <div>
               <button onClick={() => setConfirmReset(false)}>

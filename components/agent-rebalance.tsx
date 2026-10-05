@@ -36,9 +36,10 @@ import {
   type RebalancePlan,
   type RebalanceStep,
 } from "../lib/rebalance";
-import type {
-  RebalanceExecution,
-  RebalanceStepProgress,
+import {
+  hasPendingRebalance,
+  type RebalanceExecution,
+  type RebalanceStepProgress,
 } from "../lib/rebalance-execution";
 import styles from "./agent-rebalance.module.css";
 
@@ -66,13 +67,13 @@ function stepLabel(step: RebalanceStep) {
 
 function progressLabel(progress?: RebalanceStepProgress) {
   return progress?.status === "wallet"
-    ? "Sign in your wallet"
+    ? "Included in one wallet approval"
     : progress?.status === "submitted"
       ? "Confirming on BNB Chain"
       : progress?.status === "confirmed"
         ? "Confirmed on-chain"
         : progress?.status === "error"
-          ? "Paused at this step"
+          ? "Batch paused"
           : "Queued";
 }
 
@@ -361,7 +362,8 @@ export default function AgentRebalance({
       ? 3
       : active?.status === "wallet"
         ? 1
-        : shownExecution?.steps.some((step) => step.hash && !step.reverted)
+        : shownExecution?.batchStatus === "pending" ||
+            shownExecution?.steps.some((step) => step.hash && !step.reverted)
           ? 2
           : shownPlan
             ? 1
@@ -376,8 +378,8 @@ export default function AgentRebalance({
           </span>
           <h3 id="rebalance-title">A new balance. A city in motion.</h3>
           <p>
-            Give Cokoo a direction. Review the blueprint, sign each change, then
-            watch your stock buildings take shape.
+            Give Cokoo a direction. Review the blueprint, sign once, then watch
+            your stock buildings take shape.
           </p>
         </div>
         <span className={styles.network}>
@@ -394,7 +396,7 @@ export default function AgentRebalance({
           },
           {
             title: "Wallet approval",
-            detail: "You sign every change",
+            detail: "One approval for the whole plan",
             icon: Wallet,
           },
           {
@@ -556,8 +558,8 @@ export default function AgentRebalance({
           <div className={styles.boundary}>
             <ShieldCheck size={17} aria-hidden="true" />
             <p>
-              The agent prepares the plan. Your wallet approves each on-chain
-              transaction.
+              The agent prepares the plan. Your wallet approves the complete
+              rebalance in one atomic transaction.
             </p>
           </div>
           <div className={styles.snapshot}>
@@ -814,9 +816,20 @@ export default function AgentRebalance({
 
               <div className={styles.ledgerHeader}>
                 <h5>Every building. Every step.</h5>
-                <span>{shownPlan.steps.length} on-chain changes</span>
+                <span>{shownPlan.steps.length} changes · 1 approval</span>
               </div>
-              <ol className={styles.steps} aria-label="Rebalance transactions">
+              {shownExecution?.batchId && (
+                <p className={styles.hint} style={{ overflowWrap: "anywhere" }}>
+                  Saved batch ID: <code>{shownExecution.batchId}</code>
+                  {shownExecution.batchStatus !== "confirmed" &&
+                    shownExecution.batchStatus !== "failed" &&
+                    " · Check confirmation to recover this request. No new signature is needed."}
+                </p>
+              )}
+              <ol
+                className={styles.steps}
+                aria-label="Building changes in the rebalance batch"
+              >
                 {shownPlan.steps.map((step, index) => {
                   const progress = shownExecution?.steps.find(
                     (s) => s.stepId === step.id,
@@ -947,12 +960,12 @@ export default function AgentRebalance({
                         <b>
                           {active
                             ? progressLabel(active)
-                            : "Preparing the next transaction"}
+                            : "Preparing the atomic rebalance"}
                         </b>
                         <p>
                           {active?.status === "wallet"
-                            ? "Approve this step in your wallet. The city changes only after the transaction confirms."
-                            : "Cokoo proceeds in order. You can follow the buildings from your island."}
+                            ? "Approve the complete batch once in your wallet, including any mUSD approval. The city updates after confirmation."
+                            : "The whole rebalance settles together. Follow the confirmed building changes from your island."}
                         </p>
                       </div>
                     </div>
@@ -981,21 +994,30 @@ export default function AgentRebalance({
                         <b>Paused after {completed} confirmed changes.</b>
                         <p>
                           {shownExecution.error ||
-                            "One transaction couldn’t finish."}{" "}
-                          Confirmed transactions stay in your city. Resume
-                          continues from the pending step.
+                            "The batch could not finish."}{" "}
+                          {hasPendingRebalance(shownExecution)
+                            ? "Checking confirmation recovers the saved request without asking you to sign again."
+                            : "Keep any confirmed changes and request a fresh blueprint, or retry the wallet check."}
                         </p>
                       </div>
                     </div>
                     <button
                       type="button"
                       className={styles.primary}
-                      disabled={starting || walletChanged}
+                      disabled={
+                        starting ||
+                        walletChanged ||
+                        shownExecution.batchStatus === "failed"
+                      }
                       onClick={() => void execute()}
                       aria-busy={starting}
                     >
                       <RefreshCw size={16} aria-hidden="true" />
-                      {starting ? "Resuming…" : "Resume remaining changes"}
+                      {starting
+                        ? "Checking…"
+                        : hasPendingRebalance(shownExecution)
+                          ? "Check batch confirmation"
+                          : "Retry wallet check"}
                     </button>
                     {walletChanged && (
                       <p className={styles.errorText}>
@@ -1003,9 +1025,7 @@ export default function AgentRebalance({
                         resume.
                       </p>
                     )}
-                    {!shownExecution.steps.some(
-                      (s) => !!s.hash && s.status !== "confirmed",
-                    ) && (
+                    {!hasPendingRebalance(shownExecution) && (
                       <button
                         type="button"
                         className={styles.replan}
@@ -1025,11 +1045,11 @@ export default function AgentRebalance({
                     <div className={styles.executeHeading}>
                       <ShieldCheck size={21} aria-hidden="true" />
                       <div>
-                        <b>Review first. Sign before every move.</b>
+                        <b>Review first. One signature for the whole city.</b>
                         <p>
-                          {shownPlan.steps.length} building transactions on BNB
-                          Chain testnet. A separate mUSD approval may be needed.
-                          Network fees are paid in tBNB.
+                          {shownPlan.steps.length} building changes in one
+                          atomic BNB testnet transaction. Any required mUSD
+                          approval is included. Network fees are paid in tBNB.
                         </p>
                       </div>
                     </div>
@@ -1054,12 +1074,13 @@ export default function AgentRebalance({
                       <Wallet size={17} aria-hidden="true" />
                       {starting
                         ? "Opening your wallet…"
-                        : "Approve blueprint & start signing"}
+                        : "Sign once & rebalance city"}
                       <ArrowRight size={16} aria-hidden="true" />
                     </button>
                     <small className={styles.executeNote}>
-                      Removals confirm before the agent builds new positions.
-                      Each step is recorded in City Hall.
+                      Requires atomic batching enabled in your wallet on BNB
+                      testnet. All changes succeed or revert together. Every
+                      building shares the batch receipt in City Hall.
                     </small>
                   </>
                 )}
@@ -1130,10 +1151,16 @@ export function AgentExecutionDock({
       </div>
       <p>
         {execution.status === "completed"
-          ? "Every change has a BNB Chain receipt in City Hall."
+          ? "One transaction. Every building recorded in City Hall."
           : execution.status === "paused"
-            ? "Confirmed changes are saved. Open Agent Hall to continue."
-            : `${step ? `${stepLabel(step)} · ` : ""}${progress ? progressLabel(progress) : "Preparing the next step"}`}
+            ? "Open Agent Hall to check the saved batch or review wallet support."
+            : execution.mode === "atomic"
+              ? execution.batchStatus === "confirmed"
+                ? "Batch confirmed · touring your updated city"
+                : progress
+                  ? progressLabel(progress)
+                  : "Preparing one wallet approval"
+              : `${step ? `${stepLabel(step)} · ` : ""}${progress ? progressLabel(progress) : "Checking saved receipts"}`}
       </p>
       <div className={styles.progressTrack}>
         <i

@@ -56,7 +56,10 @@
     0 2px 0 #9c825444,
     0 4px 10px #324d2d26,
     inset 0 0 0 2px #fff9e966;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
 }
 .plaque:focus-visible {
   outline: 3px solid #386249;

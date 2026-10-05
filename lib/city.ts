@@ -1363,6 +1363,7 @@ export type CityState = {
     at: number;
     planId: string;
     stepId: string;
+    batch?: boolean;
     positionId: `0x${string}`;
   }[];
 };

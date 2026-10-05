@@ -56,6 +56,7 @@ export type AgentMapActivity = {
   phase: "wallet" | "submitted" | "confirmed" | "error";
   detail: string;
   hash?: string;
+  originalImage?: string;
 };
 
 type Props = {
@@ -163,9 +164,7 @@ export default function CityMap(props: Props) {
       ? agentBuilding
         ? "Position resized"
         : "Building removed"
-      : agentSite?.key === agentKey && agentSite.existing
-        ? "Position resized"
-        : "Building added";
+      : "Building added";
   useEffect(() => {
     if (!agentActivity) {
       setAgentSite(null);
@@ -196,7 +195,7 @@ export default function CityMap(props: Props) {
                 props.simulationReturns?.[target.id],
               ),
             )
-          : undefined,
+          : agentActivity.originalImage,
       };
     });
   }, [agentActivity, agentKey]);
@@ -532,7 +531,8 @@ export default function CityMap(props: Props) {
               const status = portfolioStatus(ret);
               const confirmation = props.confirmingBuildings?.[b.id];
               const isConfirmedAgentBuilding = city.agentReceipts?.some(
-                (receipt) => receipt.action === "buy" && receipt.positionId === b.vaultId,
+                (receipt) =>
+                  receipt.action === "buy" && receipt.positionId === b.vaultId,
               );
               const isUnderConstruction =
                 (!isConfirmedAgentBuilding && now - b.builtAt < 8850) ||
