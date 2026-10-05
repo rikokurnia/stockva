@@ -133,7 +133,9 @@ export default function FaucetOnboardModal({
 
     try {
       setClaimStatus("Please confirm the faucet transaction in your wallet…");
-      const hash = await claimFaucetOnchain(activeWallet);
+      const connected = wallets.find((w) => w.address.toLowerCase() === activeWallet.toLowerCase());
+      const provider = connected ? await connected.getEthereumProvider() : window.ethereum;
+      const hash = await claimFaucetOnchain(activeWallet, provider);
       setClaimTxHash(hash);
       setClaimed(true);
       setClaimStatus("10,000 $mUSD successfully claimed!");

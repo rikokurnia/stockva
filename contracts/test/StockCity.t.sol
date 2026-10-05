@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {MockUSD} from "../src/MockUSD.sol";
 import {StockCityVault} from "../src/StockCityVault.sol";
 
@@ -185,6 +186,70 @@ contract StockCityTest is Test {
             new uint256[](0),
             new uint8[](0)
         );
+        vm.stopPrank();
+    }
+
+    function test_OnlyOwnerCanSellOrUpdatePosition() public {
+        vm.startPrank(alice);
+        token.claimFaucet();
+        token.approve(address(vault), 500e18);
+        bytes32 id = vault.buyPosition("NVDA", 500e18, 100e18, 1);
+        vm.stopPrank();
+        vm.startPrank(bob);
+        vm.expectRevert("Only position owner can sell");
+        vault.sellPosition(id, 100e18, 10000);
+        vm.expectRevert("Not authorized to update tier");
+        vault.updateTier(id, 3);
+        vm.stopPrank();
+        assertEq(vault.getUserPositions(alice)[0].quantity, 5e18);
+    }
+
+    function test_CappedSaleReturnsAndEmitsActualTransferredPayout() public {
+        vm.startPrank(alice);
+        token.claimFaucet();
+        token.approve(address(vault), 500e18);
+        bytes32 id = vault.buyPosition("NVDA", 500e18, 100e18, 1);
+        uint256 reserves = token.balanceOf(address(vault));
+        uint256 before = token.balanceOf(alice);
+        vm.recordLogs();
+        uint256 paid = vault.sellPosition(id, 1_000_000e18, 10000);
+        assertEq(paid, reserves);
+        assertEq(token.balanceOf(alice) - before, paid);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool found;
+        for (uint256 i; i < logs.length; i++) {
+            if (logs[i].emitter != address(vault)) continue;
+            (string memory ticker, uint256 quantity, uint256 payout, int256 pnl, uint256 bps, bool closed) =
+                abi.decode(logs[i].data, (string, uint256, uint256, int256, uint256, bool));
+            assertEq(ticker, "NVDA");
+            assertEq(quantity, 5e18);
+            assertEq(payout, paid);
+            assertEq(pnl, int256(paid) - int256(500e18));
+            assertEq(bps, 10000);
+            assertTrue(closed);
+            found = true;
+        }
+        assertTrue(found);
+        vm.expectRevert("Position is not active");
+        vault.sellPosition(id, 100e18, 10000);
+        vm.stopPrank();
+    }
+
+    function testFuzz_PartialSaleConservesQuantityAndPayout(uint16 fraction) public {
+        uint256 bps = bound(uint256(fraction), 1, 9999);
+        vm.startPrank(alice);
+        token.claimFaucet();
+        token.approve(address(vault), 1000e18);
+        bytes32 id = vault.buyPosition("NVDA", 1000e18, 100e18, 1);
+        uint256 before = token.balanceOf(alice);
+        uint256 first = vault.sellPosition(id, 150e18, bps);
+        StockCityVault.Position memory remaining = vault.getUserPositions(alice)[0];
+        assertEq(remaining.quantity, 10e18 - (10e18 * bps / 10000));
+        assertTrue(remaining.active);
+        uint256 second = vault.sellPosition(id, 150e18, 10000);
+        assertEq(first + second, 1500e18);
+        assertEq(token.balanceOf(alice) - before, 1500e18);
+        assertFalse(vault.getUserPositions(alice)[0].active);
         vm.stopPrank();
     }
 }

@@ -2,7 +2,7 @@ import type { RebalancePlan } from "./rebalance";
 import type { CityState } from "./city";
 import type { SaleRecord } from "./city.ts";
 import { defFor } from "./city.ts";
-import type { RebalanceReceipt } from "./contracts";
+import type { RebalanceReceipt, BatchBuildingInput, BatchRecordResult } from "./contracts";
 
 export type RebalanceStepProgress = {
   stepId: string;
@@ -25,6 +25,57 @@ export type RebalanceExecution = {
 };
 
 export const REBALANCE_STORAGE = "stockva.agent-rebalance.v1";
+export const DIRECT_SALE_STORAGE = "stockva.pending-sale.v1";
+export const DIRECT_PURCHASE_STORAGE = "stockva.pending-purchase.v1";
+export type PendingDirectPurchase = {
+  owner: `0x${string}`;
+  hash: `0x${string}`;
+  items: BatchBuildingInput[];
+};
+export function recoverDirectPurchase(value: unknown): PendingDirectPurchase | null {
+  if (!value || typeof value !== "object") return null;
+  const purchase = value as PendingDirectPurchase;
+  if (!/^0x[a-fA-F0-9]{40}$/.test(purchase.owner) ||
+      !/^0x[a-fA-F0-9]{64}$/.test(purchase.hash) ||
+      !Array.isArray(purchase.items) || !purchase.items.length || purchase.items.length > 150) return null;
+  const ids = new Set<string>();
+  for (const item of purchase.items) {
+    if (!item || typeof item.buildingId !== "string" || !item.buildingId || item.buildingId.length > 100 ||
+        ids.has(item.buildingId) || typeof item.ticker !== "string" || !/^[A-Z0-9]{1,24}$/.test(item.ticker) ||
+        !Number.isFinite(item.usdAmount) || item.usdAmount <= 0 ||
+        !Number.isFinite(item.entryPrice) || item.entryPrice <= 0 ||
+        (item.initialTier !== undefined && item.initialTier !== 1)) return null;
+    ids.add(item.buildingId);
+  }
+  return purchase;
+}
+export function applyDirectPurchaseReceipt(
+  city: CityState, purchase: PendingDirectPurchase, result: BatchRecordResult,
+): CityState {
+  if (result.positionIds.length !== purchase.items.length ||
+      new Set(result.positionIds).size !== result.positionIds.length ||
+      result.positionIds.some((id) => !/^0x[a-fA-F0-9]{64}$/.test(id)))
+    throw new Error("The purchase receipt is missing valid position IDs.");
+  for (const [index, item] of purchase.items.entries()) {
+    const building = city.buildings.find((b) => b.id === item.buildingId);
+    if (!building || defFor(building.kind).ticker !== item.ticker ||
+        building.cost !== item.usdAmount || building.entry !== item.entryPrice ||
+        (building.vaultId && building.vaultId.toLowerCase() !== result.positionIds[index].toLowerCase()))
+      throw new Error("The submitted purchase no longer matches its city draft. Keep the hash for reconciliation.");
+  }
+  return { ...city, buildings: city.buildings.map((building) => {
+    const index = purchase.items.findIndex((item) => item.buildingId === building.id);
+    return index < 0 ? building : { ...building, locked: false, vaultTx: result.hash, vaultId: result.positionIds[index] };
+  }) };
+}
+export type PendingDirectSale = { buildingId: string; owner: `0x${string}`; hash: `0x${string}` };
+export function recoverDirectSale(value: unknown): PendingDirectSale | null {
+  if (!value || typeof value !== "object") return null;
+  const sale = value as PendingDirectSale;
+  return typeof sale.buildingId === "string" && sale.buildingId.length > 0 &&
+    sale.buildingId.length <= 100 && /^0x[a-fA-F0-9]{40}$/.test(sale.owner) &&
+    /^0x[a-fA-F0-9]{64}$/.test(sale.hash) ? sale : null;
+}
 
 export function hasPendingRebalance(
   run: RebalanceExecution | null | undefined,
@@ -200,6 +251,8 @@ export function applyRebalanceReceipt(
   let realizedPnl = city.realizedPnl ?? 0;
   let saleRow: SaleRecord | null = null;
   if (step.action === "sell") {
+    if (step.fractionBps === 10000 && !receipt.fullyClosed)
+      throw new Error("The approved full sale did not close its position.");
     if (receipt.positionId.toLowerCase() !== step.positionId.toLowerCase())
       throw new Error("The confirmed position does not match this building.");
     const building = buildings.find((b) => b.id === step.buildingId);
@@ -233,7 +286,11 @@ export function applyRebalanceReceipt(
       hash: receipt.hash,
       source: "onchain",
     };
-  } else {    if (buildings.some((b) => b.id === step.buildingId))
+  } else {
+    if ((step.amount !== undefined && receipt.amount !== Number(step.amount.toFixed(6))) ||
+        (step.price !== undefined && receipt.entryPrice !== Number(step.price.toFixed(6))))
+      throw new Error("The confirmed purchase amounts do not match the approved plan.");
+    if (buildings.some((b) => b.id === step.buildingId))
       throw new Error(
         "This new building already exists. Check the receipt before continuing.",
       );

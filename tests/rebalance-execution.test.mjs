@@ -5,6 +5,9 @@ import {
   applyRebalanceBatch,
   hasPendingRebalance,
   recoverRebalanceExecution,
+  recoverDirectSale,
+  recoverDirectPurchase,
+  applyDirectPurchaseReceipt,
 } from "../lib/rebalance-execution.ts";
 
 const hash = `0x${"a".repeat(64)}`;
@@ -40,6 +43,25 @@ const receipt = {
   entryPrice: 0,
   fullyClosed: true,
 };
+
+test("saved manual purchases validate inputs and reconcile idempotently without spending twice", () => {
+  const purchase = { owner: walletAddress, hash, items: [{ buildingId: "old", ticker: "NVDA", usdAmount: 500, entryPrice: 100, initialTier: 1 }] };
+  assert.deepEqual(recoverDirectPurchase(purchase), purchase);
+  for (const bad of [null, { ...purchase, hash: "0x" }, { ...purchase, items: [] },
+    { ...purchase, items: [purchase.items[0], purchase.items[0]] },
+    { ...purchase, items: [{ ...purchase.items[0], usdAmount: 0 }] }])
+    assert.equal(recoverDirectPurchase(bad), null);
+  const draft = { ...city, buildings: [{ ...building, vaultId: undefined, locked: true }] };
+  const result = { hash, positionIds: [positionId] };
+  const next = applyDirectPurchaseReceipt(draft, purchase, result);
+  assert.equal(next.cash, draft.cash, "Placement already debited city cash");
+  assert.equal(next.buildings[0].locked, false);
+  assert.equal(next.buildings[0].vaultId, positionId);
+  assert.deepEqual(applyDirectPurchaseReceipt(next, purchase, result), next);
+  assert.throws(() => applyDirectPurchaseReceipt(draft, purchase, { ...result, positionIds: [] }), /position IDs/);
+  assert.throws(() => applyDirectPurchaseReceipt({ ...draft, buildings: [] }, purchase, result), /draft/);
+  assert.throws(() => applyDirectPurchaseReceipt(city, purchase, { hash, positionIds: [`0x${"d".repeat(64)}`] }), /draft/);
+});
 
 test("a confirmed removal records actual capped proceeds and remains in city history", () => {
   const next = applyRebalanceReceipt(city, plan, sell, receipt);
@@ -101,6 +123,17 @@ test("a mismatched receipt cannot mutate the city", () => {
     /position/,
   );
   assert.equal(city.cash, 100);
+});
+
+test("a full-sale blueprint cannot confirm a partial sale", () => {
+  assert.throws(() => applyRebalanceReceipt(city, plan, { ...sell, fractionBps: 10000 }, { ...receipt, fullyClosed: false, quantity: 2 }), /did not close/);
+});
+
+test("pending inspector sales persist only valid wallet, building and transaction references", () => {
+  const saved = { buildingId: "old", owner: walletAddress, hash };
+  assert.deepEqual(recoverDirectSale(JSON.parse(JSON.stringify(saved))), saved);
+  for (const invalid of [null, {}, { ...saved, hash: "0x" }, { ...saved, owner: "foreign" }, { ...saved, buildingId: "" }])
+    assert.equal(recoverDirectSale(invalid), null);
 });
 
 test("floating settlement cannot invalidate the saved city with a negative zero balance", () => {

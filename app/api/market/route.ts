@@ -49,7 +49,7 @@ async function yahooUnderlying(
     const closes = result?.indicators?.quote?.[0]?.close as unknown as
       number[] | undefined;
     const price = Number(meta?.regularMarketPrice);
-    const prev = Number(meta?.chartPreviousClose);
+    const prev = Number(meta?.previousClose ?? meta?.regularMarketPreviousClose ?? closes?.filter((c) => Number.isFinite(c) && c > 0).at(-2));
     if (!Number.isFinite(price) || price <= 0) {
       const valid = (closes ?? []).filter((c) => Number.isFinite(c) && c > 0);
       const last = valid[valid.length - 1];
@@ -106,6 +106,10 @@ export async function GET() {
         break;
       }
     }
+  } catch {
+    // Independent providers must still run when Kraken is unavailable.
+  }
+  try {
     // Fallback chain for tickers Kraken doesn't list (e.g. BLK, WMT):
     // 1) xStocks indicative token price (same issuer family),
     // 2) Yahoo underlying reference (honestly labeled, never illustrative).
@@ -154,8 +158,6 @@ export async function GET() {
         }
       }
     }
-    if (!Object.values(feed.quotes).some((q) => q.status === "live"))
-      throw new Error("No matching quotes");
     // Best-effort RWA layer: on-chain vs reference spread + market session
     // from Binance Web3 RWA Data. Never breaks the xStocks/Yahoo chain.
     if (rwaConfigured()) {
@@ -187,23 +189,17 @@ export async function GET() {
         /* RWA layer stays silent; core quotes stand on their own */
       }
     }
-    if (cache)
-      for (const [ticker, q] of Object.entries(cache.feed.quotes)) {
-        if (
-          feed.quotes[ticker]?.status === "fallback" &&
-          q.status !== "fallback"
-        )
-          feed.quotes[ticker] = { ...q, status: "stale" };
-      }
-    cache = { at: Date.now(), feed };
   } catch {
+    // Preserve successfully retrieved quotes when an optional provider fails.
+  }
+  if (cache)
+    for (const [ticker, q] of Object.entries(cache.feed.quotes))
+      if (feed.quotes[ticker]?.status === "fallback" && q.status !== "fallback")
+        feed.quotes[ticker] = { ...q, status: "stale" };
+  if (!Object.values(feed.quotes).some((q) => q.status === "live"))
     feed.error =
       "Live provider unavailable. Retry shortly; fallback prices are illustrative.";
-    if (cache)
-      for (const [ticker, q] of Object.entries(cache.feed.quotes))
-        if (q.status === "live")
-          feed.quotes[ticker] = { ...q, status: "stale" };
-  }
+  cache = { at: Date.now(), feed };
   return NextResponse.json(feed, {
     headers: {
       "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",

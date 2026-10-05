@@ -39,6 +39,8 @@ export type CivicProps = {
   onConfirmBatch?: (
     receipts: { buildingId: string; hash: `0x${string}`; vaultId: string }[],
   ) => void;
+  transactionPending?: boolean;
+  onPurchaseSubmitted?: (purchase: import("../lib/rebalance-execution").PendingDirectPurchase) => void;
 };
 const services = {
   portfolio: {
@@ -133,7 +135,7 @@ export default function CivicPanel(props: CivicProps) {
             </div>
           </div>
           <div className={styles.headerEnd}>
-            {mode !== "portfolio" && <RwaSessionClock />}
+            {mode !== "portfolio" && <span className={styles.sessionClock}><RwaSessionClock /></span>}
             <span className={styles.badge}>City sandbox · BNB testnet</span>
             <button
               className={styles.iconButton}

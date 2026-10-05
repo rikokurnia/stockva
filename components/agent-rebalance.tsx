@@ -463,7 +463,7 @@ export default function AgentRebalance({
           },
           {
             title: "Wallet approval",
-            detail: "1 signature for all stocks (same as Bundle)",
+            detail: "Atomic batch or separate wallet signatures",
             icon: Wallet,
           },
           {
@@ -688,8 +688,8 @@ export default function AgentRebalance({
           <div className={styles.boundary}>
             <ShieldCheck size={17} aria-hidden="true" />
             <p>
-              The agent prepares the plan. Your wallet approves all stock
-              buildings in 1 transaction (same as the bundle feature).
+              The agent prepares the plan. Your wallet approves an atomic batch
+              when supported, or signs each building change separately.
             </p>
           </div>
           <div className={styles.snapshot}>
@@ -951,7 +951,7 @@ export default function AgentRebalance({
               <div className={styles.ledgerHeader}>
                 <h5>Every building. Every step.</h5>
                 <span>
-                  {shownPlan.steps.length} changes · 1 batch approval
+                  {shownPlan.steps.length} changes · {shownExecution?.mode === "sequential" ? "separate signatures" : "wallet approval"}
                 </span>
               </div>
               {shownExecution?.batchId && (
@@ -1208,11 +1208,12 @@ export default function AgentRebalance({
                     <div className={styles.executeHeading}>
                       <ShieldCheck size={21} aria-hidden="true" />
                       <div>
-                        <b>Review first. 1 signature for all stocks.</b>
+                        <b>Review and approve your rebalance.</b>
                         <p>
                           {shownPlan.steps.length} building changes on BNB
-                          testnet. 1 signature in your wallet for all stocks
-                          (same as the Bundle feature). Network fees paid in tBNB.
+                          testnet. Compatible wallets can approve one atomic batch.
+                          Standard wallets sign each sale and purchase separately,
+                          including mUSD approval when needed. Network fees paid in tBNB.
                         </p>
                       </div>
                     </div>
@@ -1237,12 +1238,11 @@ export default function AgentRebalance({
                       <Wallet size={17} aria-hidden="true" />
                       {starting
                         ? "Opening your wallet…"
-                        : "Sign once & rebalance city"}
+                        : "Approve rebalance"}
                       <ArrowRight size={16} aria-hidden="true" />
                     </button>
                     <small className={styles.executeNote}>
-                      1 batch signature for all stocks on BNB testnet. Every
-                      building is permanently recorded in City Hall.
+                      Each building change is recorded after onchain confirmation.
                     </small>
                   </>
                 )}

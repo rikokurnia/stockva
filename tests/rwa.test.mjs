@@ -36,7 +36,7 @@ test("sessionLabel narrates open, closed, halted and unknown", () => {
   assert.match(sessionLabel("unknown", null, null), /unknown/);
 });
 
-test("estimatedSession follows the 13:30-20:00 UTC weekday clock", () => {
+test("estimatedSession follows New York trading hours across DST", () => {
   const open = estimatedSession(new Date("2026-10-07T15:00:00.000Z"));
   assert.equal(open.state, "open");
   assert.equal(open.provenance, "estimated");
@@ -44,6 +44,10 @@ test("estimatedSession follows the 13:30-20:00 UTC weekday clock", () => {
   assert.equal(weekend.state, "closed");
   const night = estimatedSession(new Date("2026-10-07T02:00:00.000Z"));
   assert.equal(night.state, "closed");
+  assert.equal(estimatedSession(new Date("2026-01-07T14:00:00Z")).state, "closed");
+  assert.equal(estimatedSession(new Date("2026-01-07T14:30:00Z")).state, "open");
+  assert.equal(estimatedSession(new Date("2026-01-07T20:30:00Z")).state, "open");
+  assert.equal(estimatedSession(new Date("2026-01-07T21:00:00Z")).state, "closed");
 });
 
 test("sessionFromStatus reads real RWA statusInfo blocks", () => {
@@ -73,6 +77,7 @@ test("sessionFromStatus reads real RWA statusInfo blocks", () => {
     reasonCode: "MARKET_PAUSED",
   });
   assert.equal(paused.session, "closed");
+  assert.equal(sessionFromStatus({ openState: false, marketStatus: "regular" }).referenceFrozen, true);
   const halted = sessionFromStatus({
     openState: false,
     marketStatus: "halt",

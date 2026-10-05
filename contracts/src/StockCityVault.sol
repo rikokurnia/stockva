@@ -7,7 +7,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title StockCityVault — On-Chain Stock Building Position Manager
-/// @notice Handles buying, tracking, and liquidating tokenized stock building positions for StockCity on BNB Chain
+/// @notice Testnet simulation ledger. Caller-supplied prices are not an authenticated oracle.
 contract StockCityVault is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
@@ -197,7 +197,7 @@ contract StockCityVault is ReentrancyGuard, Ownable {
 
     /// @notice Partially or fully liquidate a position
     /// @param positionId The ID of the position to sell
-    /// @param currentPrice The current market price from oracle/feed (18 decimals)
+    /// @param currentPrice Caller-supplied simulation price (18 decimals); never safe for real collateral
     /// @param fractionBps Basis points to sell (1 to 10000, where 10000 = 100%)
     function sellPosition(
         bytes32 positionId,
@@ -217,7 +217,6 @@ contract StockCityVault is ReentrancyGuard, Ownable {
         // Calculate payout: (soldQuantity * currentPrice) / 1e18
         payout = (soldQuantity * currentPrice) / 1e18;
         uint256 costBasis = (soldQuantity * pos.entryPrice) / 1e18;
-        int256 pnl = int256(payout) - int256(costBasis);
 
         // Update position remaining quantity
         pos.quantity -= soldQuantity;
@@ -232,6 +231,8 @@ contract StockCityVault is ReentrancyGuard, Ownable {
         if (actualPayout > 0) {
             paymentToken.safeTransfer(msg.sender, actualPayout);
         }
+        payout = actualPayout;
+        int256 pnl = int256(actualPayout) - int256(costBasis);
 
         emit PositionSold(
             positionId,

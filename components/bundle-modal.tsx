@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useWallets } from "@privy-io/react-auth";
+import type { PendingDirectPurchase } from "../lib/rebalance-execution";
 import { X, CheckCircle2, AlertCircle, Layers } from "lucide-react";
 import type { Building, PriceMap } from "../lib/city";
 import { defFor, money, sprite, wholeMoney } from "../lib/city";
@@ -18,6 +20,9 @@ type Props = {
     receipts: { buildingId: string; hash: `0x${string}`; vaultId: string }[],
   ) => void;
   onStartConfirmation?: (buildingIds: string[]) => void;
+  onFinishConfirmation?: (buildingIds: string[]) => void;
+  transactionPending?: boolean;
+  onPurchaseSubmitted?: (purchase: PendingDirectPurchase) => void;
 };
 
 export default function BundleModal({
@@ -29,7 +34,11 @@ export default function BundleModal({
   onConnectWallet,
   onConfirmSuccess,
   onStartConfirmation,
+  onFinishConfirmation,
+  transactionPending,
+  onPurchaseSubmitted,
 }: Props) {
+  const { wallets } = useWallets();
   const [submitting, setSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -39,6 +48,7 @@ export default function BundleModal({
   const totalCost = buildings.reduce((sum, b) => sum + b.cost, 0);
 
   const handleConfirm = async () => {
+    if (transactionPending) return;
     setErrorMsg(null);
     setSubmitting(true);
     setStatusMsg("Preparing batch transaction on BSC Testnet…");
@@ -59,6 +69,8 @@ export default function BundleModal({
         entryPrice: b.entry,
         initialTier: 1,
       }));
+      const connected = wallets.find((w) => w.address.toLowerCase() === account.toLowerCase());
+      const provider = connected ? await connected.getEthereumProvider() : window.ethereum;
 
       const { hash, positionIds } = await recordBuildingsBatch(
         account,
@@ -77,17 +89,19 @@ export default function BundleModal({
               `Confirm batch purchase popup — ${buildings.length} positions, 1 signature…`,
             );
           } else if (step === "buy" && stepHash) {
+            onPurchaseSubmitted?.({ owner: account!, hash: stepHash, items: batchItems });
             setStatusMsg(
               "Transaction broadcast! Waiting for BSC block confirmation…",
             );
           }
         },
+        provider,
       );
 
       const receipts = buildings.map((b, i) => ({
         buildingId: b.id,
         hash,
-        vaultId: positionIds[i] ?? "0x",
+        vaultId: positionIds[i],
       }));
 
       onConfirmSuccess(receipts);
@@ -100,6 +114,7 @@ export default function BundleModal({
       setErrorMsg(msg);
       setStatusMsg(null);
     } finally {
+      onFinishConfirmation?.(buildings.map((b) => b.id));
       setSubmitting(false);
     }
   };
@@ -123,7 +138,7 @@ export default function BundleModal({
             </h2>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className={styles.badge}>1 SIGNATURE</span>
+            <span className={styles.badge}>BATCH PURCHASE</span>
             <button
               type="button"
               className={styles.closeBtn}
@@ -223,7 +238,7 @@ export default function BundleModal({
             type="button"
             className={styles.confirmBtn}
             onClick={handleConfirm}
-            disabled={submitting}
+            disabled={submitting || transactionPending}
           >
             {submitting ? (
               <>
@@ -231,7 +246,7 @@ export default function BundleModal({
                 <span>Confirming…</span>
               </>
             ) : (
-              <span>Confirm on BSC (1 Signature)</span>
+              <span>{transactionPending ? "Confirming submitted purchase" : "Confirm on BSC"}</span>
             )}
           </button>
         </footer>

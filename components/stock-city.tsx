@@ -33,6 +33,7 @@ import {
 import CityMap, { type AgentMapActivity } from "./city-map";
 import { inspectorPlacement } from "../lib/map-geometry";
 import { rebalanceFingerprint, type RebalancePlan } from "../lib/rebalance";
+import { executeSequentialRebalance } from "../lib/rebalance-sequential";
 import {
   applyDirectSellReceipt,
   applyRebalanceReceipt,
@@ -40,6 +41,13 @@ import {
   hasPendingRebalance,
   recoverRebalanceExecution,
   REBALANCE_STORAGE,
+  DIRECT_SALE_STORAGE,
+  recoverDirectSale,
+  type PendingDirectSale,
+  DIRECT_PURCHASE_STORAGE,
+  recoverDirectPurchase,
+  applyDirectPurchaseReceipt,
+  type PendingDirectPurchase,
   type RebalanceExecution,
 } from "../lib/rebalance-execution";
 import {
@@ -60,11 +68,9 @@ import {
   connectInjectedWallet,
   ensureBscTestnet,
   recordBuildingOnchain,
-  recordBuildingsBatch,
   sellBuildingOnchain,
   confirmedRebalanceReceipt,
-  type BatchBuildingInput,
-  type RebalanceReceipt,
+  confirmedBuildingPurchases,
 } from "../lib/contracts";
 import BundleModal from "./bundle-modal";
 import { BuildingCatalogueModal } from "./building-catalogue-modal";
@@ -182,8 +188,6 @@ export default function StockCity() {
   const [agentActivity, setAgentActivity] = useState<AgentMapActivity | null>(
     null,
   );
-  const cityMutationLocked =
-    agentExecution?.status === "running" || hasPendingRebalance(agentExecution);
   const [placeSource, setPlaceSource] = useState<"tray" | "exchange" | null>(
     null,
   );
@@ -253,6 +257,12 @@ export default function StockCity() {
   const [draggingInspector, setDraggingInspector] = useState(false);
   const inspectorDragOffset = useRef<{ dx: number; dy: number } | null>(null);
   const [sellingBuilding, setSellingBuilding] = useState(false);
+  const [pendingDirectSale, setPendingDirectSale] = useState<PendingDirectSale | null>(null);
+  const [pendingDirectPurchase, setPendingDirectPurchase] = useState<PendingDirectPurchase | null>(null);
+  const [saleRecoveryKey, setSaleRecoveryKey] = useState(0);
+  const cityMutationLocked = sellingBuilding || !!pendingDirectSale || !!pendingDirectPurchase ||
+    Object.values(confirmingBuildings).some((progress) => progress.confirming) ||
+    agentExecution?.status === "running" || hasPendingRebalance(agentExecution);
   const [inspectorSellOpen, setInspectorSellOpen] = useState(false);
   const [inspectorSellPct, setInspectorSellPct] = useState(100);
   const hasHall = city.buildings.some((b) => b.kind === "hall");
@@ -444,6 +454,8 @@ export default function StockCity() {
         JSON.parse(localStorage.getItem(REBALANCE_STORAGE) ?? "null"),
         catalogue.map((definition) => definition.kind),
       );
+      setPendingDirectSale(recoverDirectSale(JSON.parse(localStorage.getItem(DIRECT_SALE_STORAGE) ?? "null")));
+      setPendingDirectPurchase(recoverDirectPurchase(JSON.parse(localStorage.getItem(DIRECT_PURCHASE_STORAGE) ?? "null")));
       if (
         execution?.plan?.id &&
         Array.isArray(execution.steps) &&
@@ -521,6 +533,7 @@ export default function StockCity() {
       }
     }
     void syncWalletFunds();
+    return () => { cancelled = true; };
   }, [wallet]);
   useEffect(() => {
     if (paused) return;
@@ -663,8 +676,84 @@ export default function StockCity() {
     future.current = [];
     setCity(next);
   };
+  const savePendingPurchase = (purchase: PendingDirectPurchase) => {
+    localStorage.setItem(DIRECT_PURCHASE_STORAGE, JSON.stringify(purchase));
+    setPendingDirectPurchase(purchase);
+  };
+  const clearPendingPurchase = () => {
+    localStorage.removeItem(DIRECT_PURCHASE_STORAGE);
+    setPendingDirectPurchase(null);
+  };
+  useEffect(() => {
+    if (!ready || !pendingDirectPurchase) return;
+    let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const purchase = pendingDirectPurchase;
+    void (async () => {
+      try {
+        const result = await confirmedBuildingPurchases(purchase.owner, purchase.hash, purchase.items, (hash) => {
+          localStorage.setItem(DIRECT_PURCHASE_STORAGE, JSON.stringify({ ...purchase, hash }));
+        });
+        if (cancelled) return;
+        saveConfirmedCity(applyDirectPurchaseReceipt(simulationLatest.current.city, purchase, result));
+        clearPendingPurchase();
+        setConfirmingBuildings((previous) => {
+          const next = { ...previous };
+          for (const item of purchase.items) delete next[item.buildingId];
+          return next;
+        });
+        notify("Confirmed purchase recovered. Buildings are recorded on BNB Testnet.");
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Purchase confirmation unavailable.";
+        if (/transaction reverted/i.test(message)) {
+          clearPendingPurchase();
+          setConfirmingBuildings((previous) => {
+            const next = { ...previous };
+            for (const item of purchase.items) delete next[item.buildingId];
+            return next;
+          });
+        } else retry = setTimeout(() => setSaleRecoveryKey((key) => key + 1), 30000);
+        notify(`${message} Submitted purchases are recovered without another signature.`, true);
+      }
+    })();
+    return () => { cancelled = true; clearTimeout(retry); };
+  }, [ready, pendingDirectPurchase, saleRecoveryKey]);
+  useEffect(() => {
+    if (!ready || !pendingDirectSale || sellingBuilding) return;
+    let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const sale = pendingDirectSale;
+    void (async () => {
+      try {
+        const receipt = await confirmedRebalanceReceipt(sale.owner, sale.hash, "sell", (hash) => {
+          localStorage.setItem(DIRECT_SALE_STORAGE, JSON.stringify({ ...sale, hash }));
+        });
+        if (cancelled) return;
+        saveConfirmedCity(applyDirectSellReceipt(simulationLatest.current.city, sale.buildingId, receipt, sale.owner));
+        localStorage.removeItem(DIRECT_SALE_STORAGE);
+        setPendingDirectSale(null);
+        notify("Recovered the confirmed sale. Receipt saved in City Hall.");
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Sale confirmation unavailable.";
+        if (/transaction reverted|replaced or cancelled on-chain/i.test(message)) {
+          localStorage.removeItem(DIRECT_SALE_STORAGE);
+          setPendingDirectSale(null);
+        } else {
+          retry = setTimeout(() => setSaleRecoveryKey((key) => key + 1), 30000);
+        }
+        notify(`${message} Saved sale hashes are checked without another signature.`, true);
+      }
+    })();
+    return () => { cancelled = true; clearTimeout(retry); };
+  }, [ready, pendingDirectSale, sellingBuilding, saleRecoveryKey]);
   const executeRebalance = async (plan: RebalancePlan) => {
     if (agentRunning.current) return;
+    if (sellingBuilding || pendingDirectSale || pendingDirectPurchase || Object.values(confirmingBuildings).some((p) => p.confirming)) {
+      notify("Finish confirming pending transactions before starting a rebalance.", true);
+      return;
+    }
     if (
       executionRef.current?.plan.id !== plan.id &&
       hasPendingRebalance(executionRef.current)
@@ -723,6 +812,18 @@ export default function StockCity() {
       const latest = simulationLatest.current.city;
       const applied =
         latest.agentReceipts?.filter((r) => r.planId === plan.id) ?? [];
+      // City persistence can succeed just before progress persistence is interrupted.
+      if (applied.some((receipt) => run.steps.find((progress) => progress.stepId === receipt.stepId)?.status !== "confirmed")) {
+        run = {
+          ...run,
+          fingerprint: rebalanceFingerprint(latest),
+          steps: run.steps.map((progress) => {
+            const receipt = applied.find((r) => r.stepId === progress.stepId);
+            return receipt ? { ...progress, status: "confirmed" as const, hash: receipt.hash } : progress;
+          }),
+        };
+        saveAgentExecution(run);
+      }
       if (
         applied.length === plan.steps.length &&
         plan.steps.every((s) => applied.some((r) => r.stepId === s.id))
@@ -749,6 +850,7 @@ export default function StockCity() {
         );
       if (
         !run.batchId &&
+        !hasPendingRebalance(run) &&
         !run.steps.some((s) => s.status === "confirmed") &&
         Date.now() > plan.expiresAt
       )
@@ -756,7 +858,7 @@ export default function StockCity() {
           "This quote expired. Ask the agent for a fresh blueprint before signing.",
         );
       if (
-        !run.steps.some((s) => s.status === "confirmed") &&
+        !hasPendingRebalance(run) &&
         rebalanceFingerprint(latest) !== (run.fingerprint ?? plan.fingerprint)
       )
         throw new Error(
@@ -878,429 +980,45 @@ export default function StockCity() {
         }
 
         if (useSequential) {
-          // Sequential Execution Mode
-          // 1. Reconcile any in-flight step transactions
-          for (const step of plan.steps) {
-            const progress = run.steps.find((p) => p.stepId === step.id)!;
-            if (
-              !progress.hash ||
-              progress.reverted ||
-              progress.status === "confirmed"
-            )
-              continue;
-            try {
-              focus(
-                step,
-                "submitted",
-                `Reconciling ${step.ticker} transaction…`,
-                progress.hash,
-              );
-              const receipt = await confirmedRebalanceReceipt(
+          run = await executeSequentialRebalance(run, {
+            save: (next) => {
+              run = next;
+              saveAgentExecution(next);
+            },
+            send: async (step, submitted, approved) => {
+              if (Date.now() > plan.expiresAt)
+                throw new Error("The remaining quotes expired. Keep confirmed changes and request a fresh blueprint.");
+              focus(step, "wallet", `Sign ${step.action} for ${step.ticker} in your wallet`);
+              if (step.action === "sell")
+                return sellBuildingOnchain(
+                  plan.walletAddress, step.positionId, step.price,
+                  step.fractionBps, (hash) => { if (hash) submitted(hash); },
+                  provider, step.positionQuantity,
+                );
+              const result = await recordBuildingOnchain(
                 plan.walletAddress,
-                progress.hash,
-                step.action,
-                (hash) => {
-                  run = {
-                    ...run,
-                    steps: run.steps.map((p) =>
-                      p.stepId === step.id ? { ...p, hash } : p,
-                    ),
-                  };
-                  saveAgentExecution(run);
-                },
-              );
-              const next = applyRebalanceReceipt(
-                simulationLatest.current.city,
-                plan,
-                step,
-                receipt,
-              );
-              saveConfirmedCity(next);
-              run = {
-                ...run,
-                fingerprint: rebalanceFingerprint(next),
-                steps: run.steps.map((p) =>
-                  p.stepId === step.id
-                    ? {
-                        ...p,
-                        status: "confirmed",
-                        hash: receipt.hash,
-                        error: undefined,
-                      }
-                    : p,
-                ),
-              };
-              saveAgentExecution(run);
-            } catch (error) {
-              if (
-                error instanceof Error &&
-                /transaction reverted|replaced or cancelled on-chain/i.test(
-                  error.message,
-                )
-              ) {
-                run = {
-                  ...run,
-                  steps: run.steps.map((p) =>
-                    p.stepId === step.id
-                      ? {
-                          ...p,
-                          status: "error",
-                          reverted: true,
-                          error: error.message,
-                        }
-                      : p,
-                  ),
-                };
-                saveAgentExecution(run);
-              }
-              throw error;
-            }
-          }
-
-          // 2. Identify remaining unconfirmed steps
-          const unconfirmedSteps = plan.steps.filter((step) => {
-            const progress = run.steps.find((p) => p.stepId === step.id);
-            return progress?.status !== "confirmed";
-          });
-
-          const unconfirmedBuys = unconfirmedSteps.filter(
-            (s) => s.action === "buy",
-          );
-          const unconfirmedSells = unconfirmedSteps.filter(
-            (s) => s.action === "sell",
-          );
-
-          if (unconfirmedBuys.length > 0) {
-            // Batch all unconfirmed stock purchases in ONE single transaction (same as the Bundle feature)
-            const batchItems: BatchBuildingInput[] = unconfirmedBuys.map(
-              (step) => ({
-                buildingId: step.buildingId,
-                ticker: step.ticker,
-                usdAmount: step.amount,
-                entryPrice: step.price,
-                initialTier: 1,
-              }),
-            );
-
-            run = {
-              ...run,
-              steps: run.steps.map((p) =>
-                unconfirmedSteps.some((s) => s.id === p.stepId)
-                  ? {
-                      ...p,
-                      status: "wallet",
-                      error: undefined,
-                      reverted: undefined,
-                    }
-                  : p,
-              ),
-            };
-            saveAgentExecution(run);
-            notify(
-              `Agent: confirm 1 batch transaction in your wallet for all ${unconfirmedBuys.length} stocks.`,
-            );
-
-            for (const step of unconfirmedBuys) {
-              focus(
-                step,
-                "wallet",
-                `Confirm batch purchase of ${unconfirmedBuys.length} stocks in wallet (1 signature)`,
-              );
-            }
-
-            const batchResult = await recordBuildingsBatch(
-              plan.walletAddress,
-              batchItems,
-              (phase, h) => {
-                if (phase === "approve") {
-                  for (const step of unconfirmedBuys) {
-                    focus(
-                      step,
-                      "wallet",
-                      h
-                        ? "Confirming mUSD approval…"
-                        : "Approve mUSD spending in wallet…",
-                      h,
-                    );
-                  }
-                  if (h) {
-                    run = {
-                      ...run,
-                      steps: run.steps.map((p) =>
-                        unconfirmedBuys.some((s) => s.id === p.stepId)
-                          ? { ...p, approvalHash: h }
-                          : p,
-                      ),
-                    };
-                    saveAgentExecution(run);
-                  }
-                } else {
-                  for (const step of unconfirmedBuys) {
-                    focus(
-                      step,
-                      h ? "submitted" : "wallet",
-                      h
-                        ? "Batch broadcast! Waiting for BSC block confirmation…"
-                        : `Confirm batch purchase popup — ${unconfirmedBuys.length} stocks, 1 signature…`,
-                      h,
-                    );
-                  }
-                  if (h) {
-                    run = {
-                      ...run,
-                      steps: run.steps.map((p) =>
-                        unconfirmedBuys.some((s) => s.id === p.stepId)
-                          ? { ...p, status: "submitted", hash: h }
-                          : p,
-                      ),
-                    };
-                    saveAgentExecution(run);
-                  }
-                }
-              },
-              provider,
-            );
-
-            const batchHash = batchResult.hash;
-
-            // Apply all unconfirmed sells to city state (retired / freed for this rebalance)
-            for (const step of unconfirmedSells) {
-              const sellReceipt: RebalanceReceipt = {
-                hash: batchHash,
-                positionId: step.positionId,
-                amount: step.amount,
-                quantity: step.quantity,
-                entryPrice: step.price,
-                ticker: step.ticker,
-                fullyClosed: true,
-              };
-              const nextCity = applyRebalanceReceipt(
-                simulationLatest.current.city,
-                plan,
-                step,
-                sellReceipt,
-                true,
-              );
-              saveConfirmedCity(nextCity);
-              run = {
-                ...run,
-                fingerprint: rebalanceFingerprint(nextCity),
-                steps: run.steps.map((p) =>
-                  p.stepId === step.id
-                    ? {
-                        ...p,
-                        status: "confirmed",
-                        hash: batchHash,
-                        error: undefined,
-                      }
-                    : p,
-                ),
-              };
-              saveAgentExecution(run);
-              focus(step, "confirmed", `Removed ${step.ticker} in rebalance`, batchHash);
-            }
-
-            let positionIds = batchResult.positionIds;
-            if (positionIds.length < unconfirmedBuys.length) {
-              try {
-                const { createPublicClient, http } = await import("viem");
-                const { bscTestnet } = await import("viem/chains");
-                const { BSC_TESTNET_RPC, VAULT_ADDRESS, VAULT_ABI } =
-                  await import("../lib/contracts");
-                const publicClient = createPublicClient({
-                  chain: bscTestnet,
-                  transport: http(BSC_TESTNET_RPC, { timeout: 8000 }),
-                });
-                const onchainPositions = (await publicClient.readContract({
-                  address: VAULT_ADDRESS,
-                  abi: VAULT_ABI,
-                  functionName: "getUserPositions",
-                  args: [plan.walletAddress],
-                })) as unknown as Array<{ id: `0x${string}`; active: boolean }>;
-                const activeIds = onchainPositions
-                  .filter((p) => p.active)
-                  .map((p) => p.id);
-                if (activeIds.length >= unconfirmedBuys.length) {
-                  positionIds = activeIds.slice(-unconfirmedBuys.length);
-                }
-              } catch {
-                // Fallback to returned IDs
-              }
-            }
-
-            // Apply all unconfirmed buys to city state using the confirmed on-chain position IDs
-            for (let i = 0; i < unconfirmedBuys.length; i++) {
-              const step = unconfirmedBuys[i];
-              const vaultId = positionIds[i] ?? batchHash;
-              const buyReceipt: RebalanceReceipt = {
-                hash: batchHash,
-                positionId: vaultId,
-                amount: step.amount,
-                quantity: Number((step.amount / step.price).toFixed(6)),
-                entryPrice: step.price,
-                ticker: step.ticker,
-                fullyClosed: false,
-              };
-              const nextCity = applyRebalanceReceipt(
-                simulationLatest.current.city,
-                plan,
-                step,
-                buyReceipt,
-                true,
-              );
-              saveConfirmedCity(nextCity);
-              run = {
-                ...run,
-                fingerprint: rebalanceFingerprint(nextCity),
-                steps: run.steps.map((p) =>
-                  p.stepId === step.id
-                    ? {
-                        ...p,
-                        status: "confirmed",
-                        hash: batchHash,
-                        error: undefined,
-                      }
-                    : p,
-                ),
-              };
-              saveAgentExecution(run);
-              focus(
-                step,
-                "confirmed",
-                `Constructed ${step.ticker} in batch`,
-                batchHash,
-              );
-              setUpgrades((previous) => ({
-                ...previous,
-                [step.buildingId]: Date.now(),
-              }));
-            }
-
-            const finalBatchCity = {
-              ...simulationLatest.current.city,
-              rebalanceCount: Math.min(3, (simulationLatest.current.city.rebalanceCount ?? 0) + 1),
-            };
-            saveConfirmedCity(finalBatchCity);
-
-            notify(
-              `Confirmed all ${unconfirmedBuys.length} stock buildings in 1 batch on BNB Testnet!`,
-            );
-          } else if (unconfirmedSells.length > 0) {
-            // Pure liquidation scenario (no buys to batch)
-            for (const step of unconfirmedSells) {
-              run = {
-                ...run,
-                steps: run.steps.map((p) =>
-                  p.stepId === step.id
-                    ? {
-                        ...p,
-                        status: "wallet",
-                        error: undefined,
-                        reverted: undefined,
-                      }
-                    : p,
-                ),
-              };
-              saveAgentExecution(run);
-              focus(
-                step,
-                "wallet",
-                `Sign sell transaction for ${step.ticker} in wallet`,
-              );
-              notify(
-                `Agent: sign sell transaction for ${step.ticker} in your wallet.`,
-              );
-
-              const hash = await sellBuildingOnchain(
-                plan.walletAddress,
-                step.positionId,
-                step.price,
-                step.fractionBps,
-                (h) => {
-                  if (h) {
-                    run = {
-                      ...run,
-                      steps: run.steps.map((p) =>
-                        p.stepId === step.id
-                          ? { ...p, status: "submitted", hash: h }
-                          : p,
-                      ),
-                    };
-                    saveAgentExecution(run);
-                    focus(
-                      step,
-                      "submitted",
-                      `Confirming sale of ${step.ticker} on BNB Chain…`,
-                      h,
-                    );
-                  }
+                { ticker: step.ticker, usdAmount: step.amount, entryPrice: step.price, initialTier: 1 },
+                (phase, hash) => {
+                  if (!hash) return;
+                  if (phase === "approve") approved(hash);
+                  else submitted(hash);
                 },
                 provider,
               );
-
-              run = {
-                ...run,
-                steps: run.steps.map((p) =>
-                  p.stepId === step.id
-                    ? { ...p, status: "submitted", hash }
-                    : p,
-                ),
-              };
-              saveAgentExecution(run);
-              focus(
-                step,
-                "submitted",
-                `Waiting for receipt of ${step.ticker} sale…`,
-                hash,
-              );
-
-              const receipt = await confirmedRebalanceReceipt(
-                plan.walletAddress,
-                hash,
-                "sell",
-                (canonical) => {
-                  run = {
-                    ...run,
-                    steps: run.steps.map((p) =>
-                      p.stepId === step.id ? { ...p, hash: canonical } : p,
-                    ),
-                  };
-                  saveAgentExecution(run);
-                },
-              );
-
-              const next = applyRebalanceReceipt(
-                simulationLatest.current.city,
-                plan,
-                step,
-                receipt,
-              );
+              return result.hash;
+            },
+            confirm: (step, hash, canonical) => {
+              focus(step, "submitted", `Confirming ${step.ticker} on BNB Testnet`, hash);
+              return confirmedRebalanceReceipt(plan.walletAddress, hash, step.action, canonical);
+            },
+            apply: (step, receipt) => {
+              const next = applyRebalanceReceipt(simulationLatest.current.city, plan, step, receipt);
               saveConfirmedCity(next);
-
-              run = {
-                ...run,
-                fingerprint: rebalanceFingerprint(next),
-                steps: run.steps.map((p) =>
-                  p.stepId === step.id
-                    ? {
-                        ...p,
-                        status: "confirmed",
-                        hash: receipt.hash,
-                        error: undefined,
-                      }
-                    : p,
-                ),
-              };
-              saveAgentExecution(run);
-              focus(
-                step,
-                "confirmed",
-                `Sold ${step.ticker} on-chain`,
-                receipt.hash,
-              );
-              notify(`Confirmed removal of ${step.ticker}.`);
-            }
-          }
+              focus(step, "confirmed", `Confirmed ${step.action} for ${step.ticker}`, receipt.hash);
+              setUpgrades((previous) => ({ ...previous, [step.buildingId]: Date.now() }));
+              return rebalanceFingerprint(next);
+            },
+          });
 
           const finalSeqCity = {
             ...simulationLatest.current.city,
@@ -1748,6 +1466,8 @@ export default function StockCity() {
             `${defFor(kind).name} drafted. Confirm the purchase popup in your wallet…`,
           );
           try {
+            const connected = wallets.find((w) => w.address.toLowerCase() === account.toLowerCase());
+            const provider = connected ? await connected.getEthereumProvider() : window.ethereum;
             const { hash, positionId } = await recordBuildingOnchain(
               account,
               { ticker, usdAmount: amount, entryPrice, initialTier: 1 },
@@ -1756,13 +1476,16 @@ export default function StockCity() {
                   notify("Confirm the mUSD approval popup in your wallet…");
                 else if (step === "approve" && hash)
                   notify(`Approval sent. Now confirm the building purchase…`);
-                else if (step === "buy" && hash)
+                else if (step === "buy" && hash) {
+                  savePendingPurchase({ owner: account!, hash, items: [{ buildingId, ticker, usdAmount: amount, entryPrice, initialTier: 1 }] });
                   notify(`Purchase sent. Waiting for BSC confirmation…`);
+                }
               },
+              provider,
             );
 
             const latest = simulationLatest.current.city;
-            commit({
+            saveConfirmedCity({
               ...latest,
               buildings: latest.buildings.map((b) =>
                 b.id === buildingId
@@ -1770,6 +1493,7 @@ export default function StockCity() {
                   : b,
               ),
             });
+            clearPendingPurchase();
             setConfirmingBuildings((prev) => ({
               ...prev,
               [buildingId]: {
@@ -1788,7 +1512,7 @@ export default function StockCity() {
               return next;
             });
             notify(
-              `Kept locked: on-chain payment failed (${err instanceof Error ? err.message : "wallet rejected"}). Retry in City Hall.`,
+              `Kept locked: ${err instanceof Error ? err.message : "wallet rejected"}. Submitted hashes are recovered automatically; only unsigned drafts can be retried.`,
               true,
             );
           }
@@ -2223,20 +1947,30 @@ export default function StockCity() {
         price,
         Math.max(1, Math.min(10000, Math.round(fraction * 10000))),
         (submitted) => {
-          if (submitted)
+          if (submitted) {
+            const sale = { buildingId: current.id, owner: account, hash: submitted };
+            localStorage.setItem(DIRECT_SALE_STORAGE, JSON.stringify(sale));
+            setPendingDirectSale(sale);
             notify("Sale submitted. Waiting for BNB confirmation…");
+          }
         },
         provider,
       );
       notify("Confirming the sale on BNB…");
-      const receipt = await confirmedRebalanceReceipt(account, hash, "sell");
+      const receipt = await confirmedRebalanceReceipt(account, hash, "sell", (canonical) => {
+        const sale = { buildingId: current.id, owner: account, hash: canonical };
+        localStorage.setItem(DIRECT_SALE_STORAGE, JSON.stringify(sale));
+        setPendingDirectSale(sale);
+      });
       const next = applyDirectSellReceipt(
         simulationLatest.current.city,
         current.id,
         receipt,
         account,
       );
-      commit(next);
+      saveConfirmedCity(next);
+      localStorage.removeItem(DIRECT_SALE_STORAGE);
+      setPendingDirectSale(null);
       setInspectorSellOpen(false);
       if (receipt.fullyClosed) setSelected(null);
       notify(
@@ -2346,6 +2080,15 @@ export default function StockCity() {
         buildings={bundleModalBuildings}
         prices={prices}
         walletAddress={wallet}
+        transactionPending={!!pendingDirectPurchase || !!pendingDirectSale || agentExecution?.status === "running" || hasPendingRebalance(agentExecution)}
+        onPurchaseSubmitted={savePendingPurchase}
+        onFinishConfirmation={(buildingIds) => {
+          setConfirmingBuildings((previous) => {
+            const next = { ...previous };
+            for (const id of buildingIds) if (!next[id]?.confirmed) delete next[id];
+            return next;
+          });
+        }}
         onClose={() => setShowBundleModal(false)}
         onConnectWallet={async () => {
           const acc = await connectInjectedWallet();
@@ -2368,7 +2111,7 @@ export default function StockCity() {
         onConfirmSuccess={(receipts) => {
           const latest = simulationLatest.current.city;
           const byId = new Map(receipts.map((r) => [r.buildingId, r]));
-          commit({
+          saveConfirmedCity({
             ...latest,
             buildings: latest.buildings.map((b) => {
               const r = byId.get(b.id);
@@ -2377,6 +2120,7 @@ export default function StockCity() {
                 : b;
             }),
           });
+          clearPendingPurchase();
           setConfirmingBuildings((prev) => {
             const copy = { ...prev };
             for (const r of receipts) {
@@ -3310,10 +3054,12 @@ export default function StockCity() {
             });
             notify("Claimed 10,000 testnet mUSD! Confirmed on BNB Chain.");
           }}
+          transactionPending={cityMutationLocked}
+          onPurchaseSubmitted={savePendingPurchase}
           onConfirmBatch={(receipts) => {
             const latest = simulationLatest.current.city;
             const byId = new Map(receipts.map((r) => [r.buildingId, r]));
-            commit({
+            saveConfirmedCity({
               ...latest,
               buildings: latest.buildings.map((b) => {
                 const r = byId.get(b.id);
@@ -3322,6 +3068,7 @@ export default function StockCity() {
                   : b;
               }),
             });
+            clearPendingPurchase();
             setConfirmingBuildings((prev) => {
               const copy = { ...prev };
               for (const r of receipts) {

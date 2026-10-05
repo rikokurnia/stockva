@@ -139,15 +139,10 @@ export async function connectInjectedWallet(): Promise<`0x${string}`> {
 /** Send a real on-chain claimFaucet tx. Caller must have connected + switched chain. */
 export async function claimFaucetOnchain(
   account: `0x${string}`,
+  customProvider?: any,
 ): Promise<`0x${string}`> {
-  const { createWalletClient, custom } = await import("viem");
-  const { bscTestnet } = await import("viem/chains");
-  await ensureBscTestnet();
-  const walletClient = createWalletClient({
-    account,
-    chain: bscTestnet,
-    transport: custom(window.ethereum!),
-  });
+  const { decodeEventLog } = await import("viem");
+  const { publicClient: client, walletClient, bscTestnet } = await getClients(account, customProvider);
   const hash = await walletClient.writeContract({
     address: MOCK_USD_ADDRESS,
     abi: MOCK_USD_ABI,
@@ -155,16 +150,20 @@ export async function claimFaucetOnchain(
     account,
     chain: bscTestnet,
   });
-  const client = getBscClient();
-  try {
-    const receipt = await client.waitForTransactionReceipt({
-      hash,
-      timeout: 30_000,
-    });
-    return receipt.transactionHash ?? hash;
-  } catch {
-    return hash;
-  }
+  const receipt = await client.waitForTransactionReceipt({ hash, timeout: 120_000 });
+  if (receipt.status !== "success")
+    throw new Error("Faucet transaction reverted. No testnet funds were credited.");
+  const claimed = receipt.logs.some((log) => {
+    if (log.address.toLowerCase() !== MOCK_USD_ADDRESS.toLowerCase()) return false;
+    try {
+      const event = decodeEventLog({ abi: MOCK_USD_ABI, data: log.data, topics: log.topics });
+      return event.eventName === "FaucetClaimed" &&
+        event.args.recipient.toLowerCase() === account.toLowerCase() &&
+        event.args.amount === parseUnits("10000", 18);
+    } catch { return false; }
+  });
+  if (!claimed) throw new Error("The receipt does not confirm a faucet claim for this wallet.");
+  return receipt.transactionHash;
 }
 
 /** Read current $mUSD token balance for a wallet address from BSC Testnet. */
@@ -213,7 +212,9 @@ export type RecordBuildingResult = {
 
 const toWei = (n: number): bigint => {
   if (!Number.isFinite(n) || n <= 0) throw new Error("Invalid amount");
-  return parseUnits(n.toFixed(6), 18);
+  const amount = parseUnits(n.toFixed(6), 18);
+  if (amount <= BigInt(0)) throw new Error("Amount is below the supported precision.");
+  return amount;
 };
 
 async function getClients(account: `0x${string}`, customProvider?: any) {
@@ -263,6 +264,7 @@ export async function sellBuildingOnchain(
   fractionBps: number,
   onStatus?: (hash?: `0x${string}`) => void,
   customProvider?: any,
+  expectedQuantity?: string,
 ): Promise<`0x${string}`> {
   if (
     !/^0x[a-fA-F0-9]{64}$/.test(positionId) ||
@@ -286,6 +288,8 @@ export async function sellBuildingOnchain(
     throw new Error(
       "This position is closed or belongs to another wallet. Request a fresh plan.",
     );
+  if (expectedQuantity !== undefined && position[5].toString() !== expectedQuantity)
+    throw new Error("The on-chain quantity changed. Request a fresh plan before signing.");
   onStatus?.();
   const hash = await walletClient.writeContract({
     address: VAULT_ADDRESS,
@@ -349,6 +353,7 @@ export async function confirmedRebalanceReceipt(
       "This receipt does not belong to the reviewed wallet and vault.",
     );
   let result: RebalanceReceipt | undefined;
+  let matchingEvents = 0;
   let actualPayout = BigInt(0);
   for (const log of receipt.logs) {
     if (
@@ -383,6 +388,7 @@ export async function confirmedRebalanceReceipt(
         event.eventName === "PositionOpened" &&
         event.args.owner.toLowerCase() === account.toLowerCase()
       ) {
+        matchingEvents++;
         result = {
           hash: canonicalHash,
           positionId: event.args.id,
@@ -398,6 +404,7 @@ export async function confirmedRebalanceReceipt(
         event.eventName === "PositionSold" &&
         event.args.owner.toLowerCase() === account.toLowerCase()
       ) {
+        matchingEvents++;
         result = {
           hash: canonicalHash,
           positionId: event.args.id,
@@ -416,6 +423,8 @@ export async function confirmedRebalanceReceipt(
     throw new Error(
       "The receipt has no matching position event. Keep this hash and check City Hall before retrying.",
     );
+  if (matchingEvents !== 1)
+    throw new Error("This receipt contains multiple position changes. Reconcile the batch before continuing.");
   if (action === "sell") result.amount = Number(formatUnits(actualPayout, 18));
   return result;
 }
@@ -430,7 +439,6 @@ export async function recordBuildingOnchain(
   onStatus?: (step: "approve" | "buy", hash?: `0x${string}`) => void,
   customProvider?: any,
 ): Promise<RecordBuildingResult> {
-  const { decodeEventLog, parseAbiItem } = await import("viem");
   const { publicClient, walletClient, bscTestnet } = await getClients(account, customProvider);
   const amountWei = toWei(input.usdAmount);
   const entryWei = toWei(input.entryPrice);
@@ -495,30 +503,8 @@ export async function recordBuildingOnchain(
     );
   }
 
-  const openedEvent = parseAbiItem(
-    "event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)",
-  );
-  let positionId: `0x${string}` = "0x";
-  for (const log of receipt.logs) {
-    try {
-      const decoded = decodeEventLog({
-        abi: [openedEvent],
-        data: log.data,
-        topics: log.topics,
-      });
-      if (decoded.eventName === "PositionOpened") {
-        positionId = (decoded.args as { id: `0x${string}` }).id;
-        break;
-      }
-    } catch {
-      continue;
-    }
-  }
-  if (!/^0x[a-fA-F0-9]{64}$/.test(positionId))
-    throw new Error(
-      "The signed transaction was replaced or cancelled on-chain. No city change was applied; request a fresh signature.",
-    );
-  return { hash: receipt.transactionHash, positionId };
+  const result = await parseBuildingPurchases(account, [{ ...input, buildingId: "single" }], receipt);
+  return { hash: result.hash, positionId: result.positionIds[0] };
 }
 
 export type BatchBuildingInput = {
@@ -534,6 +520,54 @@ export type BatchRecordResult = {
   positionIds: `0x${string}`[];
 };
 
+/** Recover a submitted manual purchase without requesting another signature. */
+export async function confirmedBuildingPurchases(
+  account: `0x${string}`,
+  hash: `0x${string}`,
+  items: BatchBuildingInput[],
+  onCanonicalHash?: (hash: `0x${string}`) => void,
+): Promise<BatchRecordResult> {
+  const client = createPublicClient({ chain: bscTestnet, transport: http(BSC_TESTNET_RPC) });
+  const receipt = await client.waitForTransactionReceipt({
+    hash, timeout: 120000,
+    onReplaced: ({ transactionReceipt }) => onCanonicalHash?.(transactionReceipt.transactionHash),
+  });
+  onCanonicalHash?.(receipt.transactionHash);
+  if (receipt.status !== "success") throw new Error("Purchase transaction reverted on-chain.");
+  return parseBuildingPurchases(account, items, receipt);
+}
+
+async function parseBuildingPurchases(
+  account: `0x${string}`, items: BatchBuildingInput[],
+  receipt: { transactionHash: `0x${string}`; logs: readonly any[] },
+): Promise<BatchRecordResult> {
+  const { decodeEventLog, parseAbiItem } = await import("viem");
+  const amounts = items.map((item) => toWei(item.usdAmount));
+  const entries = items.map((item) => toWei(item.entryPrice));
+  const tiers = items.map((item) => item.initialTier ?? 1);
+  const openedEvent = parseAbiItem("event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)");
+  const positionIds: `0x${string}`[] = [];
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== VAULT_ADDRESS.toLowerCase()) continue;
+    let decoded;
+    try { decoded = decodeEventLog({ abi: [openedEvent], data: log.data, topics: log.topics }); }
+    catch { continue; }
+    if (decoded.eventName !== "PositionOpened" || decoded.args.owner.toLowerCase() !== account.toLowerCase()) continue;
+    const args = decoded.args;
+    const index = positionIds.length;
+    if (!items[index] || args.ticker !== items[index].ticker ||
+        args.usdCost !== amounts[index] || args.entryPrice !== entries[index] ||
+        args.initialTier !== tiers[index] ||
+        args.quantity !== (amounts[index] * BigInt(10) ** BigInt(18)) / entries[index] ||
+        positionIds.includes(args.id))
+      throw new Error("The batch receipt does not match the purchased buildings.");
+    positionIds.push(args.id);
+  }
+  if (positionIds.length !== items.length)
+    throw new Error("The batch receipt is missing building positions. Keep its hash and reconcile before retrying.");
+  return { hash: receipt.transactionHash, positionIds };
+}
+
 /**
  * Demo batch confirm: approve once (if needed), then record ALL queued
  * buildings in ONE buyPositionsBatch tx — a single wallet signature.
@@ -545,7 +579,6 @@ export async function recordBuildingsBatch(
   customProvider?: any,
 ): Promise<BatchRecordResult> {
   if (!items.length) throw new Error("Nothing to confirm");
-  const { decodeEventLog, parseAbiItem } = await import("viem");
   const { publicClient, walletClient, bscTestnet } = await getClients(account, customProvider);
   const amounts = items.map((i) => toWei(i.usdAmount));
   const entries = items.map((i) => toWei(i.entryPrice));
@@ -599,32 +632,18 @@ export async function recordBuildingsBatch(
     chain: bscTestnet,
   });
   onStatus?.("buy", hash);
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash,
+    onReplaced: ({ transactionReceipt }) => onStatus?.("buy", transactionReceipt.transactionHash),
+  });
+  if (receipt.transactionHash !== hash) onStatus?.("buy", receipt.transactionHash);
   if (receipt.status === "reverted") {
     throw new Error(
       `Batch transaction reverted on BSC Testnet (tx: ${hash.slice(0, 10)}…). Please ensure you have claimed $mUSD in City Hall.`,
     );
   }
 
-  const openedEvent = parseAbiItem(
-    "event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)",
-  );
-  const positionIds: `0x${string}`[] = [];
-  for (const log of receipt.logs) {
-    try {
-      const decoded = decodeEventLog({
-        abi: [openedEvent],
-        data: log.data,
-        topics: log.topics,
-      });
-      if (decoded.eventName === "PositionOpened") {
-        positionIds.push((decoded.args as { id: `0x${string}` }).id);
-      }
-    } catch {
-      continue;
-    }
-  }
-  return { hash, positionIds };
+  return parseBuildingPurchases(account, items, receipt);
 }
 
 /** History RPC: the default seed endpoint rejects eth_getLogs, so log

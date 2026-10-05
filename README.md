@@ -60,11 +60,15 @@ Every corporate headquarters dynamically evolves across architectural tiers base
 ### 6. Agent Hall — Cokoo's Command Center
 - **Four Tabs, One Flow:** Rebalance (agent blueprint → wallet approval → city restructuring), Overview (portfolio landscape), Strategy Lab (equal-weight basket templates), and Stress Test (hypothetical ±50% shock playground).
 - **Verified-Only Rebalance:** Plans derive every transaction from read-only BNB Testnet vault positions mapped 1:1 to buildings. Changed positions fully close before rebuilding; local, draft, and unmapped holdings stay outside the plan.
-- **Review-First Execution:** Fingerprinted, expiring blueprints (5 min) with before/after allocation shift, road-connected blueprint preview, per-step receipts in City Hall, and pause/resume with hash recovery on reload.
+- **Review-First Execution:** Fingerprinted, expiring blueprints (5 min) with before/after allocation shift, road-connected blueprint preview, per-step receipts in City Hall, and pause/resume with hash recovery on reload. Atomic-capable wallets sign one batch; standard wallets sign each sale and purchase separately, with sales settling first.
 
 ---
 
 ## Verified Smart Contracts (BSC Testnet)
+
+This is a testnet simulation ledger, not custody or exchange of the listed issuer tokens. The vault accepts caller-supplied prices without an authenticated oracle, and mUSD is a freely minted demo token. Real issuer contracts and research quotes are read-only information. These contracts must not hold real collateral without an oracle and an appropriate settlement design.
+
+The October 2026 audit corrects the local Solidity source so capped sales return and emit the actual transferred payout. The existing deployed vault is unchanged; its older sale event may report the uncapped quote, so the application reconciles actual mUSD Transfer logs. Deploying the updated source is a separate operation.
 
 The core game logic and ledger contracts are deployed and verified on **BNB Smart Chain Testnet (Chain ID: 97)**:
 

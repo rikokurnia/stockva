@@ -53,10 +53,12 @@ export default function RwaSessionClock() {
         : "#f0b90b";
   const stateText =
     session.state === "open"
-      ? "US market open"
+      ? session.referenceFrozen ? "Token session open" : "US market open"
       : session.state === "halted"
         ? "Trading halted"
-        : "US market closed";
+      : session.state === "closed"
+        ? "US market closed"
+        : "Market session unknown";
   const next =
     session.state === "open" ? session.nextCloseAt : session.nextOpenAt;
   return (
@@ -73,7 +75,9 @@ export default function RwaSessionClock() {
         border: `1px solid ${color}55`,
         borderRadius: "20px",
         padding: "6px 10px",
-        whiteSpace: "nowrap",
+        whiteSpace: "normal",
+        flexWrap: "wrap",
+        maxWidth: "100%",
       }}
     >
       <i
@@ -85,6 +89,8 @@ export default function RwaSessionClock() {
         }}
       />
       {stateText}
+      {session.referenceFrozen && session.state === "open" && <span>· US ref frozen</span>}
+      {session.provenance === "estimated" && <span>(est.)</span>}
       {next ? (
         <span style={{ fontWeight: 400, opacity: 0.85 }}>
           · {session.state === "open" ? "closes" : "opens"} {shortTime(next)}

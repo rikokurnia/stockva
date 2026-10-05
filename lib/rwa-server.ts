@@ -177,7 +177,7 @@ export function sessionFromStatus(statusInfo: unknown): {
     session,
     // The per-share reference only moves during the regular session;
     // overnight/pre/post-market the on-chain leg trades alone.
-    referenceFrozen: marketStatus !== null && marketStatus !== "regular",
+    referenceFrozen: !open || (marketStatus !== null && marketStatus !== "regular"),
     nextOpenAt: msToIso(pick(info, /nextopen/i)),
     nextCloseAt: msToIso(pick(info, /nextclose/i)),
     marketStatus,
@@ -251,8 +251,8 @@ export async function rwaSession(
     return {
       state,
       label:
-        sessionLabel(state, nextOpenAt, nextCloseAt) +
-        (overnight ? " · overnight, ref frozen" : ""),
+        overnight ? "Token session open · US reference frozen" : sessionLabel(state, nextOpenAt, nextCloseAt),
+      referenceFrozen: overnight || state === "closed" || state === "halted",
       nextOpenAt,
       nextCloseAt,
       provenance: "rwa",

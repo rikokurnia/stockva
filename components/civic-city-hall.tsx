@@ -13,6 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { formatUnits } from "viem";
+import { useWallets } from "@privy-io/react-auth";
 import { assets, defFor, money, pct, priceOf, sprite } from "../lib/city";
 import { portfolioLandscape } from "../lib/agent-hall";
 import { transactionHistory, type CityTransaction } from "../lib/civic";
@@ -44,6 +45,7 @@ import styles from "./civic-panel.module.css";
 export default function CivicCityHall(
   props: CivicProps & { onBusy: (busy: boolean) => void },
 ) {
+  const { wallets } = useWallets();
   const {
     city,
     prices,
@@ -276,11 +278,13 @@ export default function CivicCityHall(
         throw new Error(
           "Connect a wallet using the wallet menu, then try again.",
         );
+      const connected = wallets.find((w) => w.address.toLowerCase() === account.toLowerCase());
+      const provider = connected ? await connected.getEthereumProvider() : window.ethereum;
       if (kind === "faucet") {
         setStatus(
           "Approve the faucet claim in your wallet. Waiting for confirmation…",
         );
-        const hash = await claimFaucetOnchain(account);
+        const hash = await claimFaucetOnchain(account, provider);
         setRecentFaucet({ owner: account, hash });
         setStatus(
           "10,000 testnet mUSD claimed. You can now confirm placed buildings.",
@@ -288,6 +292,7 @@ export default function CivicCityHall(
         props.onClaimFaucet?.();
         setRefresh((val) => val + 1);
       } else if (kind === "batch") {
+        if (props.transactionPending) throw new Error("A transaction is already pending. Wait for its saved receipt.");
         const result = await recordBuildingsBatch(
           account,
           drafts.map((building) => ({
@@ -298,6 +303,9 @@ export default function CivicCityHall(
             initialTier: 1,
           })),
           (step, hash) => {
+            if (step === "buy" && hash) props.onPurchaseSubmitted?.({ owner: account, hash, items: drafts.map((building) => ({
+              buildingId: building.id, ticker: defFor(building.kind).ticker!, usdAmount: building.cost, entryPrice: building.entry, initialTier: 1,
+            })) });
             setStatus(
               step === "approve"
                 ? hash
@@ -308,12 +316,13 @@ export default function CivicCityHall(
                   : "Confirm the batch purchase in your wallet…",
             );
           },
+          provider,
         );
         onConfirmBatch?.(
           drafts.map((building, index) => ({
             buildingId: building.id,
             hash: result.hash,
-            vaultId: result.positionIds[index] ?? "",
+            vaultId: result.positionIds[index],
           })),
         );
         setStatus(
@@ -858,7 +867,7 @@ export default function CivicCityHall(
               </span>
               <button
                 className={styles.primary}
-                disabled={Boolean(operation) || !onConfirmBatch}
+                disabled={Boolean(operation) || !onConfirmBatch || props.transactionPending}
                 aria-busy={operation === "batch"}
                 onClick={() => void transact("batch")}
               >

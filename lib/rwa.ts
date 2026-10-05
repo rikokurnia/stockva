@@ -25,6 +25,7 @@ export type RwaSpreadQuote = {
 export type RwaSession = {
   state: RwaSessionState;
   label: string;
+  referenceFrozen?: boolean;
   nextOpenAt: string | null;
   nextCloseAt: string | null;
   /** "rwa" when derived from Binance RWA Data, "estimated" for clock fallback. */
@@ -80,14 +81,18 @@ export function sessionLabel(
   return "Market session unknown";
 }
 
-/** Regular-session clock fallback (13:30–20:00 UTC, Mon–Fri). Labeled estimated. */
+/** Regular weekday session in New York; holidays require the provider's calendar. */
 export function estimatedSession(now = new Date()): RwaSession {
-  const day = now.getUTCDay();
-  const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(now);
+  const part = (name: string) => parts.find((p) => p.type === name)?.value;
+  const day = part("weekday");
+  const mins = Number(part("hour")) * 60 + Number(part("minute"));
   const state: RwaSessionState =
-    day === 0 || day === 6
+    day === "Sun" || day === "Sat"
       ? "closed"
-      : mins >= 13 * 60 + 30 && mins < 20 * 60
+      : mins >= 9 * 60 + 30 && mins < 16 * 60
         ? "open"
         : "closed";
   const fetchedAt = now.toISOString();
