@@ -1856,7 +1856,7 @@ input {
   flex: 1;
   font-size: 10px;
 }
-.inspection-actions > button:last-child {
+.inspection-actions > button.danger {
   color: #f1c397;
   border-color: #82694f;
   background: #4f453b;
@@ -3777,12 +3777,12 @@ input {
   border-color: #38bdf8;
   color: #ffffff;
 }
-.inspection-panel .inspection-actions > button:last-child {
+.inspection-panel .inspection-actions > button.danger {
   border-color: rgba(248, 113, 113, 0.35);
   color: #f87171;
   background: rgba(248, 113, 113, 0.1);
 }
-.inspection-panel .inspection-actions > button:last-child:hover:not(:disabled) {
+.inspection-panel .inspection-actions > button.danger:hover:not(:disabled) {
   background: rgba(248, 113, 113, 0.2);
   border-color: #f87171;
   color: #ffffff;
@@ -3853,14 +3853,41 @@ input {
   background: rgba(255, 255, 255, 0.16);
   border-color: rgba(244, 205, 96, 0.4);
 }
-.inspection-actions > button:last-child {
+.inspection-actions > button.danger {
   background: rgba(248, 113, 113, 0.15);
   border-color: rgba(248, 113, 113, 0.35);
   color: #fca5a5;
 }
-.inspection-actions > button:last-child:hover {
+.inspection-actions > button.danger:hover {
   background: rgba(248, 113, 113, 0.25);
   border-color: #f87171;
+}
+.inspection-actions > button.rwa-passport {
+  border-color: rgba(240, 185, 11, 0.55);
+  color: #f0b90b;
+  background: rgba(240, 185, 11, 0.1);
+}
+.inspection-actions > button.rwa-passport:hover:not(:disabled) {
+  background: rgba(240, 185, 11, 0.2);
+  border-color: #f0b90b;
+  color: #ffe08a;
+  box-shadow: 0 0 10px rgba(240, 185, 11, 0.25);
+}
+.inspection-panel > header {
+  cursor: grab;
+  touch-action: none;
+}
+.inspection-panel > header:active {
+  cursor: grabbing;
+}
+.inspection-panel.dragging,
+.inspection-panel.dragging * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.inspection-panel .drag-handle {
+  color: #5b7a89;
+  flex-shrink: 0;
 }
 @media (max-width: 600px) {
   .time-control > span,

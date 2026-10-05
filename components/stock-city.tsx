@@ -12,6 +12,7 @@ import {
   ChevronUp,
   ExternalLink,
   Grid2X2,
+  GripVertical,
   HelpCircle,
   Landmark,
   Maximize2,
@@ -245,6 +246,11 @@ export default function StockCity() {
   const [inspectorStyle, setInspectorStyle] =
     useState<React.CSSProperties | null>(null);
   const inspectorStyleKey = useRef("dock");
+  const inspectorRef = useRef<HTMLElement>(null);
+  const inspectorPinned = useRef(false);
+  const lastInspectorId = useRef<string | null>(null);
+  const [draggingInspector, setDraggingInspector] = useState(false);
+  const inspectorDragOffset = useRef<{ dx: number; dy: number } | null>(null);
   const hasHall = city.buildings.some((b) => b.kind === "hall");
   const hasExchange = city.buildings.some((b) => b.kind === "exchange");
   const hasData = city.buildings.some((b) => b.kind === "oracle");
@@ -1930,6 +1936,12 @@ export default function StockCity() {
   );
   const placeInspector = useCallback(() => {
     if (typeof window === "undefined" || !selected) return;
+    if (lastInspectorId.current !== selected) {
+      lastInspectorId.current = selected;
+      inspectorPinned.current = false;
+    }
+    // A user-dragged card stays where it was dropped until a new selection.
+    if (inspectorPinned.current) return;
     const node = document.querySelector(
       `[data-building-id="${CSS.escape(selected)}"]`,
     );
@@ -2005,6 +2017,63 @@ export default function StockCity() {
       window.removeEventListener("resize", placeInspector);
     };
   }, [inspectorOpen, placeInspector, selected, zoom]);
+  const onInspectorDragStart = (event: React.PointerEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest("button")) return;
+    const panel = inspectorRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    inspectorDragOffset.current = {
+      dx: event.clientX - rect.left,
+      dy: event.clientY - rect.top,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDraggingInspector(true);
+  };
+  const onInspectorDragMove = (event: React.PointerEvent<HTMLElement>) => {
+    if (!inspectorDragOffset.current) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const w = inspectorRef.current?.offsetWidth ?? 308;
+    const left = Math.max(
+      -(w - 80),
+      Math.min(
+        vw - 80,
+        event.clientX - inspectorDragOffset.current.dx,
+      ),
+    );
+    const top = Math.max(
+      0,
+      Math.min(vh - 60, event.clientY - inspectorDragOffset.current.dy),
+    );
+    inspectorPinned.current = true;
+    inspectorStyleKey.current = `manual|${Math.round(left)}|${Math.round(top)}`;
+    setInspectorStyle((previous) => ({
+      position: "fixed",
+      left,
+      top,
+      width: previous?.width ?? w,
+      maxHeight: previous?.maxHeight ?? vh - top - 12,
+      right: "auto",
+      bottom: "auto",
+    }));
+  };
+  const onInspectorDragEnd = () => {
+    inspectorDragOffset.current = null;
+    setDraggingInspector(false);
+  };
+  const sellCurrentBuilding = () => {
+    if (!current) return;
+    if (cityMutationLocked) {
+      notify("Finish the agent's pending transaction before selling.", true);
+      return;
+    }
+    if (current.vaultId && definition?.ticker) {
+      setPanel("agent");
+      notify("On-chain position — review and sign its sale in Agent Hall.");
+      return;
+    }
+    onBulldoze(current);
+  };
   const steps = [
     city.roads.length > 0,
     hasExchange,
@@ -2427,12 +2496,25 @@ export default function StockCity() {
         !scanMode &&
         !intelBuilding && (
           <aside
-            className="inspection-panel"
+            ref={inspectorRef}
+            className={`inspection-panel${draggingInspector ? " dragging" : ""}`}
             aria-label="Selected building"
             style={inspectorStyle ?? undefined}
           >
-            <header>
-              <div>
+            <header
+              title="Hold and drag to move this card"
+              onPointerDown={onInspectorDragStart}
+              onPointerMove={onInspectorDragMove}
+              onPointerUp={onInspectorDragEnd}
+              onPointerCancel={onInspectorDragEnd}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                <GripVertical
+                  size={15}
+                  className="drag-handle"
+                  aria-hidden="true"
+                />
+                <div style={{ minWidth: 0 }}>
                 <small>
                   {definition.category === "companies"
                     ? "STOCK BUILDING · TOKENIZED ASSET"
@@ -2461,11 +2543,14 @@ export default function StockCity() {
                   </h2>
                 </div>
               </div>
+              </div>
               <button
                 aria-label="Close building inspector"
+                title="Close"
                 onClick={() => setSelected(null)}
+                style={{ minWidth: "36px", minHeight: "36px" }}
               >
-                <X size={17} />
+                <X size={19} />
               </button>
             </header>
             <div className={`inspection-art ${definition.category}`}>
@@ -2719,6 +2804,7 @@ export default function StockCity() {
                   Trade position
                 </button>
                 <button
+                  className="rwa-passport"
                   disabled={!hasData}
                   title={
                     hasData
@@ -2748,7 +2834,7 @@ export default function StockCity() {
               >
                 Move
               </button>
-              <button onClick={() => onBulldoze(current)}>
+              <button className="danger" onClick={sellCurrentBuilding}>
                 <Trash2 size={14} />
                 {definition.ticker ? "Sell & remove" : "Bulldoze"}
               </button>

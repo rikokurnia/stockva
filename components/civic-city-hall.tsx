@@ -32,6 +32,12 @@ import {
 } from "../lib/contracts";
 import type { CivicProps } from "./civic-panel";
 import { stamp } from "../lib/civic";
+import CivicPerformance from "./civic-performance";
+import {
+  loadEquityHistory,
+  recordEquityPoint,
+  type EquityPoint,
+} from "../lib/equity-history";
 import StockLogo from "./stock-logo";
 import styles from "./civic-panel.module.css";
 
@@ -72,6 +78,12 @@ export default function CivicCityHall(
   const [saleTicker, setSaleTicker] = useState<string | null>(null);
   const [salePercent, setSalePercent] = useState(25);
   const [saleMessage, setSaleMessage] = useState("");
+  const [hallView, setHallView] = useState<"holdings" | "performance">(
+    "holdings",
+  );
+  const [equityHistory, setEquityHistory] = useState<EquityPoint[]>(() =>
+    loadEquityHistory(),
+  );
   const drafts = city.buildings.filter(
     (building) => building.locked && Boolean(defFor(building.kind).ticker),
   );
@@ -121,6 +133,10 @@ export default function CivicCityHall(
   );
   const localPnl = landscape.total - landscape.basis;
   const totalDraft = drafts.reduce((sum, building) => sum + building.cost, 0);
+  const totalEquity = landscape.total + city.cash;
+  useEffect(() => {
+    setEquityHistory(recordEquityPoint(totalEquity));
+  }, [totalEquity]);
 
   useEffect(() => {
     onBusy(Boolean(operation));
@@ -362,6 +378,22 @@ export default function CivicCityHall(
           </button>
         </div>
       </div>
+      <div className={styles.hallTabs} role="tablist" aria-label="City Hall views">
+        {(["holdings", "performance"] as const).map((view) => (
+          <button
+            key={view}
+            type="button"
+            role="tab"
+            aria-selected={hallView === view}
+            className={hallView === view ? styles.hallTabActive : undefined}
+            onClick={() => setHallView(view)}
+          >
+            {view === "holdings" ? "Holdings" : "Performance"}
+          </button>
+        ))}
+      </div>
+      {hallView === "holdings" ? (
+        <>
       <div className={styles.summaryStrip}>
         <Metric
           label="Invested value"
@@ -523,7 +555,7 @@ export default function CivicCityHall(
                 );
               })}
               {saleTicker && (
-                <div className={styles.inlineForm}>
+                <div className={styles.inlineForm} id="city-hall-sale-form">
                   <h4>Manage {saleTicker} · local city position</h4>
                   <p>
                     This adjusts your saved city balance only. It does not sell
@@ -975,6 +1007,28 @@ export default function CivicCityHall(
         fallback prices when a provider is unavailable. Last feed refresh:{" "}
         {stamp(feed.fetchedAt)}.
       </p>
+        </>
+      ) : (
+        <CivicPerformance
+          city={city}
+          prices={prices}
+          feed={feed}
+          landscape={landscape}
+          localPnl={localPnl}
+          equityHistory={equityHistory}
+          onSellRow={(ticker) => {
+            setSaleTicker(ticker);
+            setSalePercent(100);
+            setSaleMessage("");
+            setHallView("holdings");
+            requestAnimationFrame(() =>
+              document
+                .getElementById("city-hall-sale-form")
+                ?.scrollIntoView({ block: "center" }),
+            );
+          }}
+        />
+      )}
     </>
   );
 }

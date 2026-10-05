@@ -705,6 +705,65 @@
   border-bottom-color: var(--accent);
   font-weight: 700;
 }
+.hallTabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.hallTabs button {
+  min-height: 38px;
+  border: 1px solid var(--control-line);
+  border-radius: 20px;
+  padding: 6px 18px;
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(8, 16, 22, 0.4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.hallTabs button:hover {
+  color: var(--ink);
+  border-color: var(--accent-blue);
+}
+.hallTabs .hallTabActive,
+.hallTabs button[aria-selected="true"] {
+  background: #1e3646;
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.perfTableWrap {
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.perfTable {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.perfTable th,
+.perfTable td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line-subtle);
+  text-align: left;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.perfTable th {
+  color: var(--subtle);
+  font-weight: 600;
+  font-size: 11px;
+}
+.perfTable .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 .marketLayout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
