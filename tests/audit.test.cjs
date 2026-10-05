@@ -47,7 +47,23 @@ const sequence = () => ({
   ],
 });
 
-test("standard wallets must mine a real sale before submitting a purchase", async () => {
+test("legacy recovery confirms submitted trades but never sends remaining transactions", async () => {
+  const { reconcileLegacyRebalance } = load("lib/rebalance-sequential.ts");
+  const run = sequence();
+  run.steps[0] = { stepId: "sell", status: "submitted", hash: hash(1) };
+  const calls = [];
+  let saved;
+  await assert.rejects(reconcileLegacyRebalance(run, {
+    save(value) { saved = value; },
+    async confirm(step, tx) { calls.push(step.id); return { hash: tx }; },
+    apply() { return "confirmed-city"; },
+  }), /Separate-signature execution is disabled/);
+  assert.deepEqual(calls, ["sell"]);
+  assert.equal(saved.steps[0].status, "confirmed");
+  assert.equal(saved.steps[1].hash, undefined);
+});
+
+test("legacy sequential settlement mines a real sale before submitting a purchase", async () => {
   const { executeSequentialRebalance } = load("lib/rebalance-sequential.ts");
   const calls = [];
   let cash = 0;

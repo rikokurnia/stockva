@@ -33,7 +33,7 @@ import {
 import CityMap, { type AgentMapActivity } from "./city-map";
 import { inspectorPlacement } from "../lib/map-geometry";
 import { rebalanceFingerprint, type RebalancePlan } from "../lib/rebalance";
-import { executeSequentialRebalance } from "../lib/rebalance-sequential";
+import { reconcileLegacyRebalance } from "../lib/rebalance-sequential";
 import {
   applyDirectSellReceipt,
   applyRebalanceReceipt,
@@ -57,7 +57,6 @@ import {
   newRebalanceBatchId,
   RebalanceBatchRejected,
   type BatchProvider,
-  type RebalanceCalls,
 } from "../lib/rebalance-batch";
 import OnchainWallet from "./onchain-wallet";
 import FaucetOnboardModal from "./faucet-onboard-modal";
@@ -943,69 +942,15 @@ export default function StockCity() {
 
         await ensureBscTestnet(provider);
 
-        let useSequential = run.mode === "sequential";
-        let calls: RebalanceCalls | null = null;
-
-        if (!useSequential) {
-          try {
-            calls = await prepareRebalanceBatch(provider, plan);
-          } catch (batchError) {
-            const msg =
-              batchError instanceof Error
-                ? batchError.message
-                : String(batchError);
-            const isBatchUnsupported =
-              /cannot batch a rebalance/i.test(msg) ||
-              /atomic batching/i.test(msg) ||
-              /atomicBatch/i.test(msg) ||
-              /capabilities/i.test(msg) ||
-              /not supported/i.test(msg) ||
-              /method not found/i.test(msg) ||
-              /wallet_getCapabilities/i.test(msg) ||
-              /wallet_sendCalls/i.test(msg) ||
-              (typeof batchError === "object" &&
-                batchError !== null &&
-                "code" in batchError &&
-                (batchError as { code: unknown }).code === -32601);
-
-            if (isBatchUnsupported) {
-              useSequential = true;
-              run = { ...run, mode: "sequential" };
-              saveAgentExecution(run);
-              notify("Standard wallet: executing rebalance step-by-step.");
-            } else {
-              throw batchError;
-            }
-          }
-        }
+        // Legacy runs may only reconcile transactions already submitted.
+        const useSequential = run.mode === "sequential";
+        const calls = useSequential ? null : await prepareRebalanceBatch(provider, plan);
 
         if (useSequential) {
-          run = await executeSequentialRebalance(run, {
+          run = await reconcileLegacyRebalance(run, {
             save: (next) => {
               run = next;
               saveAgentExecution(next);
-            },
-            send: async (step, submitted, approved) => {
-              if (Date.now() > plan.expiresAt)
-                throw new Error("The remaining quotes expired. Keep confirmed changes and request a fresh blueprint.");
-              focus(step, "wallet", `Sign ${step.action} for ${step.ticker} in your wallet`);
-              if (step.action === "sell")
-                return sellBuildingOnchain(
-                  plan.walletAddress, step.positionId, step.price,
-                  step.fractionBps, (hash) => { if (hash) submitted(hash); },
-                  provider, step.positionQuantity,
-                );
-              const result = await recordBuildingOnchain(
-                plan.walletAddress,
-                { ticker: step.ticker, usdAmount: step.amount, entryPrice: step.price, initialTier: 1 },
-                (phase, hash) => {
-                  if (!hash) return;
-                  if (phase === "approve") approved(hash);
-                  else submitted(hash);
-                },
-                provider,
-              );
-              return result.hash;
             },
             confirm: (step, hash, canonical) => {
               focus(step, "submitted", `Confirming ${step.ticker} on BNB Testnet`, hash);

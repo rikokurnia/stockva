@@ -17,6 +17,16 @@ type SequenceIO = {
   apply: (step: RebalanceStep, receipt: RebalanceReceipt) => string;
 };
 
+/** Legacy recovery cannot request additional wallet signatures. */
+export function reconcileLegacyRebalance(initial: RebalanceExecution, io: Omit<SequenceIO, "send">) {
+  return executeSequentialRebalance(initial, {
+    ...io,
+    send: async () => {
+      throw new Error("Separate-signature execution is disabled. Keep confirmed trades, clear this paused plan, and request a fresh one-approval rebalance.");
+    },
+  });
+}
+
 /** Persist each hash before waiting; recovery only polls an existing transaction. */
 export async function executeSequentialRebalance(
   initial: RebalanceExecution,

@@ -463,7 +463,7 @@ export default function AgentRebalance({
           },
           {
             title: "Wallet approval",
-            detail: "Atomic batch or separate wallet signatures",
+            detail: "One wallet approval for all changes",
             icon: Wallet,
           },
           {
@@ -688,8 +688,8 @@ export default function AgentRebalance({
           <div className={styles.boundary}>
             <ShieldCheck size={17} aria-hidden="true" />
             <p>
-              The agent prepares the plan. Your wallet approves an atomic batch
-              when supported, or signs each building change separately.
+              The agent prepares the plan. One wallet approval covers the complete
+              atomic rebalance, including mUSD approval when needed.
             </p>
           </div>
           <div className={styles.snapshot}>
@@ -951,7 +951,7 @@ export default function AgentRebalance({
               <div className={styles.ledgerHeader}>
                 <h5>Every building. Every step.</h5>
                 <span>
-                  {shownPlan.steps.length} changes · {shownExecution?.mode === "sequential" ? "separate signatures" : "wallet approval"}
+                  {shownPlan.steps.length} changes · {shownExecution?.mode === "sequential" ? "previous execution" : "1 batch approval"}
                 </span>
               </div>
               {shownExecution?.batchId && (
@@ -1116,12 +1116,12 @@ export default function AgentRebalance({
                           {active
                             ? progressLabel(active)
                             : shownExecution?.mode === "sequential"
-                              ? "Executing rebalance steps"
+                              ? "Recovering submitted transactions"
                               : "Preparing the rebalance"}
                         </b>
                         <p>
                           {shownExecution?.mode === "sequential"
-                            ? "Confirm each step in your wallet. The city updates as each building confirms on-chain."
+                            ? "Checking previously submitted hashes. No additional signatures will be requested."
                             : active?.status === "wallet"
                               ? "Approve the batch in your wallet, including any mUSD approval. The city updates after confirmation."
                               : "The rebalance settles on BNB Chain. Follow the confirmed building changes from your island."}
@@ -1157,7 +1157,7 @@ export default function AgentRebalance({
                           {hasPendingRebalance(shownExecution)
                             ? "Checking confirmation recovers the saved request without asking you to sign again."
                             : shownExecution.mode === "sequential"
-                              ? "Resume to continue signing remaining building changes, or keep confirmed changes and replan."
+                              ? "Keep confirmed changes and request a new one-approval blueprint."
                               : "Keep any confirmed changes and request a fresh blueprint, or retry the wallet check."}
                         </p>
                       </div>
@@ -1169,6 +1169,7 @@ export default function AgentRebalance({
                         starting ||
                         walletChanged ||
                         shownExecution.batchStatus === "failed"
+                        || (shownExecution.mode === "sequential" && !hasPendingRebalance(shownExecution))
                       }
                       onClick={() => void execute()}
                       aria-busy={starting}
@@ -1179,7 +1180,7 @@ export default function AgentRebalance({
                         : hasPendingRebalance(shownExecution)
                           ? "Check confirmation"
                           : shownExecution.mode === "sequential"
-                            ? "Resume rebalance"
+                            ? "Replan remaining changes below"
                             : "Retry wallet check"}
                     </button>
                     {walletChanged && (
@@ -1211,9 +1212,9 @@ export default function AgentRebalance({
                         <b>Review and approve your rebalance.</b>
                         <p>
                           {shownPlan.steps.length} building changes on BNB
-                          testnet. Compatible wallets can approve one atomic batch.
-                          Standard wallets sign each sale and purchase separately,
-                          including mUSD approval when needed. Network fees paid in tBNB.
+                          testnet in one atomic transaction and one wallet approval,
+                          including mUSD approval when needed. Your wallet must
+                          support atomic batching. Network fees paid in tBNB.
                         </p>
                       </div>
                     </div>

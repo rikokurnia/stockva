@@ -2,6 +2,8 @@
 
 ## Scope
 
+Update on 2026-10-06: AI rebalances are atomic-only again. Automatic separate-signature fallback is removed. Unsupported wallets stop before signing. Interrupted older sequential executions can only reconcile already-submitted hashes; remaining changes require a fresh atomic blueprint.
+
 Reviewed agent planning and execution, atomic and sequential wallet flows, direct purchases and sales, faucet settlement, vault accounting, market-provider fallbacks, RWA metadata/spreads/sessions, and desktop/mobile interaction. Changes are limited to Stockcity. No transactions were signed, contracts deployed, or commits pushed during this audit.
 
 ## Findings Fixed

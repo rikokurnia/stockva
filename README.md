@@ -60,7 +60,7 @@ Every corporate headquarters dynamically evolves across architectural tiers base
 ### 6. Agent Hall — Cokoo's Command Center
 - **Four Tabs, One Flow:** Rebalance (agent blueprint → wallet approval → city restructuring), Overview (portfolio landscape), Strategy Lab (equal-weight basket templates), and Stress Test (hypothetical ±50% shock playground).
 - **Verified-Only Rebalance:** Plans derive every transaction from read-only BNB Testnet vault positions mapped 1:1 to buildings. Changed positions fully close before rebuilding; local, draft, and unmapped holdings stay outside the plan.
-- **Review-First Execution:** Fingerprinted, expiring blueprints (5 min) with before/after allocation shift, road-connected blueprint preview, per-step receipts in City Hall, and pause/resume with hash recovery on reload. Atomic-capable wallets sign one batch; standard wallets sign each sale and purchase separately, with sales settling first.
+- **Review-First Execution:** Fingerprinted, expiring blueprints (5 min) with before/after allocation shift, road-connected blueprint preview, per-step receipts in City Hall, and hash recovery on reload. AI rebalances require one atomic wallet batch covering every sale, mUSD approval, and purchase. Unsupported wallets stop before signing; there is no separate-transaction fallback. Older sequential runs can only recover hashes already submitted, then keep confirmed changes and replan.
 
 ---
 
