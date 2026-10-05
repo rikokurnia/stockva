@@ -1354,6 +1354,7 @@ export type CityState = {
   buildings: Building[];
   roads: Cell[];
   paper?: PaperHolding[];
+  rebalanceCount?: number;
   /** Confirmed agent receipts survive removal of the associated building. */
   agentReceipts?: {
     hash: `0x${string}`;

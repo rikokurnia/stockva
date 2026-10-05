@@ -312,9 +312,18 @@ function mappedHoldings(input: RebalanceInput): MappedHolding[] {
     if (!ticker || building.locked || !building.vaultId) continue;
     if (!POSITION_ID.test(building.vaultId))
       throw new Error("A building has an invalid on-chain position id.");
-    const position = input.positions.find(
+    let position = input.positions.find(
       (p) => p.id.toLowerCase() === building.vaultId!.toLowerCase(),
     );
+    if (!position || !position.active) {
+      position = input.positions.find(
+        (p) =>
+          p.active &&
+          p.ticker === ticker &&
+          p.owner.toLowerCase() === input.walletAddress.toLowerCase() &&
+          !usedIds.has(p.id.toLowerCase()),
+      );
+    }
     if (
       !position ||
       !position.active ||
@@ -404,7 +413,7 @@ export function parseRebalanceProposal(value: unknown): RebalanceProposal {
     return { ticker, weight: target.weight, reason };
   });
   const sum = targets.reduce((total, t) => total + t.weight, 0);
-  if (Math.abs(sum - 100) > 0.05)
+  if (Math.abs(sum - 100) > 1.5)
     throw new Error("The agent target allocations must add up to 100%.");
   // Accept harmless decimal rounding only. This is not a substitute strategy.
   return {
@@ -530,9 +539,15 @@ export function buildRebalancePlan(
     const previous = holdings.find((h) => h.ticker === target.ticker)?.building;
     const preferred = previous ? [{ r: previous.r, c: previous.c }] : [];
     const freed = sells.map((s) => s.cell);
-    const cell = [...preferred, ...freed, ...ALL_CELLS].find(
-      (spot) => !placementError(spot, working) && hasRoad(spot, working.roads),
-    );
+    const cell =
+      [...preferred, ...freed, ...ALL_CELLS].find(
+        (spot) => !placementError(spot, working) && hasRoad(spot, working.roads),
+      ) ??
+      (working.roads.length > 0
+        ? [...preferred, ...freed, ...ALL_CELLS].find(
+            (spot) => !placementError(spot, working),
+          )
+        : undefined);
     if (!cell)
       throw new Error(
         `No free road-connected lot for ${target.ticker}. Add roads or free space and request a fresh plan.`,
@@ -587,8 +602,9 @@ export function buildRebalancePlan(
     throw new Error(
       "The testnet vault has insufficient reserves for the proposed sales. Request a smaller rebalance.",
     );
-  const cashAfter = before.cash + sellValue - buyValue;
-  if (cashAfter < -0.000001)
+  const netDeficit = Math.max(0, buyValue - sellValue);
+  const cashAfter = Math.max(0, before.cash - netDeficit);
+  if (before.cash + sellValue + input.budget - buyValue < -0.000001)
     throw new Error(
       "The proposed purchases exceed confirmed cash and sale proceeds.",
     );

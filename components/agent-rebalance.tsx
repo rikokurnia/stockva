@@ -108,6 +108,7 @@ export default function AgentRebalance({
   );
   const [budget, setBudget] = useState("0");
   const [plan, setPlan] = useState<RebalancePlan | null>(null);
+  const [walletMusd, setWalletMusd] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -119,6 +120,19 @@ export default function AgentRebalance({
   const mounted = useRef(false);
   const draftInputs = useRef("");
   const rows = useRef<Record<string, HTMLLIElement | null>>({});
+
+  const rebalanceCount = Math.min(
+    3,
+    city.rebalanceCount ??
+      new Set(
+        (city.agentReceipts ?? [])
+          .map((r) => r.planId)
+          .filter((id) => id && id !== "direct"),
+      ).size,
+  );
+  const rebalancesRemaining = Math.max(0, 3 - rebalanceCount);
+  const maxRebalancesReached = rebalanceCount >= 3;
+
   const running = execution?.status === "running";
   const shownPlan =
     execution &&
@@ -168,6 +182,44 @@ export default function AgentRebalance({
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (!walletAddress) {
+      setWalletMusd(null);
+      return;
+    }
+    let cancelled = false;
+    async function checkBalance() {
+      try {
+        const { createPublicClient, http, formatUnits } = await import("viem");
+        const { bscTestnet } = await import("viem/chains");
+        const { BSC_TESTNET_RPC, MOCK_USD_ADDRESS, MOCK_USD_ABI } = await import(
+          "../lib/contracts"
+        );
+        const client = createPublicClient({
+          chain: bscTestnet,
+          transport: http(BSC_TESTNET_RPC, { timeout: 8000 }),
+        });
+        const bal = (await client.readContract({
+          address: MOCK_USD_ADDRESS,
+          abi: MOCK_USD_ABI,
+          functionName: "balanceOf",
+          args: [walletAddress as `0x${string}`],
+        })) as bigint;
+        if (!cancelled) {
+          setWalletMusd(Number(formatUnits(bal, 18)));
+        }
+      } catch {
+        // Silently continue
+      }
+    }
+    void checkBalance();
+    const interval = setInterval(() => void checkBalance(), 12000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [walletAddress]);
 
   const allocations = useMemo(() => {
     if (!shownPlan) return [];
@@ -292,7 +344,7 @@ export default function AgentRebalance({
   }
 
   async function requestPlan() {
-    if (busy || running || !walletAddress || !validBudget) return;
+    if (busy || running || !walletAddress || !validBudget || maxRebalancesReached) return;
     setBusy(true);
     setError("");
     const nextController = new AbortController();
@@ -303,7 +355,10 @@ export default function AgentRebalance({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          city,
+          city: {
+            ...city,
+            cash: Math.max(city.cash, walletMusd ?? 0),
+          },
           prices,
           feed,
           walletAddress,
@@ -387,9 +442,14 @@ export default function AgentRebalance({
             then watch your stock buildings take shape.
           </p>
         </div>
-        <span className={styles.network}>
-          <i /> BNB Chain testnet
-        </span>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <span className={styles.badgeCount}>
+            Rebalance {rebalanceCount}/3 {maxRebalancesReached ? "(Limit reached)" : `(${rebalancesRemaining} left)`}
+          </span>
+          <span className={styles.network}>
+            <i /> BNB Chain testnet
+          </span>
+        </div>
       </div>
 
       <ol className={styles.stages} aria-label="Rebalance stages">
@@ -451,6 +511,21 @@ export default function AgentRebalance({
               <span>Your city, your call.</span>
             </div>
           </div>
+          {maxRebalancesReached && (
+            <div
+              className={styles.boundary}
+              style={{
+                borderColor: "rgba(240, 185, 11, 0.4)",
+                background: "rgba(240, 185, 11, 0.08)",
+                marginBottom: "14px",
+              }}
+            >
+              <ShieldCheck size={17} aria-hidden="true" style={{ color: "#f0b90b" }} />
+              <p>
+                <b>3 of 3 rebalances completed.</b> You have used all 3 available AI rebalances for this city.
+              </p>
+            </div>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -466,7 +541,7 @@ export default function AgentRebalance({
               onChange={(e) => setInstruction(e.target.value)}
               maxLength={500}
               rows={4}
-              disabled={running || busy || shownExecution?.status === "paused"}
+              disabled={running || busy || shownExecution?.status === "paused" || maxRebalancesReached}
               autoComplete="off"
             />
             <div
@@ -489,16 +564,23 @@ export default function AgentRebalance({
                   onClick={() => setInstruction(goal.text)}
                   aria-pressed={instruction === goal.text}
                   disabled={
-                    running || busy || shownExecution?.status === "paused"
+                    running || busy || shownExecution?.status === "paused" || maxRebalancesReached
                   }
                 >
                   {goal.label}
                 </button>
               ))}
             </div>
-            <label className={styles.label} htmlFor="rebalance-budget">
-              Extra budget <span>mUSD</span>
-            </label>
+            <div className={styles.budgetHeader}>
+              <label className={styles.label} htmlFor="rebalance-budget" style={{ margin: 0 }}>
+                Extra budget <span>mUSD</span>
+              </label>
+              {walletMusd !== null && (
+                <span className={styles.walletBalanceBadge}>
+                  Wallet: <b>${walletMusd.toLocaleString(undefined, { maximumFractionDigits: 1 })}</b> mUSD
+                </span>
+              )}
+            </div>
             <div className={styles.amountInput}>
               <span>$</span>
               <input
@@ -509,12 +591,50 @@ export default function AgentRebalance({
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
                 disabled={
-                  running || busy || shownExecution?.status === "paused"
+                  running || busy || shownExecution?.status === "paused" || maxRebalancesReached
                 }
                 aria-invalid={!validBudget}
                 aria-describedby="rebalance-budget-hint"
               />
             </div>
+            {walletConnected && (
+              <div className={styles.budgetChips}>
+                <button
+                  type="button"
+                  className={styles.budgetChip}
+                  onClick={() => setBudget("0")}
+                  disabled={running || busy || maxRebalancesReached}
+                >
+                  $0 (Rotate)
+                </button>
+                <button
+                  type="button"
+                  className={styles.budgetChip}
+                  onClick={() => setBudget("100")}
+                  disabled={running || busy || maxRebalancesReached}
+                >
+                  +$100
+                </button>
+                <button
+                  type="button"
+                  className={styles.budgetChip}
+                  onClick={() => setBudget("500")}
+                  disabled={running || busy || maxRebalancesReached}
+                >
+                  +$500
+                </button>
+                {walletMusd !== null && walletMusd > 0 && (
+                  <button
+                    type="button"
+                    className={styles.budgetChip}
+                    onClick={() => setBudget(String(Math.floor(walletMusd)))}
+                    disabled={running || busy || maxRebalancesReached}
+                  >
+                    Max wallet (${Math.floor(walletMusd)})
+                  </button>
+                )}
+              </div>
+            )}
             <p
               id="rebalance-budget-hint"
               className={!validBudget ? styles.errorText : styles.hint}
@@ -543,7 +663,8 @@ export default function AgentRebalance({
                   running ||
                   !validBudget ||
                   !instruction.trim() ||
-                  shownExecution?.status === "paused"
+                  shownExecution?.status === "paused" ||
+                  maxRebalancesReached
                 }
                 aria-busy={busy}
               >
@@ -552,11 +673,13 @@ export default function AgentRebalance({
                   className={busy ? styles.spin : undefined}
                   aria-hidden="true"
                 />
-                {busy
-                  ? "Cokoo is planning…"
-                  : shownPlan
-                    ? "Generate a fresh blueprint"
-                    : "Ask Cokoo for a blueprint"}
+                {maxRebalancesReached
+                  ? "Max 3 rebalances used"
+                  : busy
+                    ? "Cokoo is planning…"
+                    : shownPlan
+                      ? "Generate a fresh blueprint"
+                      : "Ask Cokoo for a blueprint"}
               </button>
             )}
           </form>
@@ -571,6 +694,9 @@ export default function AgentRebalance({
             <span>City snapshot</span>
             <div>
               <b>{onchainBuildings.length}</b>on-chain stock buildings
+            </div>
+            <div>
+              <b>{rebalanceCount} of 3</b>rebalances used
             </div>
             {stockBuildings.length > onchainBuildings.length && (
               <small>
@@ -945,20 +1071,39 @@ export default function AgentRebalance({
                       <div>
                         <b>{completed} building changes confirmed.</b>
                         <p>
-                          Your updated city and each transaction receipt are
-                          ready in City Hall.
+                          {rebalanceCount >= 3
+                            ? "3 of 3 rebalances completed for this city. Every building is recorded in City Hall."
+                            : `Rebalance ${rebalanceCount} of 3 complete (${rebalancesRemaining} remaining). Explore your city or plan your next rebalance.`}
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.primary}
-                      onClick={onWatchCity}
-                    >
-                      <MapPinned size={17} aria-hidden="true" /> Explore your
-                      rebalanced city
-                      <ArrowUpRight size={16} aria-hidden="true" />
-                    </button>
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", width: "100%" }}>
+                      <button
+                        type="button"
+                        className={styles.primary}
+                        style={{ flex: 1, minWidth: "180px" }}
+                        onClick={onWatchCity}
+                      >
+                        <MapPinned size={17} aria-hidden="true" /> Explore your
+                        rebalanced city
+                        <ArrowUpRight size={16} aria-hidden="true" />
+                      </button>
+                      {!maxRebalancesReached && (
+                        <button
+                          type="button"
+                          className={styles.secondary}
+                          style={{ flex: 1, minWidth: "180px" }}
+                          onClick={() => {
+                            onClearExecution();
+                            setPlan(null);
+                            setError("");
+                          }}
+                        >
+                          <Sparkles size={16} aria-hidden="true" />
+                          Plan next rebalance ({rebalancesRemaining} remaining)
+                        </button>
+                      )}
+                    </div>
                   </>
                 ) : running ? (
                   <>

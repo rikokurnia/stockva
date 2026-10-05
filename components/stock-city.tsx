@@ -489,6 +489,38 @@ export default function StockCity() {
       }
   }, [city, ready]);
   useEffect(() => {
+    if (!wallet) return;
+    let cancelled = false;
+    async function syncWalletFunds() {
+      try {
+        const { createPublicClient, http, formatUnits } = await import("viem");
+        const { bscTestnet } = await import("viem/chains");
+        const { BSC_TESTNET_RPC, MOCK_USD_ADDRESS, MOCK_USD_ABI } =
+          await import("../lib/contracts");
+        const client = createPublicClient({
+          chain: bscTestnet,
+          transport: http(BSC_TESTNET_RPC, { timeout: 8000 }),
+        });
+        const bal = (await client.readContract({
+          address: MOCK_USD_ADDRESS,
+          abi: MOCK_USD_ABI,
+          functionName: "balanceOf",
+          args: [wallet!],
+        })) as bigint;
+        const musd = Number(formatUnits(bal, 18));
+        if (!cancelled && musd > 0 && simulationLatest.current.city.cash < musd) {
+          commit({
+            ...simulationLatest.current.city,
+            cash: musd,
+          });
+        }
+      } catch {
+        // Silently continue
+      }
+    }
+    void syncWalletFunds();
+  }, [wallet]);
+  useEffect(() => {
     if (paused) return;
     const interval = setInterval(() => setSeconds((s) => s + speed), 1000);
     return () => clearInterval(interval);
@@ -1066,10 +1098,38 @@ export default function StockCity() {
               focus(step, "confirmed", `Removed ${step.ticker} in rebalance`, batchHash);
             }
 
+            let positionIds = batchResult.positionIds;
+            if (positionIds.length < unconfirmedBuys.length) {
+              try {
+                const { createPublicClient, http } = await import("viem");
+                const { bscTestnet } = await import("viem/chains");
+                const { BSC_TESTNET_RPC, VAULT_ADDRESS, VAULT_ABI } =
+                  await import("../lib/contracts");
+                const publicClient = createPublicClient({
+                  chain: bscTestnet,
+                  transport: http(BSC_TESTNET_RPC, { timeout: 8000 }),
+                });
+                const onchainPositions = (await publicClient.readContract({
+                  address: VAULT_ADDRESS,
+                  abi: VAULT_ABI,
+                  functionName: "getUserPositions",
+                  args: [plan.walletAddress],
+                })) as unknown as Array<{ id: `0x${string}`; active: boolean }>;
+                const activeIds = onchainPositions
+                  .filter((p) => p.active)
+                  .map((p) => p.id);
+                if (activeIds.length >= unconfirmedBuys.length) {
+                  positionIds = activeIds.slice(-unconfirmedBuys.length);
+                }
+              } catch {
+                // Fallback to returned IDs
+              }
+            }
+
             // Apply all unconfirmed buys to city state using the confirmed on-chain position IDs
             for (let i = 0; i < unconfirmedBuys.length; i++) {
               const step = unconfirmedBuys[i];
-              const vaultId = batchResult.positionIds[i] ?? batchHash;
+              const vaultId = positionIds[i] ?? batchHash;
               const buyReceipt: RebalanceReceipt = {
                 hash: batchHash,
                 positionId: vaultId,
@@ -1113,6 +1173,12 @@ export default function StockCity() {
                 [step.buildingId]: Date.now(),
               }));
             }
+
+            const finalBatchCity = {
+              ...simulationLatest.current.city,
+              rebalanceCount: Math.min(3, (simulationLatest.current.city.rebalanceCount ?? 0) + 1),
+            };
+            saveConfirmedCity(finalBatchCity);
 
             notify(
               `Confirmed all ${unconfirmedBuys.length} stock buildings in 1 batch on BNB Testnet!`,
@@ -1234,6 +1300,11 @@ export default function StockCity() {
             }
           }
 
+          const finalSeqCity = {
+            ...simulationLatest.current.city,
+            rebalanceCount: Math.min(3, (simulationLatest.current.city.rebalanceCount ?? 0) + 1),
+          };
+          saveConfirmedCity(finalSeqCity);
           run = { ...run, status: "completed", error: undefined };
           saveAgentExecution(run);
           notify(
@@ -1317,11 +1388,14 @@ export default function StockCity() {
           );
         },
       );
-      const next = applyRebalanceBatch(
-        simulationLatest.current.city,
-        plan,
-        receipts,
-      );
+      const next = {
+        ...applyRebalanceBatch(
+          simulationLatest.current.city,
+          plan,
+          receipts,
+        ),
+        rebalanceCount: Math.min(3, (simulationLatest.current.city.rebalanceCount ?? 0) + 1),
+      };
       // Persist all effects together. Every building references the same mined
       // transaction, and a reload cannot replay part of the signed rebalance.
       saveConfirmedCity(next);

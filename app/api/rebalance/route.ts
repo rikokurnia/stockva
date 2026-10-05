@@ -26,37 +26,47 @@ async function geminiPlan(
 ): Promise<string | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key || signal.aborted) return null;
-  try {
-    const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: 2400,
-            temperature: 0.25,
-            responseMimeType: "application/json",
-          },
-        }),
-        signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
-      },
-    );
-    if (!response.ok) return null;
-    const result = (await response.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
-    };
-    return (
-      result.candidates?.[0]?.content?.parts
-        ?.map((p) => p.text ?? "")
-        .join("")
-        .trim() || null
-    );
-  } catch {
-    return null;
+  const models = [
+    process.env.GEMINI_MODEL,
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+  ].filter(Boolean) as string[];
+  const uniqueModels = [...new Set(models)];
+
+  for (const model of uniqueModels) {
+    if (signal.aborted) break;
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              maxOutputTokens: 2400,
+              temperature: 0.25,
+              responseMimeType: "application/json",
+            },
+          }),
+          signal: AbortSignal.any([signal, AbortSignal.timeout(25000)]),
+        },
+      );
+      if (!response.ok) continue;
+      const result = (await response.json()) as {
+        candidates?: { content?: { parts?: { text?: string }[] } }[];
+      };
+      const content =
+        result.candidates?.[0]?.content?.parts
+          ?.map((p) => p.text ?? "")
+          .join("")
+          .trim() || null;
+      if (content) return content;
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 async function compatiblePlan(
