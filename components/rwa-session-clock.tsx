@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { RwaSession } from "../lib/rwa";
+import { estimatedSession, type RwaSession } from "../lib/rwa";
 
 const shortTime = (iso: string | null) => {
   if (!iso) return "";
@@ -13,7 +13,7 @@ const shortTime = (iso: string | null) => {
   });
 };
 
-/** US-market session pill (Binance RWA Data, 60s refresh). Hidden without a key. */
+/** US-market session pill (Binance RWA Data, 60s refresh with schedule fallback). */
 export default function RwaSessionClock() {
   const [session, setSession] = useState<RwaSession | null>(null);
   useEffect(() => {
@@ -23,12 +23,18 @@ export default function RwaSessionClock() {
         const response = await fetch("/api/rwa/session", {
           cache: "no-store",
         });
-        if (!response.ok) return;
-        const data = (await response.json()) as RwaSession;
-        if (active && data && data.provenance !== "unavailable")
-          setSession(data);
+        if (response.ok) {
+          const data = (await response.json()) as RwaSession;
+          if (active && data && data.provenance !== "unavailable") {
+            setSession(data);
+            return;
+          }
+        }
       } catch {
-        /* clock stays hidden; core quotes stand on their own */
+        /* fallback to estimated clock */
+      }
+      if (active) {
+        setSession(estimatedSession());
       }
     };
     void load();

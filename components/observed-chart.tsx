@@ -101,18 +101,20 @@ export default function ObservedChart({
 
   const useToken =
     tokenSeries.length > 0 && (source === "token" || !benchmarkSeries.length);
-  // Compare mode (Data Center) shows only raw observations, never filled data.
+  // Compare mode (Data Center) compares the Token against the underlying asset.
   const primary = compare
-    ? rawToken.length
+    ? rawToken.length >= 10
       ? rawToken
-      : rawBenchmark
+      : tokenSeries
     : useToken
       ? tokenSeries
       : benchmarkSeries;
-  const comparable = compare && rawToken.length > 0 && rawBenchmark.length > 0;
-  const actualSource = (compare ? rawToken.length > 0 : useToken)
-    ? "Token"
-    : "Underlying";
+  const comparable =
+    compare &&
+    (rawBenchmark.length > 0 ||
+      Boolean(history.benchmarkPrice) ||
+      Boolean(livePrice));
+  const actualSource = compare ? "Token" : useToken ? "Token" : "Underlying";
   // Provenance: which observations are real vs. illustrative fill.
   const observedPrimary = useToken ? scaledToken : rawBenchmark;
   const fullyIllustrative = observedPrimary.length < 10;
@@ -128,6 +130,45 @@ export default function ObservedChart({
     () => buildOhlcSeries(primary, range),
     [primary, range],
   );
+
+  // Prepare underlying comparison series for Data Center compare mode.
+  // When the US stock market is closed (weekend, night, holiday), forward-hold the closing reference price
+  // to the latest token bar timestamp so the comparison line remains visible throughout the 1D / 1H timeframe.
+  const underlyingSeries = useMemo(() => {
+    if (!compare) return [];
+    const refPrice =
+      history.benchmarkPrice ?? rawBenchmark.at(-1)?.value ?? livePrice;
+    if (!refPrice || refPrice <= 0) return rawBenchmark;
+
+    if (!rawBenchmark.length) {
+      if (!ohlcBars.length) return [];
+      const firstTime = ohlcBars[0].time;
+      const lastTime = ohlcBars[ohlcBars.length - 1].time;
+      const step = 5 * 60 * 1000;
+      const pts: { time: number; value: number }[] = [];
+      for (let t = firstTime; t <= lastTime; t += step) {
+        pts.push({ time: t, value: refPrice });
+      }
+      return pts;
+    }
+
+    const pts = [...rawBenchmark];
+    const lastBenchTime = pts[pts.length - 1].time;
+    const lastChartTime = ohlcBars.length
+      ? ohlcBars[ohlcBars.length - 1].time
+      : Date.now();
+
+    if (lastChartTime > lastBenchTime) {
+      const step = 5 * 60 * 1000;
+      let t = lastBenchTime + step;
+      while (t < lastChartTime) {
+        pts.push({ time: t, value: refPrice });
+        t += step;
+      }
+      pts.push({ time: lastChartTime, value: refPrice });
+    }
+    return pts;
+  }, [compare, rawBenchmark, history.benchmarkPrice, livePrice, ohlcBars]);
 
   // Compute MA 10 and MA 20 on bar closes across the full history
   const closeSeries = useMemo(
@@ -171,11 +212,20 @@ export default function ObservedChart({
           : "rgba(239, 68, 68, 0.45)",
     }));
 
-  const formatLineData = (pts: { time: number; value: number }[]) =>
-    pts.map((p) => ({
-      time: Math.floor(p.time / 1000) as UTCTimestamp,
-      value: p.value,
-    }));
+  const formatLineData = (pts: { time: number; value: number }[]) => {
+    const map = new Map<number, number>();
+    for (const p of pts) {
+      if (Number.isFinite(p.time) && Number.isFinite(p.value) && p.value > 0) {
+        map.set(Math.floor(p.time / 1000), p.value);
+      }
+    }
+    return [...map.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([sec, value]) => ({
+        time: sec as UTCTimestamp,
+        value,
+      }));
+  };
 
   const applyVisibleRange = (
     targetRange: "1h" | "1d" | "1w",
@@ -309,11 +359,12 @@ export default function ObservedChart({
         color: "#f0b90b",
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
-        priceLineVisible: false,
+        priceLineVisible: true,
+        lastValueVisible: true,
         title: "Underlying",
       });
       refLineRef.current = reference;
-      reference.setData(formatLineData(rawBenchmark));
+      reference.setData(formatLineData(underlyingSeries));
     }
 
     // 5. MA 10 series (amber/gold)
@@ -357,6 +408,10 @@ export default function ObservedChart({
         ? (event.seriesData.get(volumeSeriesRef.current) as
             { value?: number } | undefined)
         : undefined;
+      const refVal = refLineRef.current
+        ? (event.seriesData.get(refLineRef.current) as
+            { value?: number } | undefined)
+        : undefined;
       const m10Val = ma10Ref.current
         ? (event.seriesData.get(ma10Ref.current) as
             { value?: number } | undefined)
@@ -379,6 +434,9 @@ export default function ObservedChart({
         );
       } else if (aVal && typeof aVal.value === "number") {
         parts.push(`${actualSource}: ${money(aVal.value)}`);
+      }
+      if (compare && refVal && typeof refVal.value === "number") {
+        parts.push(`Underlying: ${money(refVal.value)}`);
       }
       if (volVal && typeof volVal.value === "number") {
         const v = volVal.value;
@@ -412,7 +470,15 @@ export default function ObservedChart({
       ma20Ref.current = null;
       chart.remove();
     };
-  }, [ohlcBars, benchmarkSeries, compare, actualSource]);
+  }, [ohlcBars, underlyingSeries, benchmarkSeries, compare, actualSource]);
+
+  // Update comparison reference line whenever underlyingSeries or comparable changes
+  useEffect(() => {
+    if (!refLineRef.current) return;
+    refLineRef.current.setData(
+      comparable ? formatLineData(underlyingSeries) : [],
+    );
+  }, [comparable, underlyingSeries]);
 
   // Adjust visible range when user clicks 1H, 1D, or 1W
   useEffect(() => {
@@ -546,6 +612,56 @@ export default function ObservedChart({
               />
               LIVE
             </span>
+          )}
+          {compare && (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "11px",
+                marginLeft: "6px",
+              }}
+            >
+              <span
+                style={{
+                  color: "#38bdf8",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  fontWeight: 600,
+                }}
+              >
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "2px",
+                    background: "#38bdf8",
+                  }}
+                />
+                Token
+              </span>
+              <span
+                style={{
+                  color: "#f0b90b",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  fontWeight: 600,
+                }}
+              >
+                <span
+                  style={{
+                    width: "10px",
+                    height: "2px",
+                    background: "#f0b90b",
+                    borderTop: "1px dashed #f0b90b",
+                  }}
+                />
+                Underlying
+              </span>
+            </div>
           )}
         </div>
         <div className={styles.chartControls}>

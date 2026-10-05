@@ -366,9 +366,10 @@ export async function rwaCompany(ticker: string): Promise<RwaCompany | null> {
  * platform (Ondo / BStocks), asset type (stocks vs funds), and tags (alpha).
  */
 export async function rwaSectorTabs(
-  knownTickers: Set<string>,
+  knownTickers?: Set<string>,
 ): Promise<RwaSectorTab[]> {
   const list = await rwaTokenList();
+  const known = knownTickers ?? new Set<string>();
   const groups = new Map<string, Set<string>>();
   const add = (label: string, ticker: string | null) => {
     if (!ticker) return;
@@ -380,8 +381,8 @@ export async function rwaSectorTabs(
     // Prefer the canonical underlying ticker; fall back to suffix stripping.
     const ticker =
       str(pick(row, /underlyingticker/i))?.toUpperCase() ??
-      underlyingTicker(str(pick(row, /symbol/i)) ?? "", knownTickers);
-    if (!ticker || !knownTickers.has(ticker)) continue;
+      underlyingTicker(str(pick(row, /symbol/i)) ?? "", known);
+    if (!ticker || (known.size > 0 && !known.has(ticker))) continue;
     const platform = str(pick(row, /platformid|platform/i))?.toLowerCase();
     add(platform === "ondo" ? "Ondo" : platform === "bstock" ? "BStocks" : "RWA", ticker);
     if (String(pick(row, /assettype/i) ?? "") === "3")

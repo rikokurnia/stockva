@@ -12,6 +12,7 @@ import {
 import type { MarketFeed } from "../lib/market";
 import CivicCityHall from "./civic-city-hall";
 import CivicMarket from "./civic-market";
+import RwaSessionClock from "./rwa-session-clock";
 import styles from "./civic-panel.module.css";
 
 export type CivicMode = "portfolio" | "market" | "data";
@@ -132,6 +133,7 @@ export default function CivicPanel(props: CivicProps) {
             </div>
           </div>
           <div className={styles.headerEnd}>
+            {mode !== "portfolio" && <RwaSessionClock />}
             <span className={styles.badge}>City sandbox · BNB testnet</span>
             <button
               className={styles.iconButton}

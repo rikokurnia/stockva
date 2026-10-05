@@ -365,10 +365,17 @@ function BundleBuilder({
     const eligible = tickers.filter((ticker) => available.includes(ticker));
     setSelected(eligible);
     setMessage("");
+    const perStock =
+      eligible.length > 10 && city.cash > 0
+        ? Math.max(10, Math.floor(city.cash / eligible.length))
+        : 500;
     setAmounts((previous) => ({
       ...previous,
       ...Object.fromEntries(
-        eligible.map((ticker) => [ticker, previous[ticker] ?? "500"]),
+        eligible.map((ticker) => [
+          ticker,
+          previous[ticker] ?? String(perStock),
+        ]),
       ),
     }));
   }
@@ -624,13 +631,23 @@ function BundleBuilder({
                   available.includes(ticker),
                 ).length;
                 if (!count) return null;
+                const isSelected =
+                  selected.length > 0 &&
+                  tab.tickers
+                    .filter((t) => available.includes(t))
+                    .every((t) => selected.includes(t));
                 return (
                   <button
                     key={tab.id}
-                    className={styles.chip}
+                    className={`${styles.chip} ${isSelected ? styles.chipActive : ""}`}
                     type="button"
                     title={`Add ${tab.label}: ${tab.tickers.join(", ")}`}
-                    onClick={() => preset(tab.tickers)}
+                    onClick={() => {
+                      preset(tab.tickers);
+                      setMessage(
+                        `Loaded Binance basket: ${tab.label} (${count} stocks).`,
+                      );
+                    }}
                   >
                     {tab.label} ({count})
                   </button>

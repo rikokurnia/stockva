@@ -831,19 +831,70 @@ function TokenInspection({
                 No RWA quote returned for this asset on BSC.
               </p>
             )}
-            {(rwaPassport.data.contracts ?? []).length > 0 && (
-              <div className={styles.sourceLinks}>
-                {rwaPassport.data.contracts!.map((deployment) => (
-                  <a
-                    key={deployment.address}
-                    href={`https://bscscan.com/address/${deployment.address}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {deployment.address.slice(0, 6)}…
-                    {deployment.address.slice(-4)} <ExternalLink size={14} />
-                  </a>
-                ))}
+            {rwaPassport.data.description && (
+              <p
+                className={styles.caption}
+                style={{
+                  marginTop: "10px",
+                  lineHeight: "1.5",
+                  fontSize: "12px",
+                  color: "var(--subtle)",
+                }}
+              >
+                {rwaPassport.data.description}
+              </p>
+            )}
+            <div className={styles.sourceLinks} style={{ marginTop: "10px" }}>
+              {rwaPassport.data.website && (
+                <a
+                  href={rwaPassport.data.website}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Official website <ExternalLink size={14} />
+                </a>
+              )}
+              {(rwaPassport.data.contracts ?? []).map((deployment) => (
+                <a
+                  key={deployment.address}
+                  href={`https://bscscan.com/address/${deployment.address}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {deployment.chain ?? "BSC"}: {deployment.address.slice(0, 6)}…
+                  {deployment.address.slice(-4)} <ExternalLink size={14} />
+                </a>
+              ))}
+            </div>
+            {(rwaPassport.data.attestations ?? []).length > 0 && (
+              <div style={{ marginTop: "12px" }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "var(--subtle)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  Auditor reports & reserve attestations
+                </span>
+                <div className={styles.sourceLinks} style={{ marginTop: "6px" }}>
+                  {rwaPassport.data.attestations!.map((att) => (
+                    <a
+                      key={att.url}
+                      href={att.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        borderColor: "rgba(240, 185, 11, 0.4)",
+                        color: "#f0b90b",
+                      }}
+                    >
+                      📄 {att.label} (PDF) <ExternalLink size={14} />
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
           </div>
