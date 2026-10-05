@@ -439,7 +439,9 @@ export default function CityMap(props: Props) {
             }
           }
         } else if (tool === "road") onRoad(roadLine(d.cell, cell));
-        else if (d.distance < 8) commit(cell);
+        // Forgiving tap window for build/move placement (touch jitter);
+        // pan tools keep their own tighter thresholds above.
+        else if (d.distance < 12) commit(cell);
         drag.current = null;
         setPreview([]);
       }}

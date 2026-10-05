@@ -34,6 +34,7 @@ import CityMap, { type AgentMapActivity } from "./city-map";
 import { inspectorPlacement } from "../lib/map-geometry";
 import { rebalanceFingerprint, type RebalancePlan } from "../lib/rebalance";
 import {
+  applyDirectSellReceipt,
   applyRebalanceReceipt,
   applyRebalanceBatch,
   hasPendingRebalance,
@@ -251,6 +252,7 @@ export default function StockCity() {
   const lastInspectorId = useRef<string | null>(null);
   const [draggingInspector, setDraggingInspector] = useState(false);
   const inspectorDragOffset = useRef<{ dx: number; dy: number } | null>(null);
+  const [sellingBuilding, setSellingBuilding] = useState(false);
   const hasHall = city.buildings.some((b) => b.kind === "hall");
   const hasExchange = city.buildings.some((b) => b.kind === "exchange");
   const hasData = city.buildings.some((b) => b.kind === "oracle");
@@ -1549,7 +1551,44 @@ export default function StockCity() {
     setSelected(null);
   };
   const onPlace = (cell: Cell) => {
-    if (cityMutationLocked) return;
+    if (cityMutationLocked) {
+      notify(
+        "Finish the agent's pending transaction before editing the city.",
+        true,
+      );
+      return;
+    }
+    if (tool === "move") {
+      if (!moving) {
+        notify("Pick a building to move first.", true);
+        setTool("inspect");
+        return;
+      }
+      const error = placementError(cell, city, moving);
+      if (error) {
+        notify(error, true);
+        return;
+      }
+      const target = city.buildings.find((b) => b.id === moving);
+      if (!target) {
+        notify("That building is gone.", true);
+        setMoving(null);
+        setTool("inspect");
+        return;
+      }
+      commit({
+        ...city,
+        buildings: city.buildings.map((b) =>
+          b.id === moving ? { ...b, ...cell } : b,
+        ),
+      });
+      setSelected(moving);
+      setMoving(null);
+      setTool("inspect");
+      setKind(null);
+      notify("Building moved.");
+      return;
+    }
     if (!kind || !ready) return;
     const def = defFor(kind);
     const alreadyBuilt = city.buildings.some(
@@ -1564,25 +1603,6 @@ export default function StockCity() {
       );
       setTool("inspect");
       setKind(null);
-      return;
-    }
-    if (tool === "move" && moving) {
-      const error = placementError(cell, city, moving);
-      if (error) {
-        notify(error, true);
-        return;
-      }
-      commit({
-        ...city,
-        buildings: city.buildings.map((b) =>
-          b.id === moving ? { ...b, ...cell } : b,
-        ),
-      });
-      setSelected(moving);
-      setMoving(null);
-      setTool("inspect");
-      setKind(null);
-      notify("Building moved.");
       return;
     }
     const result = constructBuilding(kind, cell, amount, city, prices);
@@ -2061,18 +2081,71 @@ export default function StockCity() {
     inspectorDragOffset.current = null;
     setDraggingInspector(false);
   };
-  const sellCurrentBuilding = () => {
-    if (!current) return;
+  const sellCurrentBuilding = async () => {
+    if (!current || !definition?.ticker || sellingBuilding) return;
     if (cityMutationLocked) {
       notify("Finish the agent's pending transaction before selling.", true);
       return;
     }
-    if (current.vaultId && definition?.ticker) {
-      setPanel("agent");
-      notify("On-chain position — review and sign its sale in Agent Hall.");
+    // Local-only holding: no on-chain position exists, liquidate to treasury.
+    if (!current.vaultId) {
+      onBulldoze(current);
       return;
     }
-    onBulldoze(current);
+    // On-chain holding: wallet-signed vault sale, receipt saved to history.
+    setSellingBuilding(true);
+    try {
+      const account = wallet ?? (await connectInjectedWallet());
+      if (!account) throw new Error("Connect a wallet to sign the sale.");
+      setWallet(account);
+      const connected = wallets.find(
+        (w) => w.address.toLowerCase() === account.toLowerCase(),
+      );
+      const provider = (
+        connected
+          ? await connected.getEthereumProvider()
+          : window.ethereum
+      ) as unknown as any;
+      if (!provider) throw new Error("Connect your wallet to sign the sale.");
+      const positionId = current.vaultId;
+      if (!positionId || !/^0x[a-fA-F0-9]{64}$/.test(positionId))
+        throw new Error(
+          "This building has no valid on-chain position to sell.",
+        );
+      const price = priceOf(definition.ticker, prices);
+      notify("Sign the sale in your wallet…");
+      const hash = await sellBuildingOnchain(
+        account,
+        positionId as `0x${string}`,
+        price,
+        10000,
+        (submitted) => {
+          if (submitted)
+            notify("Sale submitted. Waiting for BNB confirmation…");
+        },
+        provider,
+      );
+      notify("Confirming the sale on BNB…");
+      const receipt = await confirmedRebalanceReceipt(account, hash, "sell");
+      const next = applyDirectSellReceipt(
+        simulationLatest.current.city,
+        current.id,
+        receipt,
+        account,
+      );
+      commit(next);
+      setSelected(null);
+      notify(
+        `Sold ${definition.ticker} on-chain. Receipt saved in City Hall history.`,
+      );
+    } catch (caught) {
+      notify(
+        caught instanceof Error ? caught.message : "Sale failed.",
+        true,
+      );
+    } finally {
+      setSellingBuilding(false);
+    }
   };
   const steps = [
     city.roads.length > 0,
@@ -2834,9 +2907,17 @@ export default function StockCity() {
               >
                 Move
               </button>
-              <button className="danger" onClick={sellCurrentBuilding}>
+              <button
+                className="danger"
+                disabled={sellingBuilding}
+                onClick={() => void sellCurrentBuilding()}
+              >
                 <Trash2 size={14} />
-                {definition.ticker ? "Sell & remove" : "Bulldoze"}
+                {sellingBuilding
+                  ? "Selling…"
+                  : definition.ticker
+                    ? "Sell & remove"
+                    : "Bulldoze"}
               </button>
             </div>
             <div className="inspection-note">

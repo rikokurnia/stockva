@@ -1,5 +1,6 @@
 import type { RebalancePlan } from "./rebalance";
 import type { CityState } from "./city";
+import { defFor } from "./city.ts";
 import type { RebalanceReceipt } from "./contracts";
 
 export type RebalanceStepProgress = {
@@ -304,4 +305,72 @@ export function applyRebalanceBatch(
       applyRebalanceReceipt(next, plan, step, receipts[index], true),
     city,
   );
+}
+
+/**
+ * Apply a wallet-signed inspector sale (no agent plan). The vault receipt is
+ * chain truth: payout and closed fraction come from the mined PositionSold
+ * event. Saved as a direct agent receipt so City Hall history links the tx.
+ */
+export function applyDirectSellReceipt(
+  city: CityState,
+  buildingId: string,
+  receipt: RebalanceReceipt,
+  owner: `0x${string}`,
+): CityState {
+  const building = city.buildings.find((b) => b.id === buildingId);
+  if (
+    city.agentReceipts?.some(
+      (row) => row.hash.toLowerCase() === receipt.hash.toLowerCase(),
+    )
+  )
+    return city;
+  if (!building) throw new Error("The sold building is gone. Keep the receipt and reload your saved city.");
+  const ticker = defFor(building.kind).ticker;
+  if (!ticker || ticker !== receipt.ticker)
+    throw new Error("The confirmed ticker does not match this building.");
+  if (
+    !building.vaultId ||
+    building.vaultId.toLowerCase() !== receipt.positionId.toLowerCase()
+  )
+    throw new Error("The confirmed position does not match this building.");
+  if (
+    ![receipt.amount, receipt.quantity].every(Number.isFinite) ||
+    receipt.amount < 0 ||
+    receipt.quantity <= 0
+  )
+    throw new Error("The receipt has invalid position amounts.");
+  const soldQty = Math.min(receipt.quantity, building.quantity);
+  const basis = soldQty * building.entry;
+  const fullyClosed = receipt.fullyClosed || soldQty >= building.quantity;
+  const buildings = fullyClosed
+    ? city.buildings.filter((b) => b.id !== buildingId)
+    : city.buildings.map((b) =>
+        b.id === buildingId
+          ? {
+              ...b,
+              quantity: Math.max(0, b.quantity - soldQty),
+              cost: b.cost * Math.max(0, 1 - soldQty / b.quantity),
+            }
+          : b,
+      );
+  return {
+    ...city,
+    buildings,
+    cash: Math.round((city.cash + receipt.amount) * 1_000_000) / 1_000_000,
+    realizedPnl: (city.realizedPnl ?? 0) + (receipt.amount - basis),
+    agentReceipts: [
+      ...(city.agentReceipts ?? []),
+      {
+        hash: receipt.hash,
+        owner,
+        ticker,
+        action: "sell",
+        at: Date.now(),
+        planId: "direct",
+        stepId: buildingId,
+        positionId: receipt.positionId,
+      },
+    ],
+  };
 }

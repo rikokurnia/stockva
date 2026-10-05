@@ -78,6 +78,79 @@ export default function CivicPerformance({
           </div>
         )}
       </section>
+      <section className={styles.section} aria-label="Holding performance">
+        <div className={styles.sectionHeading}>
+          <h4>Holding performance</h4>
+          <span>Unrealized P/L per asset</span>
+        </div>
+        {landscape.holdings.length ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {[...landscape.holdings]
+              .map((holding) => ({
+                ticker: holding.ticker,
+                pnl: holding.value - holding.basis,
+              }))
+              .sort((a, b) => b.pnl - a.pnl)
+              .map((row) => {
+                const max = Math.max(
+                  ...landscape.holdings.map((h) =>
+                    Math.abs(h.value - h.basis),
+                  ),
+                  1,
+                );
+                const gain = row.pnl >= 0;
+                return (
+                  <div
+                    key={row.ticker}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "64px 1fr auto",
+                      gap: "10px",
+                      alignItems: "center",
+                      fontSize: "12px",
+                    }}
+                  >
+                    <strong>{row.ticker}</strong>
+                    <div
+                      style={{
+                        height: "10px",
+                        borderRadius: "5px",
+                        background: "rgba(8, 16, 22, 0.6)",
+                        border: "1px solid var(--line-subtle)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${Math.max(2, (Math.abs(row.pnl) / max) * 100)}%`,
+                          background: gain ? "#10b981" : "#f43f5e",
+                          borderRadius: "inherit",
+                        }}
+                      />
+                    </div>
+                    <span
+                      className={gain ? styles.gain : styles.loss}
+                      style={{
+                        fontWeight: 700,
+                        fontVariantNumeric: "tabular-nums",
+                        minWidth: "90px",
+                        textAlign: "right",
+                      }}
+                    >
+                      {gain ? "+" : ""}
+                      {money(row.pnl)}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          <p className={styles.caption}>
+            Bars appear once you hold invested positions.
+          </p>
+        )}
+      </section>
       <section className={styles.section} aria-label="Daily profit and loss">
         <div className={styles.sectionHeading}>
           <h4>Daily P&L</h4>
