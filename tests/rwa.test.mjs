@@ -7,7 +7,7 @@ import {
   sessionLabel,
   estimatedSession,
 } from "../lib/rwa.ts";
-import { signRwaRequest } from "../lib/rwa-server.ts";
+import { signRwaRequest, sessionFromStatus } from "../lib/rwa-server.ts";
 
 test("spreadBps measures on-chain premium in basis points", () => {
   assert.equal(spreadBps(101, 100), 100);
@@ -44,6 +44,42 @@ test("estimatedSession follows the 13:30-20:00 UTC weekday clock", () => {
   assert.equal(weekend.state, "closed");
   const night = estimatedSession(new Date("2026-10-07T02:00:00.000Z"));
   assert.equal(night.state, "closed");
+});
+
+test("sessionFromStatus reads real RWA statusInfo blocks", () => {
+  const overnight = sessionFromStatus({
+    openState: true,
+    marketStatus: "overnight",
+    reasonCode: "TRADING",
+    nextOpenTime: 1791187260000,
+    nextCloseTime: 1791186900000,
+  });
+  assert.equal(overnight.session, "open");
+  assert.equal(overnight.referenceFrozen, true);
+  assert.equal(
+    overnight.nextOpenAt,
+    new Date(1791187260000).toISOString(),
+  );
+  const regular = sessionFromStatus({
+    openState: true,
+    marketStatus: "regular",
+    reasonCode: "TRADING",
+  });
+  assert.equal(regular.session, "open");
+  assert.equal(regular.referenceFrozen, false);
+  const paused = sessionFromStatus({
+    openState: false,
+    marketStatus: "paused",
+    reasonCode: "MARKET_PAUSED",
+  });
+  assert.equal(paused.session, "closed");
+  const halted = sessionFromStatus({
+    openState: false,
+    marketStatus: "halt",
+    reasonCode: "HALTED_CORP_ACTION",
+  });
+  assert.equal(halted.session, "halted");
+  assert.equal(sessionFromStatus(null).session, "unknown");
 });
 
 test("signRwaRequest matches Base64(HMAC-SHA256(ts + METHOD + path))", () => {

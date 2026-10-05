@@ -38,6 +38,10 @@ export type RwaCompany = {
   symbol?: string;
   platform?: string;
   sector?: string;
+  tokenToShareRatio?: string;
+  website?: string;
+  description?: string;
+  attestations?: { label: string; url: string }[];
   contracts: { chain: string; address: string }[];
   spread?: RwaSpreadQuote | null;
 };

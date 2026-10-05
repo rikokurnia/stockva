@@ -3,7 +3,7 @@ import { assets } from "../../../../lib/city";
 import { rwaConfigured, rwaSectorTabs } from "../../../../lib/rwa-server";
 export const runtime = "nodejs";
 let cache: { at: number; body: unknown } | undefined;
-/** Official RWA sector tabs (Magnificent 7, AI Chips, ETF, …) with tickers. */
+/** Official Binance baskets (platform / fund / alpha tags) with tickers. */
 export async function GET() {
   if (!rwaConfigured()) return NextResponse.json({ available: false, tabs: [] });
   if (cache && Date.now() - cache.at < 3600000)
