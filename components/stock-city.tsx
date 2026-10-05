@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import CityMap, { type AgentMapActivity } from "./city-map";
 import { inspectorPlacement } from "../lib/map-geometry";
-import { rebalanceFingerprint, type RebalancePlan } from "../lib/rebalance";
+import { rebalanceFingerprint, bindReviewedCityPositions, type RebalancePlan } from "../lib/rebalance";
 import { reconcileLegacyRebalance } from "../lib/rebalance-sequential";
 import {
   applyDirectSellReceipt,
@@ -884,6 +884,9 @@ export default function StockCity() {
       setActiveTool("inspect");
       setKind(null);
       if (!run.batchId) {
+        plan = bindReviewedCityPositions(plan, latest);
+        run = { ...run, plan };
+        saveAgentExecution(run);
         // Validate unconfirmed steps without making provisional city changes.
         let sites = latest;
         for (const step of plan.steps) {
@@ -896,7 +899,7 @@ export default function StockCity() {
             );
             if (
               !building ||
-              building.vaultId?.toLowerCase() !== step.positionId.toLowerCase()
+              building.vaultId?.toLowerCase() !== (step.cityPositionId ?? step.positionId).toLowerCase()
             )
               throw new Error(
                 "A reviewed building changed. Ask for a fresh blueprint.",

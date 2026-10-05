@@ -67,6 +67,8 @@ export type RebalanceSellStep = RebalanceStepBase & {
   action: "sell";
   buildingId: string;
   positionId: `0x${string}`;
+  /** Reviewed saved-city ID, which can differ from a reconciled chain position. */
+  cityPositionId?: `0x${string}`;
   /** Exact chain quantity for execution preflight, encoded without JSON bigint. */
   positionQuantity: string;
   costBasis: number;
@@ -146,6 +148,18 @@ export function rebalanceFingerprint(city: CityState): string {
       .map((p) => [p.id, p.ticker, p.quantity, p.entry, p.cost])
       .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
   });
+}
+
+/** Upgrade already-reviewed plans without changing amounts or chain positions. */
+export function bindReviewedCityPositions(plan: RebalancePlan, city: CityState): RebalancePlan {
+  if (rebalanceFingerprint(city) !== plan.fingerprint) return plan;
+  return { ...plan, steps: plan.steps.map((step) => {
+    if (step.action !== "sell" || step.cityPositionId) return step;
+    const building = city.buildings.find((b) => b.id === step.buildingId);
+    if (!building?.vaultId || !POSITION_ID.test(building.vaultId) ||
+        catalogue.find((d) => d.kind === building.kind)?.ticker !== step.ticker) return step;
+    return { ...step, cityPositionId: building.vaultId as `0x${string}` };
+  }) };
 }
 
 export function isRebalancePlanCurrent(
@@ -316,13 +330,16 @@ function mappedHoldings(input: RebalanceInput): MappedHolding[] {
       (p) => p.id.toLowerCase() === building.vaultId!.toLowerCase(),
     );
     if (!position || !position.active) {
-      position = input.positions.find(
+      const candidates = input.positions.filter(
         (p) =>
           p.active &&
           p.ticker === ticker &&
           p.owner.toLowerCase() === input.walletAddress.toLowerCase() &&
           !usedIds.has(p.id.toLowerCase()),
       );
+      if (candidates.length !== 1)
+        throw new Error(`${ticker} has no unique active wallet position to reconcile. Sync the city first.`);
+      position = candidates[0];
     }
     if (
       !position ||
@@ -506,6 +523,7 @@ export function buildRebalancePlan(
       ticker: h.ticker,
       buildingId: h.building.id,
       positionId: h.position.id,
+      cityPositionId: h.building.vaultId as `0x${string}`,
       positionQuantity: h.position.quantity.toString(),
       costBasis: weiNumber((h.position.quantity * h.position.entryPrice) / WEI),
       fractionBps: 10000,

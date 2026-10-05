@@ -21,7 +21,9 @@ const {
   parseRebalanceRequest,
   rebalanceFingerprint,
   isRebalancePlanCurrent,
+  bindReviewedCityPositions,
 } = require("../lib/rebalance.ts");
+const { applyRebalanceReceipt } = require("../lib/rebalance-execution.ts");
 const { hasRoad, placementError } = require("../lib/city.ts");
 const { NextResponse } = require("next/server");
 const WEI = BigInt("1000000000000000000");
@@ -95,6 +97,27 @@ const proposal = (
     weight,
     reason: `Allocate ${weight}% to ${ticker}.`,
   })),
+});
+
+test("a reconciled saved position binds both reviewed city identity and canonical chain receipt", () => {
+  const input = fixture();
+  input.positions[0].id = positionId(9);
+  const plan = buildRebalancePlan(input, proposal(), 10000);
+  const step = plan.steps.find((s) => s.action === "sell" && s.ticker === "NVDA");
+  assert.equal(step.cityPositionId, positionId(1));
+  assert.equal(step.positionId, positionId(9));
+  const receipt = { hash: positionId(99), positionId: positionId(9), ticker: "NVDA", quantity: 8, amount: 800, entryPrice: 0, fullyClosed: true };
+  const next = applyRebalanceReceipt(input.city, plan, step, receipt);
+  assert.equal(next.buildings.some((b) => b.id === "nvda"), false);
+  assert.equal(next.cash, 1300);
+  const oldPlan = { ...plan, steps: plan.steps.map(({ cityPositionId, ...s }) => s) };
+  assert.equal(bindReviewedCityPositions(oldPlan, input.city).steps[0].cityPositionId, positionId(1));
+  const changed = { ...input.city, cash: 501 };
+  assert.equal(bindReviewedCityPositions(oldPlan, changed), oldPlan, "Cannot rebind an edited city");
+  const reassigned = { ...input.city, buildings: input.city.buildings.map((b) => b.id === "nvda" ? { ...b, vaultId: positionId(10) } : b) };
+  assert.throws(() => applyRebalanceReceipt(reassigned, plan, step, receipt), /building|position/i);
+  input.positions.push({ ...input.positions[0], id: positionId(10) });
+  assert.throws(() => buildRebalancePlan(input, proposal(), 10000), /unique active wallet position/);
 });
 
 test("a rotation closes confirmed positions first and reserves non-overlapping road-connected rebuilds", () => {

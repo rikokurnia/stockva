@@ -190,6 +190,7 @@ export function recoverRebalanceExecution(
         : step.action !== "sell" ||
           typeof step.positionId !== "string" ||
           !validHash(step.positionId) ||
+          (step.cityPositionId !== undefined && (typeof step.cityPositionId !== "string" || !validHash(step.cityPositionId))) ||
           typeof step.positionQuantity !== "string" ||
           !/^\d+$/.test(step.positionQuantity) ||
           step.positionQuantity.length > 80 ||
@@ -258,7 +259,7 @@ export function applyRebalanceReceipt(
     const building = buildings.find((b) => b.id === step.buildingId);
     if (
       !building ||
-      building.vaultId?.toLowerCase() !== receipt.positionId.toLowerCase()
+      building.vaultId?.toLowerCase() !== (step.cityPositionId ?? step.positionId).toLowerCase()
     )
       throw new Error(
         "The sold building changed. Keep the receipt and reload your saved city.",
