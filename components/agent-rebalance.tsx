@@ -401,7 +401,7 @@ export default function AgentRebalance({
           },
           {
             title: "Wallet approval",
-            detail: "Atomic batch or sequential signing",
+            detail: "1 signature for all stocks (same as Bundle)",
             icon: Wallet,
           },
           {
@@ -563,8 +563,8 @@ export default function AgentRebalance({
           <div className={styles.boundary}>
             <ShieldCheck size={17} aria-hidden="true" />
             <p>
-              The agent prepares the plan. Your wallet approves the complete
-              rebalance via atomic batch or sequential execution.
+              The agent prepares the plan. Your wallet approves all stock
+              buildings in 1 transaction (same as the bundle feature).
             </p>
           </div>
           <div className={styles.snapshot}>
@@ -823,10 +823,7 @@ export default function AgentRebalance({
               <div className={styles.ledgerHeader}>
                 <h5>Every building. Every step.</h5>
                 <span>
-                  {shownPlan.steps.length} changes ·{" "}
-                  {shownExecution?.mode === "sequential"
-                    ? "step-by-step signing"
-                    : "1 approval or step-by-step"}
+                  {shownPlan.steps.length} changes · 1 batch approval
                 </span>
               </div>
               {shownExecution?.batchId && (
@@ -1064,11 +1061,11 @@ export default function AgentRebalance({
                     <div className={styles.executeHeading}>
                       <ShieldCheck size={21} aria-hidden="true" />
                       <div>
-                        <b>Review first. Sign and execute on BNB Chain.</b>
+                        <b>Review first. 1 signature for all stocks.</b>
                         <p>
                           {shownPlan.steps.length} building changes on BNB
-                          testnet. Supports atomic batching or standard wallets
-                          (MetaMask, Binance Web3 Wallet). Network fees paid in tBNB.
+                          testnet. 1 signature in your wallet for all stocks
+                          (same as the Bundle feature). Network fees paid in tBNB.
                         </p>
                       </div>
                     </div>
@@ -1093,12 +1090,12 @@ export default function AgentRebalance({
                       <Wallet size={17} aria-hidden="true" />
                       {starting
                         ? "Opening your wallet…"
-                        : "Sign & rebalance city"}
+                        : "Sign once & rebalance city"}
                       <ArrowRight size={16} aria-hidden="true" />
                     </button>
                     <small className={styles.executeNote}>
-                      Supports atomic batching wallets or standard wallets on BNB
-                      testnet. Every building is permanently recorded in City Hall.
+                      1 batch signature for all stocks on BNB testnet. Every
+                      building is permanently recorded in City Hall.
                     </small>
                   </>
                 )}
