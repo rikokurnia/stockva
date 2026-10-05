@@ -734,6 +734,13 @@ export default function CivicCityHall(
                 target="_blank"
                 rel="noreferrer"
               >
+                <Image
+                  src="/bnb-logo.png"
+                  alt="BNB"
+                  width={14}
+                  height={14}
+                  style={{ flexShrink: 0 }}
+                />
                 Vault contract <ExternalLink size={13} />
               </a>
               <a
@@ -741,6 +748,13 @@ export default function CivicCityHall(
                 target="_blank"
                 rel="noreferrer"
               >
+                <Image
+                  src="/bnb-logo.png"
+                  alt="BNB"
+                  width={14}
+                  height={14}
+                  style={{ flexShrink: 0 }}
+                />
                 mUSD contract <ExternalLink size={13} />
               </a>
             </div>
@@ -897,6 +911,13 @@ export default function CivicCityHall(
                 target="_blank"
                 rel="noreferrer"
               >
+                <Image
+                  src="/bnb-logo.png"
+                  alt="BNB"
+                  width={16}
+                  height={16}
+                  style={{ flexShrink: 0 }}
+                />
                 <code>
                   {transaction.hash.slice(0, 8)}…{transaction.hash.slice(-6)}
                 </code>
@@ -918,6 +939,13 @@ export default function CivicCityHall(
             target="_blank"
             rel="noreferrer"
           >
+            <Image
+              src="/bnb-logo.png"
+              alt="BNB"
+              width={14}
+              height={14}
+              style={{ flexShrink: 0 }}
+            />
             Open complete vault history <ExternalLink size={14} />
           </a>
         </div>

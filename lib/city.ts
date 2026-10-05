@@ -1370,7 +1370,7 @@ export const STORAGE = "stockva.sandbox.v2";
 export const ROAD_COST = 10;
 export const newCity = (): CityState => ({
   version: 2,
-  cash: 10000,
+  cash: 0,
   realizedPnl: 0,
   buildings: [],
   roads: [],

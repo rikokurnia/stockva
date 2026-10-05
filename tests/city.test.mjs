@@ -61,7 +61,7 @@ test("simulation traverses sprite tiers without changing market prices or positi
     "nvidia",
     { r: 1, c: 1 },
     500,
-    constructBuilding("exchange", { r: -6, c: 0 }, 400, newCity()).state,
+    constructBuilding("exchange", { r: -6, c: 0 }, 400, { ...newCity(), cash: 10000 }).state,
     { NVDA: 100 },
   ).state;
   const b = city.buildings.at(-1),
@@ -98,15 +98,23 @@ test("a new game has no buildings, roads, holdings, or traffic", () => {
   const city = newCity();
   assert.deepEqual(city.buildings, []);
   assert.deepEqual(city.roads, []);
-  assert.equal(city.cash, 10000);
+  assert.equal(city.cash, 0);
   assert.deepEqual(trafficRoute(city.roads), []);
   assert.equal(
     isSavedCity({ positions: [{ ticker: "NVDA" }], cash: 5240, roads: [] }),
     false,
   );
 });
-test("the first road can start on bare ground and is one atomic purchase", () => {
+test("a brand new city starts with 0 cash and cannot build without faucet funding", () => {
   const city = newCity();
+  assert.equal(city.cash, 0);
+  const roadResult = constructRoad(roadLine({ r: 0, c: -1 }, { r: 0, c: 1 }), city);
+  assert.equal(roadResult.error, "Not enough funds");
+  const buildResult = constructBuilding("exchange", { r: -6, c: 0 }, 400, city);
+  assert.equal(buildResult.error, "Not enough funds");
+});
+test("the first road can start on bare ground and is one atomic purchase", () => {
+  const city = { ...newCity(), cash: 10000 };
   const cells = roadLine({ r: 0, c: -3 }, { r: 0, c: 3 });
   const result = constructRoad(cells, city);
   assert.equal(result.error, "");
@@ -118,7 +126,7 @@ test("the first road can start on bare ground and is one atomic purchase", () =>
   assert.equal(repeat.state.roads.length, 7);
 });
 const tradingCity = () =>
-  constructBuilding("exchange", { r: -6, c: 0 }, 400, newCity()).state;
+  constructBuilding("exchange", { r: -6, c: 0 }, 400, { ...newCity(), cash: 10000 }).state;
 
 test("every building is manually purchased and reserves all four footprint tiles", () => {
   const city = constructRoad(
@@ -348,7 +356,7 @@ test("each original vehicle has all eight local image frames with valid crop bou
 });
 
 test("progression rejects company construction without an Exchange, including after demolition", () => {
-  const empty = newCity();
+  const empty = { ...newCity(), cash: 10000 };
   const rejected = constructBuilding("nvidia", { r: 1, c: 1 }, 500, empty);
   assert.match(rejected.error, /Stock Exchange/);
   assert.equal(rejected.state, empty);
@@ -417,7 +425,7 @@ test("catalogue contains 30 hero bespoke stocks, 10 sector templates, 70 sector 
   assert.equal(assets.length, 100);
   assert.equal(HERO_TICKERS.length, 30);
   for (const def of catalogue) {
-    const baseCity = def.ticker ? tradingCity() : newCity();
+    const baseCity = def.ticker ? tradingCity() : { ...newCity(), cash: 10000 };
     const built = constructBuilding(
       def.kind,
       { r: 1, c: 1 },
@@ -470,7 +478,7 @@ test("regular-session estimate handles DST, weekends and closing boundary", () =
 test("position-only buys track without buildings and sell by fraction", async () => {
   const { buyPaper, sellPaper } = await import("../lib/city.ts");
   const prices = { AAPL: 200 };
-  let city = newCity();
+  let city = { ...newCity(), cash: 10000 };
   const bought = buyPaper(city, "AAPL", 1000, prices.AAPL);
   assert.equal(bought.error, "");
   assert.equal(bought.state.cash, 9000);
@@ -515,8 +523,7 @@ test("sector towers support multi-deployment of the same sector for different co
   assert.ok(healthDef.stocks.includes("JNJ"));
   assert.ok(healthDef.stocks.includes("LLY"));
 
-  // 1. Build Stock Exchange first
-  const baseCity = constructBuilding("exchange", { r: -6, c: 0 }, 400, newCity()).state;
+  const baseCity = constructBuilding("exchange", { r: -6, c: 0 }, 400, { ...newCity(), cash: 10000 }).state;
 
   // 2. Build JNJ Healthcare Tower
   const b1 = constructBuilding("jnj", { r: 1, c: 1 }, 500, baseCity);

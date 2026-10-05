@@ -134,7 +134,7 @@ PRIVY_APP_SECRET=
 # Set at least one key; providers are tried in order Gemini → DeepSeek → MuseSpark.
 # Without any key, AI reviews/plans return an explicit "unavailable" error (no fabricated plans).
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.5-flash
 DEEPSEEK_API_KEY=
 DEEPSEEK_MODEL=deepseek-chat
 MUSESPARK_API_KEY=

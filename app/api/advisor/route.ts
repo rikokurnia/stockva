@@ -18,7 +18,7 @@ type AdvisorBody = {
   hallAnalysis?: unknown;
 };
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
 const MUSESPARK_BASE_URL =
   process.env.MUSESPARK_BASE_URL ?? "https://api.musespark.ai/v1";
