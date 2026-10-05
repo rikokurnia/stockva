@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { assets } from "../../../lib/city";
 import { fallbackFeed, type MarketFeed } from "../../../lib/market";
+import { rwaConfigured, rwaSession, rwaSpreadQuotes } from "../../../lib/rwa-server";
 export const runtime = "nodejs";
 let cache: { at: number; feed: MarketFeed } | undefined;
 async function get(path: string) {
@@ -155,6 +156,37 @@ export async function GET() {
     }
     if (!Object.values(feed.quotes).some((q) => q.status === "live"))
       throw new Error("No matching quotes");
+    // Best-effort RWA layer: on-chain vs reference spread + market session
+    // from Binance Web3 RWA Data. Never breaks the xStocks/Yahoo chain.
+    if (rwaConfigured()) {
+      try {
+        const [spreads, session] = await Promise.all([
+          rwaSpreadQuotes(
+            Object.values(feed.quotes)
+              .filter((q) => q.status === "live")
+              .map((q) => q.ticker),
+          ),
+          rwaSession(assets.map((a) => a.ticker)),
+        ]);
+        for (const spread of spreads) {
+          const quote = feed.quotes[spread.ticker];
+          if (!quote || quote.status !== "live") continue;
+          quote.rwa = {
+            onchain: spread.onchain,
+            reference: spread.reference,
+            spreadBps: spread.spreadBps,
+            onchainAt: spread.onchainAt,
+            session: spread.session,
+            referenceFrozen: spread.referenceFrozen,
+            platform: spread.platform,
+            contract: spread.contract,
+          };
+        }
+        feed.marketSession = session;
+      } catch {
+        /* RWA layer stays silent; core quotes stand on their own */
+      }
+    }
     if (cache)
       for (const [ticker, q] of Object.entries(cache.feed.quotes)) {
         if (

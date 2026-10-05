@@ -18,6 +18,7 @@ import {
   type FinancialMetric,
 } from "../lib/asset-research";
 import type { HistoryFeed, Passport } from "../lib/market";
+import type { RwaCompany } from "../lib/rwa";
 import type { CivicProps } from "./civic-panel";
 import { stamp } from "../lib/civic";
 import StockLogo from "./stock-logo";
@@ -532,6 +533,9 @@ function TokenInspection({
   const [network, setNetwork] = useState(0);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
+  const rwaPassport = useResource<
+    { available: boolean; fetchedAt?: string } & Partial<RwaCompany>
+  >(`/api/rwa/passport?ticker=${encodeURIComponent(ticker)}`, 300000, 0);
   const deployment = passport?.deployments[network];
   const reserve = passport?.reserve;
   const staleReserve = reserve
@@ -783,6 +787,67 @@ function TokenInspection({
           executable spread is implied. The underlying reference may be delayed
           or from a closed market session.
         </p>
+        {rwaPassport.data?.available && (
+          <div style={{ marginTop: "16px" }}>
+            <div className={styles.sectionHeading}>
+              <h4 style={{ fontSize: "14px" }}>
+                On-chain vs reference · {rwaPassport.data.platform ?? "RWA"}
+              </h4>
+              <span>Binance RWA Data · BSC</span>
+            </div>
+            {rwaPassport.data.spread ? (
+              <dl className={styles.facts}>
+                <Fact label="On-chain price">
+                  {money(rwaPassport.data.spread.onchain)}
+                </Fact>
+                <Fact label="Per-share reference">
+                  {money(rwaPassport.data.spread.reference)}
+                </Fact>
+                <Fact label="Spread">
+                  <span
+                    className={
+                      rwaPassport.data.spread.spreadBps >= 0
+                        ? styles.gain
+                        : styles.loss
+                    }
+                    style={{ fontWeight: 700 }}
+                  >
+                    {rwaPassport.data.spread.spreadBps >= 0 ? "+" : ""}
+                    {(rwaPassport.data.spread.spreadBps / 100).toFixed(2)}%
+                    {rwaPassport.data.spread.referenceFrozen
+                      ? " · ref frozen"
+                      : ""}
+                  </span>
+                </Fact>
+                {rwaPassport.data.spread.high52W != null && (
+                  <Fact label="52-week range">
+                    {money(rwaPassport.data.spread.low52W ?? 0)} –{" "}
+                    {money(rwaPassport.data.spread.high52W)}
+                  </Fact>
+                )}
+              </dl>
+            ) : (
+              <p className={styles.notice}>
+                No RWA quote returned for this asset on BSC.
+              </p>
+            )}
+            {(rwaPassport.data.contracts ?? []).length > 0 && (
+              <div className={styles.sourceLinks}>
+                {rwaPassport.data.contracts!.map((deployment) => (
+                  <a
+                    key={deployment.address}
+                    href={`https://bscscan.com/address/${deployment.address}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {deployment.address.slice(0, 6)}…
+                    {deployment.address.slice(-4)} <ExternalLink size={14} />
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {historyLoading && !history ? (
           <Loading label="Retrieving independent price histories…" />
         ) : history ? (

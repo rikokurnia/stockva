@@ -17,7 +17,7 @@ export type RebalanceExecution = {
   steps: RebalanceStepProgress[];
   error?: string;
   fingerprint?: string;
-  mode?: "atomic";
+  mode?: "atomic" | "sequential";
   batchId?: string;
   batchStatus?: "wallet" | "pending" | "confirmed" | "failed";
 };
@@ -51,9 +51,14 @@ export function recoverRebalanceExecution(
     (typeof hash === "string" && /^0x[a-fA-F0-9]{64}$/.test(hash));
   const finite = (n: unknown): n is number =>
     typeof n === "number" && Number.isFinite(n) && n >= 0;
-  if (run.mode !== undefined && run.mode !== "atomic") return null;
+  if (run.mode !== undefined && run.mode !== "atomic" && run.mode !== "sequential") return null;
   if (
-    run.mode === "atomic" &&
+    run.mode === "sequential" &&
+    (run.batchId !== undefined || run.batchStatus !== undefined)
+  )
+    return null;
+  if (
+    (run.mode === "atomic" || run.batchId !== undefined || run.batchStatus !== undefined) &&
     ((run.batchId !== undefined &&
       (typeof run.batchId !== "string" ||
         !run.batchId.length ||
@@ -63,7 +68,7 @@ export function recoverRebalanceExecution(
           run.batchStatus,
         )) ||
       (!!run.batchStatus && !run.batchId) ||
-      (run.status === "completed" && run.batchStatus !== "confirmed"))
+      (run.status === "completed" && run.mode === "atomic" && run.batchStatus !== "confirmed"))
   )
     return null;
   if (

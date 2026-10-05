@@ -584,3 +584,42 @@ test("a saved atomic batch with no transaction hash stays locked and can be reco
   saved.batchId = undefined;
   assert.equal(recoverRebalanceExecution(saved, supportedKinds), null);
 });
+
+test("a saved sequential execution can be recovered and pending transactions tracked", () => {
+  const saved = savedExecution();
+  saved.mode = "sequential";
+  assert.equal(recoverRebalanceExecution(saved, supportedKinds), saved);
+  assert.equal(hasPendingRebalance(saved), true);
+  saved.steps[1].status = "confirmed";
+  saved.status = "completed";
+  assert.equal(recoverRebalanceExecution(saved, supportedKinds), saved);
+  assert.equal(hasPendingRebalance(saved), false);
+
+  // Sequential execution cannot carry atomic batchId or batchStatus
+  const badSequential = structuredClone(saved);
+  badSequential.batchId = `0x${"f".repeat(64)}`;
+  assert.equal(recoverRebalanceExecution(badSequential, supportedKinds), null);
+
+  const badSequential2 = structuredClone(saved);
+  badSequential2.batchStatus = "pending";
+  assert.equal(recoverRebalanceExecution(badSequential2, supportedKinds), null);
+
+  // Invalid mode cannot be recovered
+  const badMode = structuredClone(saved);
+  badMode.mode = "invalid";
+  assert.equal(recoverRebalanceExecution(badMode, supportedKinds), null);
+
+  // Unsubmitted sequential step is not pending, but submitted with hash is pending
+  const pausedStep = structuredClone(saved);
+  pausedStep.status = "paused";
+  pausedStep.steps[1].status = "wallet";
+  pausedStep.steps[1].hash = undefined;
+  assert.equal(hasPendingRebalance(pausedStep), false);
+
+  pausedStep.steps[1].status = "submitted";
+  pausedStep.steps[1].hash = `0x${"d".repeat(64)}`;
+  assert.equal(hasPendingRebalance(pausedStep), true);
+
+  pausedStep.steps[1].reverted = true;
+  assert.equal(hasPendingRebalance(pausedStep), false);
+});

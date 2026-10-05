@@ -4,8 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowUpRight,
-  FlaskConical,
-  Leaf,
   SlidersHorizontal,
   ShieldCheck,
   Sparkles,
@@ -20,11 +18,7 @@ import {
   type PriceMap,
 } from "../lib/city";
 import type { MarketFeed } from "../lib/market";
-import {
-  equalWeightBudget,
-  portfolioLandscape,
-  stressScenario,
-} from "../lib/agent-hall";
+import { portfolioLandscape } from "../lib/agent-hall";
 import type { HallAnalysis } from "../lib/advisor";
 import type { RebalancePlan } from "../lib/rebalance";
 import type { RebalanceExecution } from "../lib/rebalance-execution";
@@ -53,12 +47,6 @@ const colors = [
   "#8d80a3",
   "#a6ae79",
 ];
-const baskets = {
-  "AI district": ["NVDA", "MSFT", "AMD", "GOOGL"],
-  "Everyday essentials": ["KO", "WMT", "PEP", "UNH"],
-  "Across the city": ["MSFT", "JPM", "XOM", "WMT"],
-};
-
 export default function AgentHall({
   city,
   prices,
@@ -75,9 +63,6 @@ export default function AgentHall({
 }: Props) {
   const [tab, setTab] = useState("Rebalance");
   const [selected, setSelected] = useState<string | null>(null);
-  const [shock, setShock] = useState(-10);
-  const [basket, setBasket] = useState<keyof typeof baskets>("Across the city");
-  const [budget, setBudget] = useState("500");
   const [goal, setGoal] = useState(
     "Review my concentration and explain one practical next step.",
   );
@@ -134,46 +119,10 @@ export default function AgentHall({
       });
     return portfolioLandscape(positions);
   }, [city, prices]);
-  const hasExchange = city.buildings.some((b) => b.kind === "exchange");
   const focus = holdings.find((h) => h.ticker === selected);
-  const scenario = stressScenario(holdings, shock, focus?.ticker ?? null);
-  const { amount, perAsset, valid } = equalWeightBudget(
-    budget,
-    city.cash,
-    baskets[basket].length,
-  );
-  const analysis: HallAnalysis =
-    tab === "Strategy lab"
-      ? {
-          mode: "basket",
-          template: basket,
-          tickers: baskets[basket],
-          budget: valid ? amount : undefined,
-        }
-      : tab === "Stress test"
-        ? {
-            mode: "stress",
-            ticker: focus?.ticker,
-            shockPct: scenario.percent,
-            impact: scenario.impact,
-            after: scenario.after,
-          }
-        : { mode: "overview" };
-  const analysisKey = JSON.stringify([
-    tab,
-    goal,
-    tab === "Strategy lab"
-      ? [basket, budget]
-      : tab === "Stress test"
-        ? [focus?.ticker, shock]
-        : null,
-  ]);
-  const contextLabel =
-    tab === "Strategy lab"
-      ? `${basket} · ${valid ? money(amount) : "no valid budget"}`
-      : tab === "Stress test"
-        ? `${shock}% · ${focus?.ticker ?? "entire portfolio"}`
-        : "Portfolio overview";
+  const analysis: HallAnalysis = { mode: "overview" };
+  const analysisKey = JSON.stringify([tab, goal]);
+  const contextLabel = "Portfolio overview";
   let cursor = 0;
   const segments = holdings
     .map((h, i) => {
@@ -183,7 +132,7 @@ export default function AgentHall({
     })
     .join(",");
   async function analyze() {
-    if (busy || !goal.trim() || (tab === "Strategy lab" && !valid)) return;
+    if (busy || !goal.trim()) return;
     setBusy(true);
     setPendingContext(contextLabel);
     setError("");
@@ -317,7 +266,7 @@ export default function AgentHall({
           </div>
         </header>
         <nav className={styles.tabs} aria-label="Agent Hall sections">
-          {["Rebalance", "Overview", "Strategy lab", "Stress test"].map((t) => (
+          {["Rebalance", "Overview"].map((t) => (
             <button
               key={t}
               aria-current={tab === t ? "page" : undefined}
@@ -325,12 +274,8 @@ export default function AgentHall({
             >
               {t === "Rebalance" ? (
                 <SlidersHorizontal size={16} aria-hidden="true" />
-              ) : t === "Overview" ? (
-                <Activity size={16} aria-hidden="true" />
-              ) : t === "Strategy lab" ? (
-                <Sparkles size={16} aria-hidden="true" />
               ) : (
-                <FlaskConical size={16} aria-hidden="true" />
+                <Activity size={16} aria-hidden="true" />
               )}
               {t}
             </button>
@@ -358,19 +303,9 @@ export default function AgentHall({
                   <span className={styles.eyebrow}>
                     YOUR CITY. A LITTLE MORE INTENTION.
                   </span>
-                  <h3>
-                    {tab === "Overview"
-                      ? "See the bigger picture."
-                      : tab === "Strategy lab"
-                        ? "Give your next move a blueprint."
-                        : "What if the market changes?"}
-                  </h3>
+                  <h3>See the bigger picture.</h3>
                   <p>
-                    {tab === "Overview"
-                      ? "Explore your holdings, spot concentration, and let Cokoo connect the dots."
-                      : tab === "Strategy lab"
-                        ? "Choose a starting template. Adjust the budget. Ask Cokoo to review the trade-offs."
-                        : "Move the slider to explore a hypothetical shock. This is a scenario, not a prediction."}
+                    Explore your holdings, spot concentration, and let Cokoo connect the dots.
                   </p>
                 </div>
                 <img src="/assets/sprites/functional/agent_hall.png" alt="" />
@@ -400,12 +335,10 @@ export default function AgentHall({
               </div>
               <div className={styles.grid}>
                 <section className={styles.card}>
-                  {tab === "Overview" ? (
-                    <>
-                      <div className={styles.sectionTitle}>
-                        <h4>Portfolio landscape</h4>
-                        <span>Click to explore</span>
-                      </div>
+                  <div className={styles.sectionTitle}>
+                    <h4>Portfolio landscape</h4>
+                    <span>Click to explore</span>
+                  </div>
                       <div className={styles.landscape}>
                         <div
                           className={styles.ring}
@@ -464,185 +397,6 @@ export default function AgentHall({
                             : `${holdings[0].ticker} represents ${concentration.toFixed(1)}% of your holdings. ${concentration > 35 ? "A large single position can drive your city’s performance." : "Review sector overlap as well as individual position sizes."}`}
                         </p>
                       </div>
-                    </>
-                  ) : tab === "Strategy lab" ? (
-                    <>
-                      <div className={styles.sectionTitle}>
-                        <h4>Basket blueprint</h4>
-                        <span>Equal-weight template</span>
-                      </div>
-                      <div className={styles.choices}>
-                        {Object.keys(baskets).map((name) => (
-                          <button
-                            key={name}
-                            aria-pressed={basket === name}
-                            onClick={() =>
-                              setBasket(name as keyof typeof baskets)
-                            }
-                          >
-                            <Leaf size={15} aria-hidden="true" />
-                            {name}
-                          </button>
-                        ))}
-                      </div>
-                      <label className={styles.label}>
-                        Preview budget (USD)
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          aria-invalid={!valid}
-                          aria-describedby={
-                            !valid ? "hall-budget-error" : undefined
-                          }
-                          value={budget}
-                          onChange={(e) => setBudget(e.target.value)}
-                        />
-                      </label>
-                      {!valid && (
-                        <p id="hall-budget-error" className={styles.error}>
-                          {city.cash < 4
-                            ? "Your treasury needs at least $4 to preview this basket."
-                            : `Enter a budget from $4 to ${money(city.cash)}.`}
-                        </p>
-                      )}
-                      <div className={styles.plan}>
-                        {baskets[basket].map((ticker, i) => (
-                          <div key={ticker}>
-                            <i style={{ background: colors[i] }} />
-                            <div className={styles.assetName}>
-                              <b>{ticker}</b>
-                              <small>
-                                {
-                                  assets.find((a) => a.ticker === ticker)
-                                    ?.sector
-                                }
-                              </small>
-                            </div>
-                            <span>
-                              25% · {valid ? money(perAsset) : "—"}
-                              <small>
-                                {valid
-                                  ? `≈ ${(perAsset / priceOf(ticker, prices)).toFixed(4)} shares`
-                                  : "Set a valid budget"}
-                              </small>
-                            </span>
-                            <button
-                              onClick={() => onMarket(ticker)}
-                              disabled={!hasExchange}
-                              title={
-                                !hasExchange
-                                  ? "Build the Stock Exchange to review this asset"
-                                  : `Open ${ticker} in the Stock Exchange`
-                              }
-                              aria-label={`Review ${ticker} in the Stock Exchange`}
-                            >
-                              <ArrowUpRight size={17} aria-hidden="true" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <p className={styles.muted}>
-                        {hasExchange
-                          ? "Open an asset to review it in the Stock Exchange."
-                          : "Build the Stock Exchange to open and review these assets."}{" "}
-                        A template preview only; no funds are moved. Share
-                        estimates use current city quotes, including any
-                        fallback prices.
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <div className={styles.sectionTitle}>
-                        <h4>Scenario playground</h4>
-                        <span>Hypothetical</span>
-                      </div>
-                      <label className={styles.label}>
-                        Apply shock to
-                        <select
-                          value={focus?.ticker ?? ""}
-                          onChange={(e) => setSelected(e.target.value || null)}
-                        >
-                          <option value="">Entire portfolio</option>
-                          {holdings.map((h) => (
-                            <option key={h.ticker} value={h.ticker}>
-                              {h.ticker}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className={styles.shock}>
-                        <strong>
-                          {shock > 0 ? "+" : ""}
-                          {shock}%
-                        </strong>
-                        <span>Price change</span>
-                      </div>
-                      <input
-                        className={styles.slider}
-                        aria-label="Hypothetical price change"
-                        type="range"
-                        min="-50"
-                        max="50"
-                        step="1"
-                        value={shock}
-                        onChange={(e) => setShock(Number(e.target.value))}
-                      />
-                      <div className={styles.range}>
-                        <span>−50%</span>
-                        <span>0%</span>
-                        <span>+50%</span>
-                      </div>
-                      <div
-                        className={styles.presets}
-                        aria-label="Scenario presets"
-                      >
-                        {[-20, -10, 0, 10].map((value) => (
-                          <button
-                            key={value}
-                            onClick={() => setShock(value)}
-                            aria-pressed={shock === value}
-                          >
-                            {value > 0 ? "+" : ""}
-                            {value}%
-                          </button>
-                        ))}
-                      </div>
-                      <div className={styles.scenario}>
-                        <div>
-                          <span>Current</span>
-                          <b>{money(total)}</b>
-                          <div className={styles.track}>
-                            <i style={{ width: `${total ? 100 / 1.5 : 0}%` }} />
-                          </div>
-                        </div>
-                        <div>
-                          <span>After scenario</span>
-                          <b>{money(scenario.after)}</b>
-                          <div className={styles.track}>
-                            <i
-                              className={
-                                shock < 0
-                                  ? styles.negativeBar
-                                  : styles.positiveBar
-                              }
-                              style={{
-                                width: `${total ? (scenario.after / total) * (100 / 1.5) : 0}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div className={styles.callout}>
-                        <FlaskConical size={20} aria-hidden="true" />
-                        <p>
-                          {money(scenario.impact)} portfolio impact
-                          {focus ? ` from ${focus.ticker}` : ""}. Cash stays
-                          unchanged. No correlations, fees or slippage modeled.
-                        </p>
-                      </div>
-                    </>
-                  )}
                 </section>
                 <section className={`${styles.card} ${styles.cokoo}`}>
                   <div className={styles.sectionTitle}>
@@ -680,11 +434,7 @@ export default function AgentHall({
                       className={styles.primary}
                       type="submit"
                       aria-busy={busy}
-                      disabled={
-                        busy ||
-                        !goal.trim() ||
-                        (tab === "Strategy lab" && !valid)
-                      }
+                      disabled={busy || !goal.trim()}
                     >
                       <Sparkles size={16} aria-hidden="true" />
                       {busy ? "Cokoo is reviewing your city…" : "Run AI review"}

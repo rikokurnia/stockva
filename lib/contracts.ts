@@ -89,10 +89,14 @@ export function hasInjectedWallet(): boolean {
 
 const BSC_TESTNET_CHAIN_HEX = "0x61";
 
-export async function ensureBscTestnet(): Promise<void> {
-  if (!hasInjectedWallet()) throw new Error("No wallet found");
+export async function ensureBscTestnet(customProvider?: any): Promise<void> {
+  const eth = customProvider ?? (typeof window !== "undefined" ? window.ethereum : undefined);
+  if (!eth?.request) {
+    if (!hasInjectedWallet()) throw new Error("No wallet found");
+  }
+  const provider = eth ?? window.ethereum!;
   try {
-    await window.ethereum!.request({
+    await provider.request({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: BSC_TESTNET_CHAIN_HEX }],
     });
@@ -102,7 +106,7 @@ export async function ensureBscTestnet(): Promise<void> {
         ? (err as { code: unknown }).code
         : undefined;
     if (code === 4902) {
-      await window.ethereum!.request({
+      await provider.request({
         method: "wallet_addEthereumChain",
         params: [
           {
@@ -212,16 +216,29 @@ const toWei = (n: number): bigint => {
   return parseUnits(n.toFixed(6), 18);
 };
 
-async function getClients(account: `0x${string}`) {
+async function getClients(account: `0x${string}`, customProvider?: any) {
   const { createWalletClient, custom, createPublicClient, http } =
     await import("viem");
   const { bscTestnet } = await import("viem/chains");
-  await ensureBscTestnet();
-  const accounts = (await window.ethereum!.request({
+  const eth = customProvider ?? (typeof window !== "undefined" ? window.ethereum : undefined);
+  if (!eth?.request)
+    throw new Error("No wallet provider found. Please connect your wallet.");
+  await ensureBscTestnet(eth);
+  let accounts = (await eth.request({
     method: "eth_accounts",
-  })) as string[];
+  })) as string[] | undefined;
+  if (!Array.isArray(accounts) || !accounts.length) {
+    try {
+      accounts = (await eth.request({
+        method: "eth_requestAccounts",
+      })) as string[] | undefined;
+    } catch {
+      /* ignore and validate accounts below */
+    }
+  }
   if (
-    !accounts.some((address) => address.toLowerCase() === account.toLowerCase())
+    !Array.isArray(accounts) ||
+    !accounts.some((address) => typeof address === "string" && address.toLowerCase() === account.toLowerCase())
   )
     throw new Error(
       "Your wallet account changed. Reconnect the wallet that reviewed this plan.",
@@ -233,7 +250,7 @@ async function getClients(account: `0x${string}`) {
   const walletClient = createWalletClient({
     account,
     chain: bscTestnet,
-    transport: custom(window.ethereum!),
+    transport: custom(eth),
   });
   return { publicClient, walletClient, bscTestnet };
 }
@@ -245,6 +262,7 @@ export async function sellBuildingOnchain(
   price: number,
   fractionBps: number,
   onStatus?: (hash?: `0x${string}`) => void,
+  customProvider?: any,
 ): Promise<`0x${string}`> {
   if (
     !/^0x[a-fA-F0-9]{64}$/.test(positionId) ||
@@ -257,7 +275,7 @@ export async function sellBuildingOnchain(
     publicClient,
     walletClient,
     bscTestnet: chain,
-  } = await getClients(account);
+  } = await getClients(account, customProvider);
   const position = await publicClient.readContract({
     address: VAULT_ADDRESS,
     abi: VAULT_ABI,
@@ -410,9 +428,10 @@ export async function recordBuildingOnchain(
   account: `0x${string}`,
   input: RecordBuildingInput,
   onStatus?: (step: "approve" | "buy", hash?: `0x${string}`) => void,
+  customProvider?: any,
 ): Promise<RecordBuildingResult> {
   const { decodeEventLog, parseAbiItem } = await import("viem");
-  const { publicClient, walletClient, bscTestnet } = await getClients(account);
+  const { publicClient, walletClient, bscTestnet } = await getClients(account, customProvider);
   const amountWei = toWei(input.usdAmount);
   const entryWei = toWei(input.entryPrice);
 
@@ -523,10 +542,11 @@ export async function recordBuildingsBatch(
   account: `0x${string}`,
   items: BatchBuildingInput[],
   onStatus?: (step: "approve" | "buy", hash?: `0x${string}`) => void,
+  customProvider?: any,
 ): Promise<BatchRecordResult> {
   if (!items.length) throw new Error("Nothing to confirm");
   const { decodeEventLog, parseAbiItem } = await import("viem");
-  const { publicClient, walletClient, bscTestnet } = await getClients(account);
+  const { publicClient, walletClient, bscTestnet } = await getClients(account, customProvider);
   const amounts = items.map((i) => toWei(i.usdAmount));
   const entries = items.map((i) => toWei(i.entryPrice));
   const tiers = items.map((i) => i.initialTier ?? 1);

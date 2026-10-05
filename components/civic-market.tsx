@@ -24,8 +24,11 @@ import {
   type SectorBuildingKind,
 } from "../lib/city";
 import { validateBundle } from "../lib/civic";
+import type { RwaSectorTab } from "../lib/rwa";
 import type { CivicProps } from "./civic-panel";
 import CivicResearch from "./civic-research";
+import RwaSessionClock from "./rwa-session-clock";
+import RwaSpreadBoard from "./rwa-spread-board";
 import StockLogo from "./stock-logo";
 import styles from "./civic-panel.module.css";
 
@@ -118,10 +121,25 @@ export default function CivicMarket(
               price provenance. Missing evidence stays visible.
             </p>
           </div>
-          <button className={styles.secondary} onClick={props.onScan}>
-            <Crosshair size={16} /> Inspect on island
-          </button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <RwaSessionClock />
+            <button className={styles.secondary} onClick={props.onScan}>
+              <Crosshair size={16} /> Inspect on island
+            </button>
+          </div>
         </div>
+      )}
+      {inspection && (
+        <RwaSpreadBoard
+          feed={props.feed}
+          tickers={[
+            ...new Set(
+              props.city.buildings
+                .map((building) => defFor(building.kind).ticker)
+                .filter((ticker): ticker is string => Boolean(ticker)),
+            ),
+          ]}
+        />
       )}
       {!inspection && view === "bundle" ? (
         <BundleBuilder
@@ -304,6 +322,22 @@ function BundleBuilder({
   const [splitBudget, setSplitBudget] = useState("3000");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState("");
+  const [rwaTabs, setRwaTabs] = useState<RwaSectorTab[]>([]);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/rwa/sectors", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (active && data?.available && Array.isArray(data.tabs))
+          setRwaTabs(data.tabs);
+      })
+      .catch(() => {
+        /* official tabs stay hidden; house sectors stand on their own */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
   const review = useRef<HTMLElement>(null);
   const chooser = useRef<HTMLElement>(null);
 
@@ -428,7 +462,10 @@ function BundleBuilder({
             together in one transaction on BNB Smart Chain.
           </p>
         </div>
-        <span className={styles.statusBadge}>{money(city.cash)} city cash</span>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+          <RwaSessionClock />
+          <span className={styles.statusBadge}>{money(city.cash)} city cash</span>
+        </div>
       </div>
 
       {/* 1-Click Sector Baskets Carousel */}
@@ -565,6 +602,42 @@ function BundleBuilder({
               Clear selection
             </button>
           </div>
+
+          {/* Official RWA taxonomy (Binance Web3: Magnificent 7, AI Chips, ETF…) */}
+          {rwaTabs.length > 0 && (
+            <div
+              className={styles.bundlePresets}
+              aria-label="Official RWA baskets"
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "var(--subtle)",
+                  alignSelf: "center",
+                }}
+              >
+                Binance tabs:
+              </span>
+              {rwaTabs.map((tab) => {
+                const count = tab.tickers.filter((ticker) =>
+                  available.includes(ticker),
+                ).length;
+                if (!count) return null;
+                return (
+                  <button
+                    key={tab.id}
+                    className={styles.chip}
+                    type="button"
+                    title={`Add ${tab.label}: ${tab.tickers.join(", ")}`}
+                    onClick={() => preset(tab.tickers)}
+                  >
+                    {tab.label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Sector Filter Tabs */}
           <div

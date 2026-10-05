@@ -1,4 +1,16 @@
 import { assets } from "./city";
+import type { RwaSession, RwaSessionState } from "./rwa";
+export type RwaQuoteDelta = {
+  onchain: number;
+  reference: number;
+  /** (onchain - reference) / reference * 10000. Positive = on-chain premium. */
+  spreadBps: number;
+  onchainAt: string | null;
+  session: RwaSessionState;
+  referenceFrozen: boolean;
+  platform: string;
+  contract: string;
+};
 export type Quote = {
   ticker: string;
   price: number;
@@ -8,10 +20,14 @@ export type Quote = {
   fetchedAt: string | null;
   pair?: string;
   tokenName?: string;
+  /** Binance RWA Data on-chain vs reference spread (when the key is set). */
+  rwa?: RwaQuoteDelta;
 };
 export type MarketFeed = {
   quotes: Record<string, Quote>;
   fetchedAt: string;
+  /** Aggregate US-market session for the exchange clock. */
+  marketSession?: RwaSession;
   error?: string;
 };
 export type PricePoint = { time: number; token?: number; benchmark?: number };

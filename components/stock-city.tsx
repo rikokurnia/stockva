@@ -47,6 +47,7 @@ import {
   newRebalanceBatchId,
   RebalanceBatchRejected,
   type BatchProvider,
+  type RebalanceCalls,
 } from "../lib/rebalance-batch";
 import OnchainWallet from "./onchain-wallet";
 import FaucetOnboardModal from "./faucet-onboard-modal";
@@ -55,7 +56,9 @@ import {
   VAULT_ADDRESS,
   bscAddressLink,
   connectInjectedWallet,
+  ensureBscTestnet,
   recordBuildingOnchain,
+  sellBuildingOnchain,
   confirmedRebalanceReceipt,
 } from "../lib/contracts";
 import BundleModal from "./bundle-modal";
@@ -440,7 +443,9 @@ export default function StockCity() {
             execution.status === "completed"
               ? undefined
               : (execution.error ??
-                "Execution paused after reload. Reconnect the same wallet to check saved batch confirmation without signing again."),
+                (execution.mode === "sequential"
+                  ? "Execution paused after reload. Reconnect your wallet to resume your rebalance."
+                  : "Execution paused after reload. Reconnect the same wallet to check saved batch confirmation without signing again.")),
         };
         executionRef.current = recovered;
         setAgentExecution(recovered);
@@ -670,94 +675,6 @@ export default function StockCity() {
     try {
       if (!wallet || wallet.toLowerCase() !== plan.walletAddress.toLowerCase())
         throw new Error("Connect the wallet that reviewed this blueprint.");
-      // Old per-step runs must reconcile their already-signed receipts, then
-      // replan the remaining city. Never replay the original sales as a batch.
-      if (
-        !run.mode &&
-        run.steps.some((s) => s.hash || s.status === "confirmed")
-      ) {
-        saveAgentExecution(run);
-        for (const step of plan.steps) {
-          const progress = run.steps.find((p) => p.stepId === step.id)!;
-          if (
-            !progress.hash ||
-            progress.reverted ||
-            progress.status === "confirmed"
-          )
-            continue;
-          try {
-            const receipt = await confirmedRebalanceReceipt(
-              plan.walletAddress,
-              progress.hash,
-              step.action,
-              (hash) => {
-                run = {
-                  ...run,
-                  steps: run.steps.map((p) =>
-                    p.stepId === step.id ? { ...p, hash } : p,
-                  ),
-                };
-                saveAgentExecution(run);
-              },
-            );
-            const next = applyRebalanceReceipt(
-              simulationLatest.current.city,
-              plan,
-              step,
-              receipt,
-            );
-            saveConfirmedCity(next);
-            run = {
-              ...run,
-              fingerprint: rebalanceFingerprint(next),
-              steps: run.steps.map((p) =>
-                p.stepId === step.id
-                  ? {
-                      ...p,
-                      status: "confirmed",
-                      hash: receipt.hash,
-                      error: undefined,
-                    }
-                  : p,
-              ),
-            };
-            saveAgentExecution(run);
-          } catch (error) {
-            if (
-              error instanceof Error &&
-              /transaction reverted|replaced or cancelled on-chain/i.test(
-                error.message,
-              )
-            ) {
-              run = {
-                ...run,
-                steps: run.steps.map((p) =>
-                  p.stepId === step.id
-                    ? {
-                        ...p,
-                        status: "error",
-                        reverted: true,
-                        error: error.message,
-                      }
-                    : p,
-                ),
-              };
-              saveAgentExecution(run);
-            }
-            throw error;
-          }
-        }
-        if (run.steps.every((p) => p.status === "confirmed")) {
-          run = { ...run, status: "completed" };
-          saveAgentExecution(run);
-          notify("Saved rebalance receipts reconciled in City Hall.");
-          return;
-        }
-        throw new Error(
-          "Saved transactions are reconciled. Keep confirmed changes and request a fresh blueprint to use one approval for the remainder.",
-        );
-      }
-      run = { ...run, mode: "atomic" };
       const latest = simulationLatest.current.city;
       const applied =
         latest.agentReceipts?.filter((r) => r.planId === plan.id) ?? [];
@@ -768,7 +685,7 @@ export default function StockCity() {
         run = {
           ...run,
           status: "completed",
-          batchStatus: "confirmed",
+          batchStatus: run.mode === "atomic" ? "confirmed" : undefined,
           steps: run.steps.map((p) => ({
             ...p,
             status: "confirmed",
@@ -785,11 +702,16 @@ export default function StockCity() {
         throw new Error(
           "This batch was rejected or reverted. Request a fresh blueprint before signing again.",
         );
-      if (!run.batchId && Date.now() > plan.expiresAt)
+      if (
+        !run.batchId &&
+        !run.steps.some((s) => s.status === "confirmed") &&
+        Date.now() > plan.expiresAt
+      )
         throw new Error(
           "This quote expired. Ask the agent for a fresh blueprint before signing.",
         );
       if (
+        !run.steps.some((s) => s.status === "confirmed") &&
         rebalanceFingerprint(latest) !== (run.fingerprint ?? plan.fingerprint)
       )
         throw new Error(
@@ -816,9 +738,12 @@ export default function StockCity() {
       setActiveTool("inspect");
       setKind(null);
       if (!run.batchId) {
-        // Validate the entire landscape without making provisional city changes.
+        // Validate unconfirmed steps without making provisional city changes.
         let sites = latest;
         for (const step of plan.steps) {
+          const stepDone = run.steps.find((s) => s.stepId === step.id)?.status === "confirmed";
+          if (stepDone) continue;
+
           if (step.action === "sell") {
             const building = sites.buildings.find(
               (b) => b.id === step.buildingId,
@@ -868,7 +793,367 @@ export default function StockCity() {
             };
           }
         }
-        const calls = await prepareRebalanceBatch(provider, plan);
+
+        await ensureBscTestnet(provider);
+
+        let useSequential = run.mode === "sequential";
+        let calls: RebalanceCalls | null = null;
+
+        if (!useSequential) {
+          try {
+            calls = await prepareRebalanceBatch(provider, plan);
+          } catch (batchError) {
+            const msg =
+              batchError instanceof Error
+                ? batchError.message
+                : String(batchError);
+            const isBatchUnsupported =
+              /cannot batch a rebalance/i.test(msg) ||
+              /atomic batching/i.test(msg) ||
+              /atomicBatch/i.test(msg) ||
+              /capabilities/i.test(msg) ||
+              /not supported/i.test(msg) ||
+              /method not found/i.test(msg) ||
+              /wallet_getCapabilities/i.test(msg) ||
+              /wallet_sendCalls/i.test(msg) ||
+              (typeof batchError === "object" &&
+                batchError !== null &&
+                "code" in batchError &&
+                (batchError as { code: unknown }).code === -32601);
+
+            if (isBatchUnsupported) {
+              useSequential = true;
+              run = { ...run, mode: "sequential" };
+              saveAgentExecution(run);
+              notify("Standard wallet: executing rebalance step-by-step.");
+            } else {
+              throw batchError;
+            }
+          }
+        }
+
+        if (useSequential) {
+          // Sequential Execution Mode
+          // 1. Reconcile any in-flight step transactions
+          for (const step of plan.steps) {
+            const progress = run.steps.find((p) => p.stepId === step.id)!;
+            if (
+              !progress.hash ||
+              progress.reverted ||
+              progress.status === "confirmed"
+            )
+              continue;
+            try {
+              focus(
+                step,
+                "submitted",
+                `Reconciling ${step.ticker} transaction…`,
+                progress.hash,
+              );
+              const receipt = await confirmedRebalanceReceipt(
+                plan.walletAddress,
+                progress.hash,
+                step.action,
+                (hash) => {
+                  run = {
+                    ...run,
+                    steps: run.steps.map((p) =>
+                      p.stepId === step.id ? { ...p, hash } : p,
+                    ),
+                  };
+                  saveAgentExecution(run);
+                },
+              );
+              const next = applyRebalanceReceipt(
+                simulationLatest.current.city,
+                plan,
+                step,
+                receipt,
+              );
+              saveConfirmedCity(next);
+              run = {
+                ...run,
+                fingerprint: rebalanceFingerprint(next),
+                steps: run.steps.map((p) =>
+                  p.stepId === step.id
+                    ? {
+                        ...p,
+                        status: "confirmed",
+                        hash: receipt.hash,
+                        error: undefined,
+                      }
+                    : p,
+                ),
+              };
+              saveAgentExecution(run);
+            } catch (error) {
+              if (
+                error instanceof Error &&
+                /transaction reverted|replaced or cancelled on-chain/i.test(
+                  error.message,
+                )
+              ) {
+                run = {
+                  ...run,
+                  steps: run.steps.map((p) =>
+                    p.stepId === step.id
+                      ? {
+                          ...p,
+                          status: "error",
+                          reverted: true,
+                          error: error.message,
+                        }
+                      : p,
+                  ),
+                };
+                saveAgentExecution(run);
+              }
+              throw error;
+            }
+          }
+
+          // 2. Execute remaining steps in sequence
+          for (const step of plan.steps) {
+            const currentProgress = run.steps.find((p) => p.stepId === step.id)!;
+            if (currentProgress.status === "confirmed") continue;
+
+            if (step.action === "sell") {
+              run = {
+                ...run,
+                steps: run.steps.map((p) =>
+                  p.stepId === step.id
+                    ? { ...p, status: "wallet", error: undefined, reverted: undefined }
+                    : p,
+                ),
+              };
+              saveAgentExecution(run);
+              focus(
+                step,
+                "wallet",
+                `Sign sell transaction for ${step.ticker} in wallet`,
+              );
+              notify(`Agent: sign sell transaction for ${step.ticker} in your wallet.`);
+
+              const hash = await sellBuildingOnchain(
+                plan.walletAddress,
+                step.positionId,
+                step.price,
+                step.fractionBps,
+                (h) => {
+                  if (h) {
+                    run = {
+                      ...run,
+                      steps: run.steps.map((p) =>
+                        p.stepId === step.id ? { ...p, status: "submitted", hash: h } : p,
+                      ),
+                    };
+                    saveAgentExecution(run);
+                    focus(
+                      step,
+                      "submitted",
+                      `Confirming sale of ${step.ticker} on BNB Chain…`,
+                      h,
+                    );
+                  }
+                },
+                provider,
+              );
+
+              run = {
+                ...run,
+                steps: run.steps.map((p) =>
+                  p.stepId === step.id ? { ...p, status: "submitted", hash } : p,
+                ),
+              };
+              saveAgentExecution(run);
+              focus(
+                step,
+                "submitted",
+                `Waiting for receipt of ${step.ticker} sale…`,
+                hash,
+              );
+
+              const receipt = await confirmedRebalanceReceipt(
+                plan.walletAddress,
+                hash,
+                "sell",
+                (canonical) => {
+                  run = {
+                    ...run,
+                    steps: run.steps.map((p) =>
+                      p.stepId === step.id ? { ...p, hash: canonical } : p,
+                    ),
+                  };
+                  saveAgentExecution(run);
+                },
+              );
+
+              const next = applyRebalanceReceipt(
+                simulationLatest.current.city,
+                plan,
+                step,
+                receipt,
+              );
+              saveConfirmedCity(next);
+
+              run = {
+                ...run,
+                fingerprint: rebalanceFingerprint(next),
+                steps: run.steps.map((p) =>
+                  p.stepId === step.id
+                    ? {
+                        ...p,
+                        status: "confirmed",
+                        hash: receipt.hash,
+                        error: undefined,
+                      }
+                    : p,
+                ),
+              };
+              saveAgentExecution(run);
+              focus(step, "confirmed", `Sold ${step.ticker} on-chain`, receipt.hash);
+              notify(`Confirmed removal of ${step.ticker}.`);
+            } else {
+              // action === "buy"
+              run = {
+                ...run,
+                steps: run.steps.map((p) =>
+                  p.stepId === step.id
+                    ? { ...p, status: "wallet", error: undefined, reverted: undefined }
+                    : p,
+                ),
+              };
+              saveAgentExecution(run);
+              focus(
+                step,
+                "wallet",
+                `Sign purchase of ${step.ticker} in wallet`,
+              );
+              notify(`Agent: sign purchase of ${step.ticker} in your wallet.`);
+
+              const recordResult = await recordBuildingOnchain(
+                plan.walletAddress,
+                {
+                  ticker: step.ticker,
+                  usdAmount: step.amount,
+                  entryPrice: step.price,
+                  initialTier: 1,
+                },
+                (phase, h) => {
+                  if (phase === "approve") {
+                    focus(
+                      step,
+                      "wallet",
+                      h
+                        ? `Confirming mUSD approval for ${step.ticker}…`
+                        : `Approve mUSD spending for ${step.ticker} in wallet`,
+                      h,
+                    );
+                    if (h) {
+                      run = {
+                        ...run,
+                        steps: run.steps.map((p) =>
+                          p.stepId === step.id ? { ...p, approvalHash: h } : p,
+                        ),
+                      };
+                      saveAgentExecution(run);
+                    }
+                  } else {
+                    focus(
+                      step,
+                      h ? "submitted" : "wallet",
+                      h
+                        ? `Confirming purchase of ${step.ticker} on BNB Chain…`
+                        : `Sign buy transaction for ${step.ticker} in wallet`,
+                      h,
+                    );
+                    if (h) {
+                      run = {
+                        ...run,
+                        steps: run.steps.map((p) =>
+                          p.stepId === step.id ? { ...p, status: "submitted", hash: h } : p,
+                        ),
+                      };
+                      saveAgentExecution(run);
+                    }
+                  }
+                },
+                provider,
+              );
+
+              run = {
+                ...run,
+                steps: run.steps.map((p) =>
+                  p.stepId === step.id
+                    ? { ...p, status: "submitted", hash: recordResult.hash }
+                    : p,
+                ),
+              };
+              saveAgentExecution(run);
+              focus(
+                step,
+                "submitted",
+                `Verifying building receipt for ${step.ticker}…`,
+                recordResult.hash,
+              );
+
+              const receipt = await confirmedRebalanceReceipt(
+                plan.walletAddress,
+                recordResult.hash,
+                "buy",
+                (canonical) => {
+                  run = {
+                    ...run,
+                    steps: run.steps.map((p) =>
+                      p.stepId === step.id ? { ...p, hash: canonical } : p,
+                    ),
+                  };
+                  saveAgentExecution(run);
+                },
+              );
+
+              const next = applyRebalanceReceipt(
+                simulationLatest.current.city,
+                plan,
+                step,
+                receipt,
+              );
+              saveConfirmedCity(next);
+
+              run = {
+                ...run,
+                fingerprint: rebalanceFingerprint(next),
+                steps: run.steps.map((p) =>
+                  p.stepId === step.id
+                    ? {
+                        ...p,
+                        status: "confirmed",
+                        hash: receipt.hash,
+                        error: undefined,
+                      }
+                    : p,
+                ),
+              };
+              saveAgentExecution(run);
+              focus(step, "confirmed", `Constructed ${step.ticker} on-chain`, receipt.hash);
+              setUpgrades((previous) => ({
+                ...previous,
+                [step.buildingId]: Date.now(),
+              }));
+              notify(`Confirmed construction of ${step.ticker}.`);
+            }
+
+            if (motion && !paused)
+              await new Promise<void>((resolve) => setTimeout(resolve, 500));
+          }
+
+          run = { ...run, status: "completed", error: undefined };
+          saveAgentExecution(run);
+          notify("Agent rebalance complete. Every building recorded in City Hall.");
+          return;
+        }
+
+        // Atomic Batch Mode:
         if (
           Date.now() > plan.expiresAt ||
           rebalanceFingerprint(simulationLatest.current.city) !==
@@ -901,7 +1186,7 @@ export default function StockCity() {
         const id = await sendRebalanceBatch(
           provider,
           plan,
-          calls,
+          calls!,
           run.batchId!,
         );
         run = {
@@ -991,16 +1276,21 @@ export default function StockCity() {
         // Saving failed before the signing RPC. There is no request to recover.
         run = { ...run, batchId: undefined, batchStatus: undefined };
       }
-      const rejected = error instanceof RebalanceBatchRejected;
+      const rejected =
+        error instanceof RebalanceBatchRejected ||
+        (error instanceof Error &&
+          /user rejected|user denied|rejected transaction/i.test(
+            error.message,
+          ));
       const message =
         error instanceof Error
           ? error.message
-          : "The wallet request could not finish. Check its saved batch ID before retrying.";
+          : "The wallet request could not finish. Check saved progress before retrying.";
       run = {
         ...run,
         status: "paused",
         error: message,
-        ...(rejected ? { batchStatus: "failed" as const } : {}),
+        ...(rejected && run.mode === "atomic" ? { batchStatus: "failed" as const } : {}),
         steps: run.steps.map((p) =>
           p.status === "confirmed"
             ? p
@@ -1008,7 +1298,7 @@ export default function StockCity() {
                 ...p,
                 status: "error",
                 error: message,
-                ...(rejected ? { reverted: true } : {}),
+                ...(rejected && run.mode === "atomic" ? { reverted: true } : {}),
               },
         ),
       };
@@ -1017,7 +1307,7 @@ export default function StockCity() {
       } catch {
         run = {
           ...run,
-          error: `${message} Browser saving is unavailable. Keep this page open and save the displayed batch ID.`,
+          error: `${message} Browser saving is unavailable. Keep this page open and save the displayed progress.`,
         };
         executionRef.current = run;
         setAgentExecution(run);
@@ -1028,14 +1318,20 @@ export default function StockCity() {
               ...activity,
               phase: "error",
               detail: rejected
-                ? "Batch rejected · city unchanged"
-                : "Agent paused · check the saved batch",
+                ? "Approval rejected in wallet"
+                : message.slice(0, 80),
             }
           : null,
       );
-      notify(`Agent paused: ${message}`, true);
+      notify(
+        rejected
+          ? "Rebalance cancelled in wallet."
+          : `Rebalance paused: ${message}`,
+        true,
+      );
     } finally {
       agentRunning.current = false;
+      setSelected(null);
     }
   };
   const setTool = (next: Tool) => {
@@ -2236,6 +2532,35 @@ export default function StockCity() {
                       <small style={{ color: "#8b9ea7", fontSize: "10px" }}>
                         Tracked & liquidatable on BSC Testnet (Chain ID 97)
                       </small>
+                      {(() => {
+                        const rwa = feed.quotes[definition.ticker!]?.rwa;
+                        if (!rwa) return null;
+                        const premium = rwa.spreadBps >= 0;
+                        return (
+                          <small
+                            style={{
+                              color: "#8b9ea7",
+                              fontSize: "10px",
+                              lineHeight: 1.6,
+                            }}
+                          >
+                            On-chain {money(rwa.onchain)} · ref{" "}
+                            {money(rwa.reference)} ·{" "}
+                            <b
+                              className={premium ? "positive" : "negative"}
+                            >
+                              {premium ? "+" : ""}
+                              {(rwa.spreadBps / 100).toFixed(2)}%
+                            </b>{" "}
+                            {rwa.referenceFrozen
+                              ? "· ref frozen (market closed)"
+                              : rwa.session === "halted"
+                                ? "· halted"
+                                : "· live spread"}{" "}
+                            · {rwa.platform}
+                          </small>
+                        );
+                      })()}
                     </div>
                   </>
                 );
