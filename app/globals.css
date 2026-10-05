@@ -4431,6 +4431,27 @@ input {
   transform: scale(0.95);
 }
 
+.add-funds-btn.faucet-pulse {
+  background: rgba(240, 185, 11, 0.35);
+  border-color: #f0b90b;
+  animation: faucetPulseGlow 1.8s ease-in-out infinite;
+}
+
+@keyframes faucetPulseGlow {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 6px rgba(240, 185, 11, 0.4);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 16px rgba(240, 185, 11, 0.85);
+  }
+}
+
+.cash-resource-container.needs-funds {
+  border-color: rgba(240, 185, 11, 0.4);
+}
+
 .portfolio-accumulator-badge {
   display: inline-flex;
   align-items: center;

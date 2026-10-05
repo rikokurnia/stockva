@@ -41,6 +41,7 @@ interface BuildingCatalogueModalProps {
   builtKinds?: Set<BuildingKind>;
   onStartDrawRoad: () => void;
   onPayAndPlace: (kind: BuildingKind, amount: number) => void;
+  onClaimFaucet?: () => void;
 }
 
 export function BuildingCatalogueModal({
@@ -56,6 +57,7 @@ export function BuildingCatalogueModal({
   builtKinds,
   onStartDrawRoad,
   onPayAndPlace,
+  onClaimFaucet,
 }: BuildingCatalogueModalProps) {
   const [selectedKind, setSelectedKind] = useState<BuildingKind | null>(null);
   const [selectedSectorKey, setSelectedSectorKey] =
@@ -658,6 +660,7 @@ export function BuildingCatalogueModal({
                           amount={validAmount ? amount : 0}
                           itemCount={1}
                           walletAddress={walletAddress}
+                          onFaucetClaimed={onClaimFaucet}
                         />
 
                         {isStockAlreadyBuilt ? (
@@ -975,6 +978,7 @@ export function BuildingCatalogueModal({
                         amount={validAmount ? amount : 0}
                         itemCount={1}
                         walletAddress={walletAddress}
+                        onFaucetClaimed={onClaimFaucet}
                       />
 
                       {/* Commit button */}
@@ -1046,6 +1050,7 @@ export function BuildingCatalogueModal({
                         itemCount={1}
                         walletAddress={walletAddress}
                         compact
+                        onFaucetClaimed={onClaimFaucet}
                       />
 
                       {Boolean(

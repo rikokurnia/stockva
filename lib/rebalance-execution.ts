@@ -17,9 +17,19 @@ export type RebalanceExecution = {
   steps: RebalanceStepProgress[];
   error?: string;
   fingerprint?: string;
+  mode?: "atomic";
+  batchId?: string;
+  batchStatus?: "wallet" | "pending" | "confirmed" | "failed";
 };
 
 export const REBALANCE_STORAGE = "stockva.agent-rebalance.v1";
+
+export function hasPendingRebalance(run: RebalanceExecution | null | undefined): boolean {
+  return !!run && (
+    (!!run.batchId && run.batchStatus !== "failed" && run.batchStatus !== "confirmed") ||
+    run.steps.some((s) => !!s.hash && !s.reverted && s.status !== "confirmed")
+  );
+}
 
 /** Treat saved browser state as untrusted, including old or interrupted versions. */
 export function recoverRebalanceExecution(
@@ -34,6 +44,13 @@ export function recoverRebalanceExecution(
     (typeof hash === "string" && /^0x[a-fA-F0-9]{64}$/.test(hash));
   const finite = (n: unknown): n is number =>
     typeof n === "number" && Number.isFinite(n) && n >= 0;
+  if (run.mode !== undefined && run.mode !== "atomic") return null;
+  if (run.mode === "atomic" && (
+    (run.batchId !== undefined && (typeof run.batchId !== "string" || !run.batchId.length || run.batchId.length > 512)) ||
+    (run.batchStatus !== undefined && !["wallet", "pending", "confirmed", "failed"].includes(run.batchStatus)) ||
+    (!!run.batchStatus && !run.batchId) ||
+    (run.status === "completed" && run.batchStatus !== "confirmed")
+  )) return null;
   if (
     !plan ||
     typeof plan.id !== "string" ||
@@ -116,7 +133,7 @@ export function recoverRebalanceExecution(
       ) ||
       !validHash(progress[0].hash) ||
       !validHash(progress[0].approvalHash) ||
-      (["submitted", "confirmed"].includes(progress[0].status) &&
+      ((progress[0].status === "confirmed" || (progress[0].status === "submitted" && !run.batchId)) &&
         !progress[0].hash)
     )
       return null;
@@ -130,9 +147,11 @@ export function applyRebalanceReceipt(
   plan: RebalancePlan,
   step: RebalancePlan["steps"][number],
   receipt: RebalanceReceipt,
+  sharedBatch = false,
 ): CityState {
   const previous = city.agentReceipts?.find(
-    (row) => row.hash.toLowerCase() === receipt.hash.toLowerCase(),
+    (row) => row.hash.toLowerCase() === receipt.hash.toLowerCase() &&
+      (!sharedBatch || row.planId !== plan.id || row.stepId === step.id),
   );
   if (previous) {
     if (previous.planId !== plan.id || previous.stepId !== step.id)
@@ -226,4 +245,20 @@ export function applyRebalanceReceipt(
       },
     ],
   };
+}
+
+/** Commit the complete validated batch in memory before persisting any city change. */
+export function applyRebalanceBatch(
+  city: CityState,
+  plan: RebalancePlan,
+  receipts: RebalanceReceipt[],
+): CityState {
+  if (!receipts.length || receipts.length !== plan.steps.length ||
+      new Set(receipts.map((r) => r.hash.toLowerCase())).size !== 1)
+    throw new Error("An atomic rebalance requires all building receipts from one transaction.");
+  const applied = city.agentReceipts?.filter((r) => r.planId === plan.id) ?? [];
+  if (applied.length && (applied.length !== plan.steps.length ||
+      !plan.steps.every((s) => applied.some((r) => r.stepId === s.id && r.hash.toLowerCase() === receipts[0].hash.toLowerCase()))))
+    throw new Error("The saved batch is incomplete. Reconcile the city before continuing.");
+  return plan.steps.reduce((next, step, index) => applyRebalanceReceipt(next, plan, step, receipts[index], true), city);
 }

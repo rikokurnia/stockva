@@ -379,20 +379,29 @@ export default function CivicCityHall(
           value={money(city.cash)}
           detail="Local treasury · separate from wallet mUSD"
           action={
-            props.onAddDemoCash ? (
+            walletAddress ? (
               <button
                 type="button"
                 className={styles.miniBtn}
-                title="Add +$10,000 Demo USD to Treasury"
-                onClick={() => {
-                  props.onAddDemoCash?.(10000);
-                  setStatus("Added +$10,000 Demo USD to Treasury!");
-                }}
+                title="Claim 10,000 $mUSD municipal faucet"
+                onClick={() => void transact("faucet")}
+                disabled={Boolean(operation)}
               >
-                <Plus size={11} />
-                $10k Demo
+                <Coins size={11} />
+                Claim Faucet
               </button>
-            ) : null
+            ) : (
+              <button
+                type="button"
+                className={styles.miniBtn}
+                title="Connect wallet to claim faucet"
+                onClick={() => void transact("connect")}
+                disabled={Boolean(operation)}
+              >
+                <Wallet size={11} />
+                Connect for Faucet
+              </button>
+            )
           }
         />
       </div>
@@ -698,29 +707,20 @@ export default function CivicCityHall(
                     : "Claim 10,000 mUSD"}
                 </button>
               ) : (
-                <div style={{ display: "flex", gap: "8px", width: "100%" }}>
-                  <button
-                    type="button"
-                    className={styles.secondary}
-                    style={{ flex: 1 }}
-                    onClick={() => {
-                      props.onAddDemoCash?.(10000);
-                      setStatus("Added +$10,000 Demo USD to Treasury!");
-                    }}
-                  >
-                    <Plus size={15} />
-                    + $10k Demo Cash
-                  </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%" }}>
                   <button
                     type="button"
                     className={styles.primary}
-                    style={{ flex: 1 }}
+                    style={{ width: "100%" }}
                     disabled={Boolean(operation)}
                     onClick={() => void transact("connect")}
                   >
                     <Wallet size={15} />
-                    Connect wallet
+                    Connect wallet to claim faucet
                   </button>
+                  <span style={{ fontSize: "0.76rem", color: "#94a3b8", textAlign: "center" }}>
+                    Sign in with your wallet first to claim 10,000 $mUSD from the municipal faucet.
+                  </span>
                 </div>
               )}
             </div>
