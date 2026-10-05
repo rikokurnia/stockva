@@ -6,6 +6,8 @@ import {
   asSnapshot,
   buildSystemPrompt,
   buildUserPrompt,
+  isCompleteReply,
+  plainText,
 } from "../lib/advisor.ts";
 
 test("advisor snapshot keeps only real holdings, capped at 20", () => {
@@ -132,4 +134,28 @@ test("advisor history keeps last 6 valid messages only", () => {
   const history = asHistory(raw);
   assert.equal(history.length, 6);
   assert.equal(history[0].text, "q2");
+});
+
+test("plainText strips markdown the chat cannot render", () => {
+  assert.equal(plainText("## Hello\n**bold** and *em* text"), "Hello\nbold and em text");
+  assert.equal(plainText("`code` and [link](https://x.y)"), "code and link");
+  assert.equal(plainText("- a\n* b\n+ c"), "- a\n- b\n- c");
+  assert.equal(plainText("```js\nconst a = 1;\n```"), "const a = 1;");
+  // Apostrophes in normal words must survive.
+  assert.match(plainText("don't stop, it's yours"), /don't stop, it's yours/);
+});
+
+test("isCompleteReply catches mid-word cuts", () => {
+  assert.equal(isCompleteReply("All good. Thanks!"), true);
+  assert.equal(isCompleteReply("Nice work…"), true);
+  assert.equal(isCompleteReply("while your te"), false);
+  assert.equal(isCompleteReply("Almost done, the island is"), false);
+  assert.equal(isCompleteReply(""), false);
+});
+
+test("system prompt demands short, finished, plain replies", () => {
+  const prompt = buildSystemPrompt(asSnapshot({ cash: 1, holdings: [] }));
+  assert.match(prompt, /Under 80 words/);
+  assert.match(prompt, /never stop or trail off mid-word/);
+  assert.match(prompt, /Plain text only/);
 });

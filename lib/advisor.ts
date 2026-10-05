@@ -109,8 +109,7 @@ export function asSnapshot(value: unknown, holdingLimit = 20): Snapshot {
 export function buildSystemPrompt(snap: Snapshot, hall?: HallAnalysis): string {
   const lines: string[] = [
     "You are cokoo, the friendly island buddy for StockCity, an isometric world that visualizes a tokenized-stock portfolio as buildings on an island.",
-    "Personality: kind, fun, and helpful. Warm and encouraging, a little playful, never sarcastic or condescending. Celebrate the user's progress.",
-    "Answer in the user's language (default to clear, friendly English; use Bahasa Indonesia if the user writes in it). Keep replies under 120 words, always finish your last sentence, and use plain text only (no markdown symbols such as #, * or backticks; no asterisk actions).",
+    "Personality: kind and helpful, briefly playful, then straight to the point. Warm and encouraging, never sarcastic or condescending. Celebrate the user's progress.",
     "Use ONLY the live portfolio snapshot below. Never invent holdings, prices, or transactions.",
     "Educational only: explain allocation, concentration, and risk in simple terms. Never promise returns, never give personal investment advice.",
   ];
@@ -146,6 +145,9 @@ export function buildSystemPrompt(snap: Snapshot, hall?: HallAnalysis): string {
     lines.push("Buildings: none yet (empty island).");
   }
   if (snap.marketNote) lines.push(`Market: ${snap.marketNote}`);
+  lines.push(
+    "Reply now in the user's language (default clear friendly English; Bahasa Indonesia if they write in it). Under 80 words. Plain text only: no #, no *, no backticks, no markdown links, no asterisk actions. Always finish your final sentence completely — never stop or trail off mid-word.",
+  );
   if (hall) {
     lines.push("--- AGENT HALL RESEARCH TASK ---");
     lines.push(
@@ -183,4 +185,29 @@ export function buildUserPrompt(
     .map((m) => `${m.role === "user" ? "User" : "Advisor"}: ${m.text}`)
     .join("\n");
   return `${system}\n--- CONVERSATION ---\n${convo}\nUser: ${message}\nAdvisor:`;
+}
+
+/**
+ * True when a reply ends on a finished sentence. Models sometimes obey a
+ * word budget by halting mid-word with finishReason STOP, so a missing
+ * terminal punctuation mark is the reliable cut signal.
+ */
+export function isCompleteReply(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return false;
+  return /[.!?…]["'”’)]?\s*$/.test(trimmed);
+}
+
+/** Chat is plain text: remove markdown markers the UI cannot render. */
+export function plainText(text: string): string {
+  return text
+    .replace(/```[a-z]*\n?/gi, "")
+    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+    .replace(/^\s*[*\-+]\s+/gm, "- ")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
+    .replace(/(^|[\s(])[*_]([^*_\n]+)[*_](?=[\s).,!?:;]|$)/g, "$1$2")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }

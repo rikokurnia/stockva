@@ -5,6 +5,8 @@ import {
   asSnapshot,
   buildSystemPrompt,
   buildUserPrompt,
+  isCompleteReply,
+  plainText,
   type ChatMsg,
 } from "../../../lib/advisor";
 
@@ -51,7 +53,10 @@ async function tryGemini(
       ?.map((p) => p.text ?? "")
       .join("")
       .trim();
-    return text || null;
+    // A word budget can halt the model mid-word with finishReason STOP.
+    // Treat cut replies as a miss so the next provider answers instead.
+    if (!text || !isCompleteReply(text)) return null;
+    return text;
   } catch {
     return null;
   }
@@ -94,24 +99,11 @@ async function tryOpenAICompatible(
       choices?: { message?: { content?: string } }[];
     };
     const text = data.choices?.[0]?.message?.content?.trim();
-    return text || null;
+    if (!text || !isCompleteReply(text)) return null;
+    return text;
   } catch {
     return null;
   }
-}
-
-/** Chat is plain text: remove markdown markers the UI cannot render. */
-function plainText(text: string): string {
-  return text
-    .replace(/```[a-z]*\n?/gi, "")
-    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
-    .replace(/^\s*[*\-+]\s+/gm, "- ")
-    .replace(/(\*\*|__)(.+?)\1/g, "$2")
-    .replace(/(^|[\s(])[*_]([^*_\n]+)[*_](?=[\s).,!?:;]|$)/g, "$1$2")
-    .replace(/`([^`]*)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
 
 export async function POST(req: Request) {
