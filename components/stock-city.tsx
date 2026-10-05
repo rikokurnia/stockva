@@ -2860,7 +2860,7 @@ export default function StockCity() {
               <p className="panel-disclaimer">
                 Buildings occupy 2 × 2 tiles. Roads cannot cross buildings or
                 leave the grassy area. Traffic appears after at least three road
-                tiles are connected, adding 3 vehicles every 5 road tiles.
+                tiles are connected, adding 3 vehicles every 10 road tiles.
               </p>
             </div>
           )}

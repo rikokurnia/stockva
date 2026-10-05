@@ -370,7 +370,7 @@ test("each original vehicle has all eight local image frames with valid crop bou
     }
 });
 
-test("traffic fleet scales by adding all 3 vehicle types every 5 placed road tiles", () => {
+test("traffic fleet scales by adding all 3 vehicle types every 10 placed road tiles", () => {
   assert.equal(trafficFleet(0).length, 3);
   assert.deepEqual(trafficFleet(0), [
     "electric_bus",
@@ -378,9 +378,9 @@ test("traffic fleet scales by adding all 3 vehicle types every 5 placed road til
     "maintenance_van",
   ]);
   assert.equal(trafficFleet(3).length, 3);
-  assert.equal(trafficFleet(4).length, 3);
-  assert.equal(trafficFleet(5).length, 6);
-  assert.deepEqual(trafficFleet(5), [
+  assert.equal(trafficFleet(9).length, 3);
+  assert.equal(trafficFleet(10).length, 6);
+  assert.deepEqual(trafficFleet(10), [
     "electric_bus",
     "construction_truck",
     "maintenance_van",
@@ -388,11 +388,11 @@ test("traffic fleet scales by adding all 3 vehicle types every 5 placed road til
     "construction_truck",
     "maintenance_van",
   ]);
-  assert.equal(trafficFleet(9).length, 6);
-  assert.equal(trafficFleet(10).length, 9);
-  assert.equal(trafficFleet(14).length, 9);
-  assert.equal(trafficFleet(15).length, 12);
-  assert.equal(trafficFleet(20).length, 15);
+  assert.equal(trafficFleet(19).length, 6);
+  assert.equal(trafficFleet(20).length, 9);
+  assert.equal(trafficFleet(29).length, 9);
+  assert.equal(trafficFleet(30).length, 12);
+  assert.equal(trafficFleet(40).length, 15);
 });
 
 test("progression rejects company construction without an Exchange, including after demolition", () => {
