@@ -378,7 +378,9 @@ export default function AgentRebalance({
         );
       if (!mounted.current) return;
       draftInputs.current = JSON.stringify([instruction.trim(), budgetAmount]);
-      setPlan(result.plan);
+      // The server saw a wallet-aligned cash figure; bind the reviewed plan to
+      // the exact city the user is looking at so it stays executable.
+      setPlan({ ...result.plan, fingerprint: rebalanceFingerprint(city) });
       setPreview("planned");
       setSelected(null);
       setNow(Date.now());
