@@ -38,7 +38,7 @@ async function tryGemini(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
+          generationConfig: { maxOutputTokens: 2000, temperature: 0.7 },
         }),
         signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]),
       },
@@ -84,7 +84,7 @@ async function tryOpenAICompatible(
           })),
           { role: "user", content: message },
         ],
-        max_tokens: 300,
+        max_tokens: 1200,
         temperature: 0.7,
       }),
       signal: AbortSignal.any([signal, AbortSignal.timeout(25000)]),
@@ -98,6 +98,20 @@ async function tryOpenAICompatible(
   } catch {
     return null;
   }
+}
+
+/** Chat is plain text: remove markdown markers the UI cannot render. */
+function plainText(text: string): string {
+  return text
+    .replace(/```[a-z]*\n?/gi, "")
+    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+    .replace(/^\s*[*\-+]\s+/gm, "- ")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
+    .replace(/(^|[\s(])[*_]([^*_\n]+)[*_](?=[\s).,!?:;]|$)/g, "$1$2")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export async function POST(req: Request) {
@@ -152,5 +166,5 @@ export async function POST(req: Request) {
       { status: 503 },
     );
   }
-  return NextResponse.json({ reply });
+  return NextResponse.json({ reply: plainText(reply) });
 }
