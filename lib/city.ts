@@ -1347,6 +1347,17 @@ export type PaperHolding = {
   cost: number;
   boughtAt: number;
 };
+/** One closed sale for the Performance sale-history feed. */
+export type SaleRecord = {
+  id: string;
+  ticker: string;
+  quantity: number;
+  proceeds: number;
+  realized: number;
+  at: number;
+  hash?: `0x${string}`;
+  source: "onchain" | "local";
+};
 export type CityState = {
   version: 2;
   cash: number;
@@ -1355,6 +1366,8 @@ export type CityState = {
   roads: Cell[];
   paper?: PaperHolding[];
   rebalanceCount?: number;
+  /** Every closed sale (local + on-chain) for history + balance proof. */
+  saleHistory?: SaleRecord[];
   /** Confirmed agent receipts survive removal of the associated building. */
   agentReceipts?: {
     hash: `0x${string}`;
@@ -1771,22 +1784,31 @@ export function constructBuilding(
 }
 export function bulldoze(cell: Cell, state: CityState, prices?: PriceMap) {
   const b = buildingAt(cell, state);
-  if (b)
+  if (b) {
+    const ticker = defFor(b.kind).ticker;
+    const proceeds = valueOf(b, prices);
+    const realized = ticker ? proceeds - b.quantity * b.entry : 0;
+    const next: CityState = {
+      ...state,
+      cash: state.cash + proceeds,
+      realizedPnl: (state.realizedPnl ?? 0) + realized,
+      buildings: state.buildings.filter((p) => p.id !== b.id),
+    };
     return {
-      state: {
-        ...state,
-        cash: state.cash + valueOf(b, prices),
-        realizedPnl:
-          (state.realizedPnl ?? 0) +
-          (defFor(b.kind).ticker
-            ? valueOf(b, prices) - b.quantity * b.entry
-            : 0),
-        buildings: state.buildings.filter((p) => p.id !== b.id),
-      },
-      message: defFor(b.kind).ticker
-        ? `${defFor(b.kind).name} removed. ${money(valueOf(b, prices))} returned to treasury funds.`
+      state: ticker
+        ? recordSale(next, {
+            ticker,
+            quantity: b.quantity,
+            proceeds,
+            realized,
+            source: "local",
+          })
+        : next,
+      message: ticker
+        ? `${defFor(b.kind).name} removed. ${money(proceeds)} returned to treasury funds.`
         : `${defFor(b.kind).name} removed.`,
     };
+  }
   if (state.roads.some((r) => sameCell(r, cell)))
     return {
       state: { ...state, roads: state.roads.filter((r) => !sameCell(r, cell)) },
@@ -1888,6 +1910,24 @@ export function buyPaper(
   };
 }
 
+/** Append a closed sale to history. Pure: returns the next state. */
+export function recordSale(
+  state: CityState,
+  sale: Omit<SaleRecord, "id" | "at">,
+): CityState {
+  return {
+    ...state,
+    saleHistory: [
+      ...(state.saleHistory ?? []),
+      {
+        ...sale,
+        id: globalThis.crypto.randomUUID(),
+        at: Date.now(),
+      },
+    ],
+  };
+}
+
 /** Sell a fraction of all paper holdings for a ticker. */
 export function sellPaper(
   state: CityState,
@@ -1901,6 +1941,7 @@ export function sellPaper(
     return { state, error: "Choose a valid sell percentage." };
   let proceeds = 0;
   let realized = 0;
+  let soldQty = 0;
   const ids = new Set(holdings.map((p) => p.id));
   const paper = (state.paper ?? [])
     .map((p) => {
@@ -1909,18 +1950,28 @@ export function sellPaper(
       const value = p.quantity * price;
       proceeds += value * fraction;
       realized += (value - p.quantity * p.entry) * fraction;
+      soldQty += p.quantity * fraction;
       if (fraction === 1) return null;
       const quantity = p.quantity * (1 - fraction);
       return { ...p, quantity, cost: p.cost * (1 - fraction) };
     })
     .filter((p): p is PaperHolding => p !== null);
   return {
-    state: {
-      ...state,
-      cash: state.cash + proceeds,
-      realizedPnl: (state.realizedPnl ?? 0) + realized,
-      paper,
-    },
+    state: recordSale(
+      {
+        ...state,
+        cash: state.cash + proceeds,
+        realizedPnl: (state.realizedPnl ?? 0) + realized,
+        paper,
+      },
+      {
+        ticker,
+        quantity: soldQty,
+        proceeds,
+        realized,
+        source: "local",
+      },
+    ),
     error: "",
     payout: proceeds,
   };
@@ -1948,25 +1999,35 @@ export function sellPosition(
     (sum, b) => sum + (valueOf(b, prices) - b.quantity * b.entry) * fraction,
     0,
   );
+  const soldQty = holdings.reduce((sum, b) => sum + b.quantity * fraction, 0);
   return {
-    state: {
-      ...state,
-      cash: state.cash + proceeds,
-      realizedPnl: (state.realizedPnl ?? 0) + realized,
-      buildings: state.buildings.flatMap((b) =>
-        defFor(b.kind).ticker !== ticker
-          ? [b]
-          : fraction === 1
-            ? []
-            : [
-                {
-                  ...b,
-                  quantity: b.quantity * (1 - fraction),
-                  cost: b.cost * (1 - fraction),
-                },
-              ],
-      ),
-    },
+    state: recordSale(
+      {
+        ...state,
+        cash: state.cash + proceeds,
+        realizedPnl: (state.realizedPnl ?? 0) + realized,
+        buildings: state.buildings.flatMap((b) =>
+          defFor(b.kind).ticker !== ticker
+            ? [b]
+            : fraction === 1
+              ? []
+              : [
+                  {
+                    ...b,
+                    quantity: b.quantity * (1 - fraction),
+                    cost: b.cost * (1 - fraction),
+                  },
+                ],
+        ),
+      },
+      {
+        ticker,
+        quantity: soldQty,
+        proceeds,
+        realized,
+        source: "local",
+      },
+    ),
     error: "",
   };
 }

@@ -253,6 +253,8 @@ export default function StockCity() {
   const [draggingInspector, setDraggingInspector] = useState(false);
   const inspectorDragOffset = useRef<{ dx: number; dy: number } | null>(null);
   const [sellingBuilding, setSellingBuilding] = useState(false);
+  const [inspectorSellOpen, setInspectorSellOpen] = useState(false);
+  const [inspectorSellPct, setInspectorSellPct] = useState(100);
   const hasHall = city.buildings.some((b) => b.kind === "hall");
   const hasExchange = city.buildings.some((b) => b.kind === "exchange");
   const hasData = city.buildings.some((b) => b.kind === "oracle");
@@ -2155,15 +2157,38 @@ export default function StockCity() {
     inspectorDragOffset.current = null;
     setDraggingInspector(false);
   };
-  const sellCurrentBuilding = async () => {
+  const sellCurrentBuilding = async (fraction: number) => {
     if (!current || !definition?.ticker || sellingBuilding) return;
+    if (
+      !Number.isFinite(fraction) ||
+      fraction <= 0 ||
+      fraction > 1
+    ) {
+      notify("Choose a valid sell percentage.", true);
+      return;
+    }
     if (cityMutationLocked) {
       notify("Finish the agent's pending transaction before selling.", true);
       return;
     }
-    // Local-only holding: no on-chain position exists, liquidate to treasury.
+    // Local-only holding: no on-chain position exists, settle to treasury.
     if (!current.vaultId) {
-      onBulldoze(current);
+      const result = sellPosition(
+        simulationLatest.current.city,
+        definition.ticker,
+        fraction,
+        prices,
+      );
+      if (result.error) {
+        notify(result.error, true);
+        return;
+      }
+      commit(result.state);
+      setInspectorSellOpen(false);
+      if (fraction === 1) setSelected(null);
+      notify(
+        `Sold ${fraction === 1 ? "all" : `${Math.round(fraction * 100)}% of`} ${definition.ticker} to treasury.`,
+      );
       return;
     }
     // On-chain holding: wallet-signed vault sale, receipt saved to history.
@@ -2187,12 +2212,16 @@ export default function StockCity() {
           "This building has no valid on-chain position to sell.",
         );
       const price = priceOf(definition.ticker, prices);
-      notify("Sign the sale in your wallet…");
+      notify(
+        fraction === 1
+          ? "Sign the sale in your wallet…"
+          : `Sign the ${Math.round(fraction * 100)}% sale in your wallet…`,
+      );
       const hash = await sellBuildingOnchain(
         account,
         positionId as `0x${string}`,
         price,
-        10000,
+        Math.max(1, Math.min(10000, Math.round(fraction * 10000))),
         (submitted) => {
           if (submitted)
             notify("Sale submitted. Waiting for BNB confirmation…");
@@ -2208,7 +2237,8 @@ export default function StockCity() {
         account,
       );
       commit(next);
-      setSelected(null);
+      setInspectorSellOpen(false);
+      if (receipt.fullyClosed) setSelected(null);
       notify(
         `Sold ${definition.ticker} on-chain. Receipt saved in City Hall history.`,
       );
@@ -2221,6 +2251,10 @@ export default function StockCity() {
       setSellingBuilding(false);
     }
   };
+  useEffect(() => {
+    setInspectorSellOpen(false);
+    setInspectorSellPct(100);
+  }, [selected]);
   const steps = [
     city.roads.length > 0,
     hasExchange,
@@ -2700,6 +2734,120 @@ export default function StockCity() {
                 <X size={19} />
               </button>
             </header>
+            {definition.ticker && inspectorSellOpen && (
+              <div
+                style={{
+                  margin: "12px 12px 0",
+                  padding: "12px",
+                  borderRadius: "10px",
+                  border: "1px solid rgba(240, 185, 11, 0.4)",
+                  background: "rgba(240, 185, 11, 0.07)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "8px",
+                  }}
+                >
+                  <strong style={{ fontSize: "12px", color: "#f0b90b" }}>
+                    Sell {definition.ticker}
+                    {current.vaultId ? " · on-chain" : " · local"}
+                  </strong>
+                  <button
+                    aria-label="Cancel sale"
+                    title="Cancel"
+                    onClick={() => setInspectorSellOpen(false)}
+                    style={{
+                      color: "#8fa6b4",
+                      background: "none",
+                      border: 0,
+                      cursor: "pointer",
+                      padding: "4px",
+                      minWidth: "30px",
+                      minHeight: "30px",
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "6px",
+                    marginTop: "10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {[25, 50, 75, 100].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      aria-pressed={inspectorSellPct === pct}
+                      onClick={() => setInspectorSellPct(pct)}
+                      style={{
+                        flex: 1,
+                        minHeight: "34px",
+                        borderRadius: "7px",
+                        border: `1px solid ${inspectorSellPct === pct ? "#f0b90b" : "#2c4c62"}`,
+                        background:
+                          inspectorSellPct === pct ? "#1e3646" : "transparent",
+                        color:
+                          inspectorSellPct === pct ? "#f0b90b" : "#edf2f3",
+                        fontWeight: 700,
+                        fontSize: "12px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="danger"
+                  disabled={sellingBuilding}
+                  onClick={() =>
+                    void sellCurrentBuilding(inspectorSellPct / 100)
+                  }
+                  style={{
+                    width: "100%",
+                    marginTop: "10px",
+                    minHeight: "38px",
+                    borderRadius: "8px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    fontSize: "12px",
+                  }}
+                >
+                  <Trash2 size={14} />
+                  {sellingBuilding
+                    ? "Waiting for wallet…"
+                    : current.vaultId
+                      ? `Sign & sell ${inspectorSellPct}%`
+                      : `Sell ${inspectorSellPct}% to treasury`}
+                </button>
+                {current.vaultId && (
+                  <small
+                    style={{
+                      display: "block",
+                      marginTop: "8px",
+                      color: "#8b9ea7",
+                      fontSize: "10px",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Signs a vault sale with your wallet. The mined receipt
+                    lands in City Hall history with realized P/L.
+                  </small>
+                )}
+              </div>
+            )}
             <div className={`inspection-art ${definition.category}`}>
               <img
                 src={sprite(
@@ -2984,7 +3132,10 @@ export default function StockCity() {
               <button
                 className="danger"
                 disabled={sellingBuilding}
-                onClick={() => void sellCurrentBuilding()}
+                onClick={() => {
+                  setInspectorSellPct(100);
+                  setInspectorSellOpen((open) => !open);
+                }}
               >
                 <Trash2 size={14} />
                 {sellingBuilding

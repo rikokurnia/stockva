@@ -1017,6 +1017,15 @@ export default function CivicCityHall(
           localPnl={localPnl}
           equityHistory={equityHistory}
           onSellRow={(ticker) => {
+            const building = stocks.find(
+              (stock) => defFor(stock.kind).ticker === ticker,
+            );
+            if (building) {
+              // On-chain sales can only be signed from the island card.
+              onFocus(building);
+              return;
+            }
+            // Position-only holding: no island card exists, use the sale form.
             setSaleTicker(ticker);
             setSalePercent(100);
             setSaleMessage("");

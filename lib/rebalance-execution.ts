@@ -1,5 +1,6 @@
 import type { RebalancePlan } from "./rebalance";
 import type { CityState } from "./city";
+import type { SaleRecord } from "./city.ts";
 import { defFor } from "./city.ts";
 import type { RebalanceReceipt } from "./contracts";
 
@@ -197,6 +198,7 @@ export function applyRebalanceReceipt(
   let buildings = city.buildings;
   let cash = city.cash;
   let realizedPnl = city.realizedPnl ?? 0;
+  let saleRow: SaleRecord | null = null;
   if (step.action === "sell") {
     if (receipt.positionId.toLowerCase() !== step.positionId.toLowerCase())
       throw new Error("The confirmed position does not match this building.");
@@ -221,8 +223,17 @@ export function applyRebalanceReceipt(
         );
     cash += receipt.amount;
     realizedPnl += receipt.amount - step.costBasis;
-  } else {
-    if (buildings.some((b) => b.id === step.buildingId))
+    saleRow = {
+      id: globalThis.crypto.randomUUID(),
+      ticker: step.ticker,
+      quantity: receipt.quantity,
+      proceeds: receipt.amount,
+      realized: receipt.amount - step.costBasis,
+      at: Date.now(),
+      hash: receipt.hash,
+      source: "onchain",
+    };
+  } else {    if (buildings.some((b) => b.id === step.buildingId))
       throw new Error(
         "This new building already exists. Check the receipt before continuing.",
       );
@@ -254,6 +265,7 @@ export function applyRebalanceReceipt(
     buildings,
     cash,
     realizedPnl,
+    saleHistory: [...(city.saleHistory ?? []), ...(saleRow ? [saleRow] : [])],
     agentReceipts: [
       ...(city.agentReceipts ?? []),
       {
@@ -359,6 +371,19 @@ export function applyDirectSellReceipt(
     buildings,
     cash: Math.round((city.cash + receipt.amount) * 1_000_000) / 1_000_000,
     realizedPnl: (city.realizedPnl ?? 0) + (receipt.amount - basis),
+    saleHistory: [
+      ...(city.saleHistory ?? []),
+      {
+        id: globalThis.crypto.randomUUID(),
+        ticker,
+        quantity: soldQty,
+        proceeds: receipt.amount,
+        realized: receipt.amount - basis,
+        at: Date.now(),
+        hash: receipt.hash,
+        source: "onchain",
+      },
+    ],
     agentReceipts: [
       ...(city.agentReceipts ?? []),
       {

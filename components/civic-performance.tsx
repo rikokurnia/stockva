@@ -1,5 +1,7 @@
 "use client";
+import { ExternalLink } from "lucide-react";
 import { money, pct, priceOf, type CityState, type PriceMap } from "../lib/city";
+import { bscTxLink } from "../lib/contracts";
 import type { MarketFeed } from "../lib/market";
 import type { portfolioLandscape } from "../lib/agent-hall";
 import {
@@ -32,6 +34,7 @@ export default function CivicPerformance({
 }: Props) {
   const realized = city.realizedPnl ?? 0;
   const deltas = dailyDeltas(equityHistory).slice(-30).reverse();
+  const sales = [...(city.saleHistory ?? [])].reverse();
   return (
     <>
       <div className={styles.summaryStrip}>
@@ -61,12 +64,89 @@ export default function CivicPerformance({
           <small>All-time, all closed sales</small>
         </div>
       </div>
+      <section className={styles.section} aria-label="Sale history">
+        <div className={styles.sectionHeading}>
+          <h4>Sale history</h4>
+          <span>
+            {sales.length} {sales.length === 1 ? "sale" : "sales"} · feeds
+            realized P/L
+          </span>
+        </div>
+        {sales.length ? (
+          <div className={styles.perfTableWrap}>
+            <table className={styles.perfTable}>
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th className={styles.num}>Qty</th>
+                  <th className={styles.num}>Proceeds</th>
+                  <th className={styles.num}>Realized</th>
+                  <th>Date</th>
+                  <th>Receipt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.slice(0, 30).map((sale) => (
+                  <tr key={sale.id}>
+                    <td>
+                      <strong>{sale.ticker}</strong>{" "}
+                      <small style={{ color: "var(--subtle)" }}>
+                        {sale.source === "onchain" ? "on-chain" : "local"}
+                      </small>
+                    </td>
+                    <td className={styles.num}>
+                      {sale.quantity.toLocaleString(undefined, {
+                        maximumFractionDigits: 4,
+                      })}
+                    </td>
+                    <td className={styles.num}>{money(sale.proceeds)}</td>
+                    <td
+                      className={`${styles.num} ${sale.realized < 0 ? styles.loss : styles.gain}`}
+                    >
+                      {sale.realized >= 0 ? "+" : ""}
+                      {money(sale.realized)}
+                    </td>
+                    <td>
+                      {new Date(sale.at).toLocaleDateString(undefined, {
+                        day: "numeric",
+                        month: "short",
+                        year: "2-digit",
+                      })}
+                    </td>
+                    <td>
+                      {sale.hash ? (
+                        <a
+                          href={bscTxLink(sale.hash)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={styles.textLink}
+                        >
+                          <code>
+                            {sale.hash.slice(0, 6)}…
+                            {sale.hash.slice(-4)}
+                          </code>
+                          <ExternalLink size={13} />
+                        </a>
+                      ) : (
+                        <span style={{ color: "var(--subtle)" }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className={styles.caption}>
+            No sales yet. Close a position and it lands here with its receipt.
+          </p>
+        )}
+      </section>
       <section className={styles.section} aria-label="Equity curve">
         <div className={styles.sectionHeading}>
           <h4>Total Equity Return</h4>
           <span>Recorded while you play</span>
-        </div>
-        {equityHistory.length >= 2 ? (
+        </div>        {equityHistory.length >= 2 ? (
           <EquityChart points={equityHistory} />
         ) : (
           <div className={styles.empty}>

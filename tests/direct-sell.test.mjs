@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { applyDirectSellReceipt } from "../lib/rebalance-execution.ts";
+import {
+  bulldoze,
+  newCity,
+  sellPosition,
+  sellPaper,
+  buyPaper,
+  constructBuilding,
+} from "../lib/city.ts";
 
 const OWNER = `0x${"a".repeat(40)}`;
 const POSITION = `0x${"c".repeat(64)}`;
@@ -65,8 +73,7 @@ test("replaying the same hash is idempotent", () => {
   assert.equal(twice, once);
 });
 
-test("wrong position or ticker is rejected", () => {
-  assert.throws(
+test("wrong position or ticker is rejected", () => {  assert.throws(
     () =>
       applyDirectSellReceipt(
         city(),
@@ -84,4 +91,58 @@ test("wrong position or ticker is rejected", () => {
     () => applyDirectSellReceipt(city(), "missing-id", receipt(), OWNER),
     /gone/,
   );
+});
+
+test("on-chain sale records a clickable history row", () => {
+  const next = applyDirectSellReceipt(city(), building.id, receipt(), OWNER);
+  assert.equal(next.saleHistory.length, 1);
+  const row = next.saleHistory[0];
+  assert.equal(row.ticker, "NVDA");
+  assert.equal(row.quantity, 5);
+  assert.equal(row.proceeds, 600);
+  assert.equal(row.realized, 100);
+  assert.equal(row.hash, HASH);
+  assert.equal(row.source, "onchain");
+});
+
+const fundedCity = () => {
+  let state = { ...newCity(), cash: 10000 };
+  state = constructBuilding("exchange", { r: -6, c: 0 }, 400, state).state;
+  return constructBuilding("nvidia", { r: 1, c: 1 }, 500, state, {
+    NVDA: 100,
+  }).state;
+};
+
+test("local building sales record history with balances intact", () => {
+  const bought = fundedCity();
+  const sold = sellPosition(bought, "NVDA", 0.5, { NVDA: 120 });
+  assert.equal(sold.error, "");
+  assert.equal(sold.state.buildings.length, 2);
+  assert.equal(sold.state.saleHistory.length, 1);
+  const row = sold.state.saleHistory[0];
+  assert.equal(row.ticker, "NVDA");
+  assert.equal(row.source, "local");
+  assert.equal(row.hash, undefined);
+  assert.ok(row.proceeds > 0);
+  const again = sellPosition(sold.state, "NVDA", 1, { NVDA: 120 });
+  assert.equal(again.state.buildings.length, 1);
+  assert.equal(again.state.saleHistory.length, 2);
+});
+
+test("bulldoze of a stock building records its liquidation", () => {
+  const bought = fundedCity();
+  const removed = bulldoze({ r: 1, c: 1 }, bought, { NVDA: 110 });
+  assert.equal(removed.state.buildings.length, 1);
+  assert.equal(removed.state.saleHistory.length, 1);
+  assert.equal(removed.state.saleHistory[0].ticker, "NVDA");
+});
+
+test("paper sales record history too", () => {
+  let state = { ...newCity(), cash: 10000 };
+  state = buyPaper(state, "AAPL", 1000, 200).state;
+  const sold = sellPaper(state, "AAPL", 1, { AAPL: 220 });
+  assert.equal(sold.error, "");
+  assert.equal(sold.state.saleHistory.length, 1);
+  assert.equal(sold.state.saleHistory[0].ticker, "AAPL");
+  assert.equal(sold.state.saleHistory[0].source, "local");
 });
