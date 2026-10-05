@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import CityMap, { type AgentMapActivity } from "./city-map";
 import { inspectorPlacement } from "../lib/map-geometry";
-import { rebalanceFingerprint, bindReviewedCityPositions, type RebalancePlan } from "../lib/rebalance";
+import { rebalanceFingerprint, bindReviewedCityPositions, reviewedSellBuilding, type RebalancePlan } from "../lib/rebalance";
 import { reconcileLegacyRebalance } from "../lib/rebalance-sequential";
 import {
   applyDirectSellReceipt,
@@ -894,16 +894,7 @@ export default function StockCity() {
           if (stepDone) continue;
 
           if (step.action === "sell") {
-            const building = sites.buildings.find(
-              (b) => b.id === step.buildingId,
-            );
-            if (
-              !building ||
-              building.vaultId?.toLowerCase() !== (step.cityPositionId ?? step.positionId).toLowerCase()
-            )
-              throw new Error(
-                "A reviewed building changed. Ask for a fresh blueprint.",
-              );
+            reviewedSellBuilding(sites, step);
             sites = {
               ...sites,
               buildings: sites.buildings.filter(

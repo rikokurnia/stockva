@@ -22,9 +22,10 @@ const {
   rebalanceFingerprint,
   isRebalancePlanCurrent,
   bindReviewedCityPositions,
+  reviewedSellBuilding,
 } = require("../lib/rebalance.ts");
 const { applyRebalanceReceipt } = require("../lib/rebalance-execution.ts");
-const { hasRoad, placementError } = require("../lib/city.ts");
+const { hasRoad, placementError, catalogue } = require("../lib/city.ts");
 const { NextResponse } = require("next/server");
 const WEI = BigInt("1000000000000000000");
 const walletAddress = `0x${"1".repeat(40)}`;
@@ -97,6 +98,19 @@ const proposal = (
     weight,
     reason: `Allocate ${weight}% to ${ticker}.`,
   })),
+});
+
+test("city preflight accepts reviewed saved IDs across tickers while leaving canonical chain checks to the wallet", () => {
+  const tickers = ["AMZN", "MSFT", "NVDA", "TSLA", "BLK"];
+  const buildings = tickers.map((ticker, index) => building(`saved-${index}`, catalogue.find((d) => d.ticker === ticker).kind, 0, index * 4, 2, { vaultId: positionId(index + 1) }));
+  const city = { version: 2, cash: 100, buildings, roads: [] };
+  for (const [index, b] of buildings.entries()) {
+    const step = { action: "sell", buildingId: b.id, ticker: tickers[index], cell: { r: b.r, c: b.c }, cityPositionId: b.vaultId, positionId: index < 2 ? positionId(index + 10) : b.vaultId };
+    assert.equal(reviewedSellBuilding(city, step), b);
+    assert.throws(() => reviewedSellBuilding(city, { ...step, buildingId: "missing" }), /missing/);
+    assert.throws(() => reviewedSellBuilding(city, { ...step, cell: { r: 1, c: b.c } }), /location/);
+    assert.throws(() => reviewedSellBuilding(city, { ...step, ticker: "JPM" }), /type/);
+  }
 });
 
 test("a reconciled saved position binds both reviewed city identity and canonical chain receipt", () => {

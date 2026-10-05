@@ -162,6 +162,18 @@ export function bindReviewedCityPositions(plan: RebalancePlan, city: CityState):
   }) };
 }
 
+/** City identity is bound by the fingerprint; chain identity is checked by wallet preflight. */
+export function reviewedSellBuilding(city: CityState, step: RebalanceSellStep): Building {
+  const building = city.buildings.find((b) => b.id === step.buildingId);
+  if (!building)
+    throw new Error(`${step.ticker}: the reviewed city building is missing (${step.buildingId}).`);
+  if (catalogue.find((d) => d.kind === building.kind)?.ticker !== step.ticker ||
+      building.r !== step.cell.r || building.c !== step.cell.c ||
+      !building.vaultId || !POSITION_ID.test(building.vaultId))
+    throw new Error(`${step.ticker}: the saved building type, location, or position reference is invalid.`);
+  return building;
+}
+
 export function isRebalancePlanCurrent(
   plan: RebalancePlan,
   city: CityState,
