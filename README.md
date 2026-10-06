@@ -74,8 +74,10 @@ The core game logic and ledger contracts are deployed and verified on **BNB Smar
 
 | Contract | Address | Explorer |
 | :--- | :--- | :--- |
-| **StockCityVault** | `0x1810b360e0a4d593117f0bfaf2e0939b2df5e415` | [View on BscScan](https://testnet.bscscan.com/address/0x1810b360e0a4d593117f0bfaf2e0939b2df5e415) |
+| **StockCityVault V2** | `0xa5D86d9829EA2097884163C1ebd38072875263D9` | [View on BscScan](https://testnet.bscscan.com/address/0xa5D86d9829EA2097884163C1ebd38072875263D9) |
 | **MockUSD (mUSD)** | `0xCA2Ab14Aa5F41705a2f3BF17b728a272441C4f21` | [View on BscScan](https://testnet.bscscan.com/address/0xCA2Ab14Aa5F41705a2f3BF17b728a272441C4f21) |
+
+V2 adds `rebalanceBatch`: close + open positions in one transaction, so Agent Hall rebalances sign once with any plain wallet (no EIP-7702 needed). Positions opened on the V1 vault stay readable there; new flows use V2.
 
 ---
 

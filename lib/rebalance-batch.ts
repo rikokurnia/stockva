@@ -19,7 +19,11 @@ import {
   VAULT_ADDRESS,
   type RebalanceReceipt,
 } from "./contracts";
-import type { RebalancePlan } from "./rebalance";
+import type {
+  RebalanceBuyStep,
+  RebalancePlan,
+  RebalanceSellStep,
+} from "./rebalance";
 
 export type BatchProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -28,6 +32,9 @@ export type RebalanceCalls = { to: Hex; data: Hex }[];
 
 /** A definitive rejection/revert can be cleared. Timeouts keep their batch ID. */
 export class RebalanceBatchRejected extends Error {}
+
+/** Vault V2 (rebalanceBatch) is not deployed at VAULT_ADDRESS yet. */
+export class RebalanceV2Missing extends Error {}
 
 export function newRebalanceBatchId(): Hex {
   return toHex(crypto.getRandomValues(new Uint8Array(32)));
@@ -50,6 +57,114 @@ const wei = (value: number) => {
   return amount;
 };
 const decimal = (value: bigint) => Number(formatUnits(value, 18));
+
+export type RebalanceOnchainState = {
+  positions: readonly {
+    id: `0x${string}`;
+    owner: `0x${string}`;
+    ticker: string;
+    active: boolean;
+    quantity: bigint;
+  }[];
+  balance: bigint;
+  reserves: bigint;
+  allowance: bigint;
+};
+
+/** Public chain reads for rebalance validation. No wallet prompts. */
+export async function readRebalanceOnchain(
+  plan: RebalancePlan,
+): Promise<RebalanceOnchainState> {
+  const client = getBscClient();
+  const [positions, balance, reserves, allowance] = await Promise.all([
+    client.readContract({
+      address: VAULT_ADDRESS,
+      abi: VAULT_ABI,
+      functionName: "getUserPositions",
+      args: [plan.walletAddress],
+    }),
+    client.readContract({
+      address: MOCK_USD_ADDRESS,
+      abi: MOCK_USD_ABI,
+      functionName: "balanceOf",
+      args: [plan.walletAddress],
+    }),
+    client.readContract({
+      address: MOCK_USD_ADDRESS,
+      abi: MOCK_USD_ABI,
+      functionName: "balanceOf",
+      args: [VAULT_ADDRESS],
+    }),
+    client.readContract({
+      address: MOCK_USD_ADDRESS,
+      abi: MOCK_USD_ABI,
+      functionName: "allowance",
+      args: [plan.walletAddress, VAULT_ADDRESS],
+    }),
+  ]);
+  return {
+    positions: positions as RebalanceOnchainState["positions"],
+    balance: balance as bigint,
+    reserves: reserves as bigint,
+    allowance: allowance as bigint,
+  };
+}
+
+/**
+ * Shared blueprint validation (positions, order, reserves, funds).
+ * Identical checks back both the EIP-7702 batch path and the single-tx path.
+ */
+export function checkRebalanceState(
+  plan: RebalancePlan,
+  state: RebalanceOnchainState,
+): {
+  sells: RebalanceSellStep[];
+  buys: RebalanceBuyStep[];
+  total: bigint;
+  proceeds: bigint;
+} {
+  const sells = plan.steps.filter((s) => s.action === "sell");
+  const buys = plan.steps.filter((s) => s.action === "buy");
+  if (
+    new Set(sells.map((s) => s.positionId.toLowerCase())).size !==
+      sells.length ||
+    new Set(buys.map((s) => s.ticker)).size !== buys.length ||
+    plan.steps.some(
+      (s, i) =>
+        s.action === "sell" &&
+        plan.steps.slice(0, i).some((p) => p.action === "buy"),
+    )
+  )
+    throw new Error(
+      "The blueprint has duplicate positions or an invalid execution order.",
+    );
+  let proceeds = BigInt(0);
+  const ten18 = BigInt(10) ** BigInt(18);
+  for (const step of sells) {
+    const position = state.positions.find((p) => same(p.id, step.positionId));
+    if (
+      !position?.active ||
+      !same(position.owner, plan.walletAddress) ||
+      position.ticker !== step.ticker ||
+      position.quantity.toString() !== step.positionQuantity ||
+      step.fractionBps !== 10000
+    )
+      throw new Error(
+        "An on-chain position changed. Request a fresh blueprint before signing.",
+      );
+    proceeds += (position.quantity * wei(step.price)) / ten18;
+  }
+  const total = buys.reduce((sum, step) => sum + wei(step.amount), BigInt(0));
+  if (state.reserves < proceeds)
+    throw new Error(
+      "Vault reserves changed. Request a fresh blueprint before signing.",
+    );
+  if (state.balance + proceeds < total)
+    throw new Error(
+      "Your mUSD balance changed. Request a fresh blueprint before signing.",
+    );
+  return { sells, buys, total, proceeds };
+}
 
 /** Read-only preflight. No chain switch, approval, or transaction is requested. */
 export async function prepareRebalanceBatch(
@@ -90,64 +205,10 @@ export async function prepareRebalanceBatch(
     throw new Error(
       "Request a fresh blueprint with at most 16 building changes.",
     );
-  const client = getBscClient();
-  const [positions, balance, reserves, allowance] = await Promise.all([
-    client.readContract({
-      address: VAULT_ADDRESS,
-      abi: VAULT_ABI,
-      functionName: "getUserPositions",
-      args: [plan.walletAddress],
-    }),
-    client.readContract({
-      address: MOCK_USD_ADDRESS,
-      abi: MOCK_USD_ABI,
-      functionName: "balanceOf",
-      args: [plan.walletAddress],
-    }),
-    client.readContract({
-      address: MOCK_USD_ADDRESS,
-      abi: MOCK_USD_ABI,
-      functionName: "balanceOf",
-      args: [VAULT_ADDRESS],
-    }),
-    client.readContract({
-      address: MOCK_USD_ADDRESS,
-      abi: MOCK_USD_ABI,
-      functionName: "allowance",
-      args: [plan.walletAddress, VAULT_ADDRESS],
-    }),
-  ]);
-  const sells = plan.steps.filter((s) => s.action === "sell");
-  const buys = plan.steps.filter((s) => s.action === "buy");
-  if (
-    new Set(sells.map((s) => s.positionId.toLowerCase())).size !==
-      sells.length ||
-    new Set(buys.map((s) => s.ticker)).size !== buys.length ||
-    plan.steps.some(
-      (s, i) =>
-        s.action === "sell" &&
-        plan.steps.slice(0, i).some((p) => p.action === "buy"),
-    )
-  )
-    throw new Error(
-      "The blueprint has duplicate positions or an invalid execution order.",
-    );
-  let proceeds = BigInt(0);
-  const ten18 = BigInt(10) ** BigInt(18);
+  const state = await readRebalanceOnchain(plan);
+  const { sells, buys, total } = checkRebalanceState(plan, state);
   const tenThousand = BigInt(10000);
   const calls: RebalanceCalls = sells.map((step) => {
-    const position = positions.find((p) => same(p.id, step.positionId));
-    if (
-      !position?.active ||
-      !same(position.owner, plan.walletAddress) ||
-      position.ticker !== step.ticker ||
-      position.quantity.toString() !== step.positionQuantity ||
-      step.fractionBps !== 10000
-    )
-      throw new Error(
-        "An on-chain position changed. Request a fresh blueprint before signing.",
-      );
-    proceeds += (position.quantity * wei(step.price)) / ten18;
     return {
       to: VAULT_ADDRESS,
       data: encodeFunctionData({
@@ -157,19 +218,10 @@ export async function prepareRebalanceBatch(
       }),
     };
   });
-  const total = buys.reduce((sum, step) => sum + wei(step.amount), BigInt(0));
-  if (reserves < proceeds)
-    throw new Error(
-      "Vault reserves changed. Request a fresh blueprint before signing.",
-    );
-  if (balance + proceeds < total)
-    throw new Error(
-      "Your mUSD balance changed. Request a fresh blueprint before signing.",
-    );
   if (buys.length) {
     // Exact spending approval is INSIDE the same atomic request, never a second
     // wallet prompt and never an unlimited allowance.
-    if (allowance < total)
+    if (state.allowance < total)
       calls.push({
         to: MOCK_USD_ADDRESS,
         data: encodeFunctionData({
@@ -235,6 +287,124 @@ export async function sendRebalanceBatch(
     }
     throw error;
   }
+}
+
+/**
+ * Probe whether the deployed vault has rebalanceBatch (Vault V2).
+ * V2 reverts WITH a reason ("Empty rebalance"); a missing function reverts
+ * with empty data. Only reason-carrying reverts count as support.
+ */
+export async function vaultSupportsRebalance(): Promise<boolean> {
+  const probe = encodeFunctionData({
+    abi: VAULT_ABI,
+    functionName: "rebalanceBatch",
+    args: [[], [], []],
+  });
+  try {
+    await getBscClient().call({ to: VAULT_ADDRESS, data: probe });
+    return true;
+  } catch (error) {
+    let cause: unknown = error;
+    for (let i = 0; i < 8 && cause && typeof cause === "object"; i++) {
+      const data = (cause as { data?: unknown }).data;
+      if (
+        typeof data === "string" &&
+        /^0x[0-9a-fA-F]{8}[0-9a-fA-F]*$/.test(data) &&
+        data.length > 10
+      )
+        return true;
+      cause = (cause as { cause?: unknown }).cause;
+    }
+    return false;
+  }
+}
+
+/**
+ * One-signature rebalance for ANY plain EOA wallet: exact mUSD approval only
+ * when needed, then a single vault.rebalanceBatch transaction for every step.
+ * Throws RebalanceV2Missing before any signature when Vault V2 is not live.
+ */
+export async function submitRebalanceSingleTx(
+  provider: BatchProvider,
+  plan: RebalancePlan,
+): Promise<{ approvalHash?: Hex; hash: Hex }> {
+  const chainId = await provider.request({ method: "eth_chainId" });
+  if (Number(chainId) !== BSC_TESTNET_CHAIN_ID)
+    throw new Error(
+      "Switch your connected wallet to BNB Chain testnet before signing the rebalance.",
+    );
+  const accounts = await provider.request({ method: "eth_accounts" });
+  if (
+    !Array.isArray(accounts) ||
+    !accounts.some((a) => typeof a === "string" && same(a, plan.walletAddress))
+  )
+    throw new Error("Connect the wallet that reviewed this blueprint.");
+  if (!(await vaultSupportsRebalance()))
+    throw new RebalanceV2Missing(
+      `Vault V2 with rebalanceBatch is not deployed at ${VAULT_ADDRESS} yet. Deploy it with contracts/script/DeployVaultV2.s.sol, update the vault address, then retry — one signature covers the whole rebalance.`,
+    );
+  const state = await readRebalanceOnchain(plan);
+  const { sells, buys, total } = checkRebalanceState(plan, state);
+  const wc = walletClient(provider, plan.walletAddress);
+  let approvalHash: Hex | undefined;
+  if (buys.length && state.allowance < total) {
+    approvalHash = await wc.writeContract({
+      address: MOCK_USD_ADDRESS,
+      abi: MOCK_USD_ABI,
+      functionName: "approve",
+      args: [VAULT_ADDRESS, total],
+      account: plan.walletAddress as Hex,
+      chain: bscTestnet,
+    });
+  }
+  const hash = await wc.writeContract({
+    address: VAULT_ADDRESS,
+    abi: VAULT_ABI,
+    functionName: "rebalanceBatch",
+    args: [
+      sells.map((s) => s.positionId),
+      sells.map((s) => wei(s.price)),
+      buys.map((b) => ({
+        ticker: b.ticker,
+        usdAmount: wei(b.amount),
+        entryPrice: wei(b.price),
+        initialTier: 1,
+      })),
+    ],
+    account: plan.walletAddress as Hex,
+    chain: bscTestnet,
+  });
+  return { approvalHash, hash };
+}
+
+/** Confirm a submitted single-tx rebalance from public logs. Never signs. */
+export async function confirmRebalanceSingleTx(
+  plan: RebalancePlan,
+  hash: Hex,
+): Promise<RebalanceReceipt[]> {
+  const receipt = await getBscClient().waitForTransactionReceipt({
+    hash,
+    timeout: 120_000,
+  });
+  return decodeRebalanceBatch(plan, receipt);
+}
+
+/**
+ * Recovery poll for an interrupted single-tx: mined → receipts; absent →
+ * null (safe to submit fresh — vault atomicity reverts any double).
+ */
+export async function recoverRebalanceTx(
+  plan: RebalancePlan,
+  id: string,
+): Promise<RebalanceReceipt[] | null> {
+  let receipt = null;
+  try {
+    receipt = await getBscClient().getTransactionReceipt({ hash: id as Hex });
+  } catch {
+    return null;
+  }
+  if (!receipt) return null;
+  return decodeRebalanceBatch(plan, receipt);
 }
 
 /** Verify every vault event against the signed plan using public chain logs. */

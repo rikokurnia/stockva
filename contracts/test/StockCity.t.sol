@@ -252,4 +252,90 @@ contract StockCityTest is Test {
         assertFalse(vault.getUserPositions(alice)[0].active);
         vm.stopPrank();
     }
+
+    function test_RebalanceBatchClosesAndOpensInOneTx() public {
+        vm.startPrank(alice);
+        token.claimFaucet();
+        token.approve(address(vault), 1000e18);
+        bytes32 sellA = vault.buyPosition("AMZN", 300e18, 100e18, 1);
+        bytes32 sellB = vault.buyPosition("MSFT", 200e18, 100e18, 1);
+        assertEq(token.balanceOf(alice), 9500e18);
+
+        bytes32[] memory sellIds = new bytes32[](2);
+        sellIds[0] = sellA;
+        sellIds[1] = sellB;
+        uint256[] memory sellPrices = new uint256[](2);
+        sellPrices[0] = 110e18;
+        sellPrices[1] = 120e18;
+
+        StockCityVault.RebalanceBuy[] memory buys = new StockCityVault.RebalanceBuy[](2);
+        buys[0] = StockCityVault.RebalanceBuy("NVDA", 400e18, 100e18, 1);
+        buys[1] = StockCityVault.RebalanceBuy("TSLA", 300e18, 100e18, 1);
+
+        // One approval covers the buys; sells pay out first in the same tx.
+        token.approve(address(vault), 700e18);
+        bytes32[] memory opened = vault.rebalanceBatch(sellIds, sellPrices, buys);
+        assertEq(opened.length, 2);
+
+        StockCityVault.Position[] memory list = vault.getUserPositions(alice);
+        assertEq(list.length, 4);
+        assertFalse(list[0].active);
+        assertFalse(list[1].active);
+        assertTrue(list[2].active);
+        assertTrue(list[3].active);
+        assertEq(list[2].ticker, "NVDA");
+        assertEq(list[3].ticker, "TSLA");
+        // 9500 - 700 buys + 330 + 240 sell proceeds = 9370
+        assertEq(token.balanceOf(alice), 9370e18);
+        vm.stopPrank();
+    }
+
+    function test_RebalanceBatchSellsOnly() public {
+        vm.startPrank(alice);
+        token.claimFaucet();
+        token.approve(address(vault), 500e18);
+        bytes32 id = vault.buyPosition("NVDA", 500e18, 100e18, 1);
+
+        bytes32[] memory sellIds = new bytes32[](1);
+        sellIds[0] = id;
+        uint256[] memory sellPrices = new uint256[](1);
+        sellPrices[0] = 150e18;
+        StockCityVault.RebalanceBuy[] memory buys = new StockCityVault.RebalanceBuy[](0);
+
+        vault.rebalanceBatch(sellIds, sellPrices, buys);
+        assertFalse(vault.getUserPositions(alice)[0].active);
+        assertEq(token.balanceOf(alice), 9500e18 + 750e18);
+        vm.stopPrank();
+    }
+
+    function test_RebalanceBatchRejectsBadInput() public {
+        vm.startPrank(alice);
+        token.claimFaucet();
+        token.approve(address(vault), 1000e18);
+        bytes32 id = vault.buyPosition("NVDA", 500e18, 100e18, 1);
+
+        bytes32[] memory sellIds = new bytes32[](1);
+        sellIds[0] = id;
+        uint256[] memory sellPrices = new uint256[](1);
+        sellPrices[0] = 150e18;
+        StockCityVault.RebalanceBuy[] memory empty = new StockCityVault.RebalanceBuy[](0);
+
+        // Non-owner cannot close someone else's position.
+        vm.stopPrank();
+        vm.startPrank(bob);
+        vm.expectRevert("Only position owner can sell");
+        vault.rebalanceBatch(sellIds, sellPrices, empty);
+        vm.stopPrank();
+
+        // Empty rebalance and length mismatch revert.
+        vm.startPrank(alice);
+        vm.expectRevert("Empty rebalance");
+        vault.rebalanceBatch(new bytes32[](0), new uint256[](0), empty);
+        uint256[] memory badPrices = new uint256[](2);
+        badPrices[0] = 150e18;
+        badPrices[1] = 150e18;
+        vm.expectRevert("Sell array mismatch");
+        vault.rebalanceBatch(sellIds, badPrices, empty);
+        vm.stopPrank();
+    }
 }

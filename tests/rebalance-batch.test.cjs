@@ -19,6 +19,7 @@ const vaultAbi = viem.parseAbi([
   "function getUserPositions(address user) view returns (Position[])",
   "function buyPositionsBatch(string[] tickers,uint256[] usdAmounts,uint256[] entryPrices,uint8[] initialTiers) returns (bytes32[])",
   "function sellPosition(bytes32 id,uint256 currentPrice,uint256 fractionBps) returns (uint256)",
+  "function rebalanceBatch(bytes32[] sellIds,uint256[] sellPrices,(string ticker,uint256 usdAmount,uint256 entryPrice,uint8 initialTier)[] buys) returns (bytes32[])",
   "event PositionOpened(bytes32 indexed id,address indexed owner,string ticker,uint256 usdCost,uint256 entryPrice,uint256 quantity,uint8 initialTier)",
   "event PositionSold(bytes32 indexed id,address indexed owner,string ticker,uint256 soldQuantity,uint256 payoutUSD,int256 pnlUSD,uint256 fractionBps,bool fullyClosed)",
 ]);
@@ -128,12 +129,31 @@ function load(options = {}) {
       waits.push(args);
       return receipt;
     },
+    async getTransactionReceipt(args) {
+      if (!options.singleTx) throw new Error("Unexpected read");
+      if (options.mined === false) return null;
+      return { status: "success", transactionHash: HASH, logs: logs() };
+    },
+    async call(args) {
+      if (!options.singleTx) throw new Error("Unexpected read");
+      if (options.v2 === false) throw new Error("execution reverted");
+      const reason = { cause: { data: `0x08c379a0${"00".repeat(64)}` } };
+      throw reason;
+    },
   };
   const provider = {
     async request(args) {
       requests.push(args);
       if (args.method === "eth_chainId") return options.chainId ?? "0x61";
       if (args.method === "eth_accounts") return options.accounts ?? [OWNER];
+      if (args.method === "eth_estimateGas") {
+        if (!options.singleTx) throw new Error(`Unexpected wallet request: ${args.method}`);
+        return 200000n;
+      }
+      if (args.method === "eth_sendTransaction") {
+        if (!options.singleTx) throw new Error(`Unexpected wallet request: ${args.method}`);
+        return options.txHash ?? HASH;
+      }
       if (args.method === "wallet_getCapabilities")
         return {
           "0x61": { atomicBatch: { status: options.capability ?? "ready" } },
@@ -566,4 +586,60 @@ test("an invalid wallet response keeps the saved request ID instead of permittin
       /saved request ID/.test(error.message) &&
       !(error instanceof batch.RebalanceBatchRejected),
   );
+});
+
+test("single-tx rebalance signs once for all steps on any plain wallet", async () => {
+  const { batch, provider, requests } = load({ singleTx: true });
+  const submitted = await batch.submitRebalanceSingleTx(provider, plan);
+  assert.equal(submitted.hash, HASH);
+  assert.ok(submitted.approvalHash, "exact approval is its own prompt");
+  const sends = requests.filter((r) => r.method === "eth_sendTransaction");
+  assert.equal(sends.length, 2, "approve + one vault call, nothing per stock");
+  assert.ok(
+    !requests.some((r) => r.method === "wallet_sendCalls"),
+    "no EIP-7702 needed",
+  );
+  const receipts = await batch.confirmRebalanceSingleTx(plan, submitted.hash);
+  assert.equal(receipts.length, 2);
+  assert.ok(receipts.every((r) => r.hash === HASH));
+  assert.equal(receipts[0].positionId, POSITION);
+  assert.equal(receipts[1].positionId, OPENED);
+});
+
+test("single-tx skips approval when allowance already covers the buys", async () => {
+  const { batch, provider, requests } = load({
+    singleTx: true,
+    allowance: wei(10000),
+  });
+  const submitted = await batch.submitRebalanceSingleTx(provider, plan);
+  assert.equal(submitted.approvalHash, undefined);
+  assert.equal(
+    requests.filter((r) => r.method === "eth_sendTransaction").length,
+    1,
+    "exactly one signature total",
+  );
+});
+
+test("single-tx refuses to sign anything when Vault V2 is not deployed", async () => {
+  const { batch, provider, requests } = load({
+    singleTx: true,
+    v2: false,
+  });
+  await assert.rejects(
+    batch.submitRebalanceSingleTx(provider, plan),
+    batch.RebalanceV2Missing,
+  );
+  assert.equal(
+    requests.filter((r) => r.method === "eth_sendTransaction").length,
+    0,
+    "no signature was requested",
+  );
+});
+
+test("recovery returns mined receipts and null for absent transactions", async () => {
+  const { batch } = load({ singleTx: true });
+  const found = await batch.recoverRebalanceTx(plan, HASH);
+  assert.equal(found.length, 2);
+  const { batch: cold } = load({ singleTx: true, mined: false });
+  assert.equal(await cold.recoverRebalanceTx(plan, HASH), null);
 });

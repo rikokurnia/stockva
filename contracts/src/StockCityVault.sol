@@ -209,8 +209,80 @@ contract StockCityVault is ReentrancyGuard, Ownable {
         require(pos.owner == msg.sender, "Only position owner can sell");
         require(fractionBps > 0 && fractionBps <= 10000, "Invalid fraction bps");
         require(currentPrice > 0, "Invalid current price");
+        payout = _executeSale(pos, currentPrice, fractionBps);
+    }
 
-        // Calculate sold quantity
+    /// @notice One-signature rebalance: close positions and open new ones in ONE tx.
+    /// @dev Sells settle first (plan order), then a single pull funds all buys.
+    /// Any plain EOA wallet signs once — no EIP-7702 atomic batching required.
+    struct RebalanceBuy {
+        string ticker;
+        uint256 usdAmount;
+        uint256 entryPrice;
+        uint8 initialTier;
+    }
+
+    function rebalanceBatch(
+        bytes32[] calldata sellIds,
+        uint256[] calldata sellPrices,
+        RebalanceBuy[] calldata buys
+    ) external nonReentrant returns (bytes32[] memory positionIds) {
+        uint256 sells = sellIds.length;
+        uint256 n = buys.length;
+        require(sells + n > 0, "Empty rebalance");
+        require(sells <= 16, "Too many sells");
+        require(n <= 50, "Too many buys");
+        require(sellPrices.length == sells, "Sell array mismatch");
+
+        for (uint256 i = 0; i < sells; i++) {
+            require(sellPrices[i] > 0, "Invalid current price");
+        }
+        _closePositions(sellIds, sellPrices);
+
+        uint256 totalCost = 0;
+        for (uint256 i = 0; i < n; i++) {
+            require(bytes(buys[i].ticker).length > 0, "Ticker cannot be empty");
+            require(buys[i].usdAmount > 0, "Amount must be greater than 0");
+            require(buys[i].entryPrice > 0, "Entry price must be greater than 0");
+            require(buys[i].initialTier <= 3, "Invalid tier level");
+            totalCost += buys[i].usdAmount;
+        }
+
+        positionIds = new bytes32[](n);
+        if (totalCost > 0) {
+            // Single pull for the whole rebalance (one approval covers it)
+            paymentToken.safeTransferFrom(msg.sender, address(this), totalCost);
+            for (uint256 i = 0; i < n; i++) {
+                positionIds[i] = _openPosition(
+                    msg.sender,
+                    buys[i].ticker,
+                    buys[i].usdAmount,
+                    buys[i].entryPrice,
+                    buys[i].initialTier
+                );
+            }
+        }
+    }
+
+    /// @notice Full-close every listed position. Split out to avoid stack pressure.
+    function _closePositions(
+        bytes32[] calldata sellIds,
+        uint256[] calldata sellPrices
+    ) internal {
+        for (uint256 i = 0; i < sellIds.length; i++) {
+            Position storage pos = positions[sellIds[i]];
+            require(pos.active, "Position is not active");
+            require(pos.owner == msg.sender, "Only position owner can sell");
+            _executeSale(pos, sellPrices[i], 10000);
+        }
+    }
+
+    /// @notice Shared sale settlement: identical math + events for single and batch sells.
+    function _executeSale(
+        Position storage pos,
+        uint256 currentPrice,
+        uint256 fractionBps
+    ) internal returns (uint256 payout) {
         uint256 soldQuantity = (pos.quantity * fractionBps) / 10000;
         require(soldQuantity > 0, "Sold quantity too small");
 
@@ -235,7 +307,7 @@ contract StockCityVault is ReentrancyGuard, Ownable {
         int256 pnl = int256(actualPayout) - int256(costBasis);
 
         emit PositionSold(
-            positionId,
+            pos.id,
             msg.sender,
             pos.ticker,
             soldQuantity,

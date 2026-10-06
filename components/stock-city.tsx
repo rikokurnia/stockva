@@ -54,8 +54,12 @@ import {
   prepareRebalanceBatch,
   sendRebalanceBatch,
   confirmRebalanceBatch,
+  submitRebalanceSingleTx,
+  confirmRebalanceSingleTx,
+  recoverRebalanceTx,
   newRebalanceBatchId,
   RebalanceBatchRejected,
+  RebalanceV2Missing,
   type BatchProvider,
 } from "../lib/rebalance-batch";
 import OnchainWallet from "./onchain-wallet";
@@ -70,6 +74,7 @@ import {
   sellBuildingOnchain,
   confirmedRebalanceReceipt,
   confirmedBuildingPurchases,
+  type RebalanceReceipt,
 } from "../lib/contracts";
 import BundleModal from "./bundle-modal";
 import { BuildingCatalogueModal } from "./building-catalogue-modal";
@@ -883,6 +888,7 @@ export default function StockCity() {
       setGameMode("live");
       setActiveTool("inspect");
       setKind(null);
+      let receipts: RebalanceReceipt[];
       if (!run.batchId) {
         plan = bindReviewedCityPositions(plan, latest);
         run = { ...run, plan };
@@ -938,7 +944,6 @@ export default function StockCity() {
 
         // Legacy runs may only reconcile transactions already submitted.
         const useSequential = run.mode === "sequential";
-        const calls = useSequential ? null : await prepareRebalanceBatch(provider, plan);
 
         if (useSequential) {
           run = await reconcileLegacyRebalance(run, {
@@ -972,7 +977,9 @@ export default function StockCity() {
           return;
         }
 
-        // Atomic Batch Mode:
+        // Single-transaction mode: one vault call for every step, signed once
+        // with any plain EOA wallet. Falls back to the EIP-7702 atomic batch
+        // only when Vault V2 is not deployed yet.
         if (
           Date.now() > plan.expiresAt ||
           rebalanceFingerprint(simulationLatest.current.city) !==
@@ -981,12 +988,11 @@ export default function StockCity() {
           throw new Error(
             "The blueprint expired or your city changed during wallet checks. Request a fresh blueprint.",
           );
-        // Save the ID BEFORE opening the wallet. An interrupted request must be
+        // Save state BEFORE opening the wallet. An interrupted request must be
         // polled, never resubmitted, even if the wallet response was lost.
         createdBatch = true;
         run = {
           ...run,
-          batchId: newRebalanceBatchId(),
           batchStatus: "wallet",
           steps: run.steps.map((p) => ({
             ...p,
@@ -998,21 +1004,95 @@ export default function StockCity() {
         focus(
           plan.steps[0],
           "wallet",
-          "One wallet approval for the complete rebalance",
+          "One signature for the complete rebalance",
         );
-        notify("Agent: approve the whole rebalance once in your wallet.");
+        notify(
+          "Agent: sign the whole rebalance once in your wallet (plus an mUSD approval only if needed).",
+        );
         sendAttempted = true;
-        const id = await sendRebalanceBatch(
-          provider,
-          plan,
-          calls!,
-          run.batchId!,
-        );
+        try {
+          const submitted = await submitRebalanceSingleTx(provider, plan);
+          run = {
+            ...run,
+            batchId: submitted.hash,
+            batchStatus: "pending",
+            steps: run.steps.map((p) => ({ ...p, status: "submitted" })),
+          };
+          saveAgentExecution(run);
+          focus(
+            plan.steps[0],
+            "submitted",
+            "Checking the single transaction · no additional signatures",
+            submitted.hash,
+          );
+          receipts = await confirmRebalanceSingleTx(plan, submitted.hash);
+        } catch (singleError) {
+          if (!(singleError instanceof RebalanceV2Missing))
+            throw singleError;
+          // Vault V2 is not deployed yet — legacy EIP-7702 atomic path.
+          notify("Vault V2 is not live yet — trying the wallet-batching path.");
+          const calls = await prepareRebalanceBatch(provider, plan);
+          run = {
+            ...run,
+            batchId: newRebalanceBatchId(),
+            batchStatus: "wallet",
+            steps: run.steps.map((p) => ({
+              ...p,
+              status: "wallet",
+              error: undefined,
+            })),
+          };
+          saveAgentExecution(run);
+          focus(
+            plan.steps[0],
+            "wallet",
+            "One wallet approval for the complete rebalance",
+          );
+          const id = await sendRebalanceBatch(
+            provider,
+            plan,
+            calls,
+            run.batchId!,
+          );
+          run = {
+            ...run,
+            batchId: id,
+            batchStatus: "pending",
+            steps: run.steps.map((p) => ({ ...p, status: "submitted" })),
+          };
+          saveAgentExecution(run);
+          focus(
+            plan.steps[0],
+            "submitted",
+            "Checking the atomic batch · no additional signatures",
+          );
+          receipts = await confirmRebalanceBatch(
+            provider,
+            plan,
+            run.batchId!,
+            (hash) => {
+              run = {
+                ...run,
+                steps: run.steps.map((p) => ({ ...p, hash })),
+              };
+              saveAgentExecution(run);
+              focus(
+                plan.steps[0],
+                "submitted",
+                "One transaction · verifying all building receipts",
+                hash,
+              );
+            },
+          );
+        }
         run = {
           ...run,
-          batchId: id,
           batchStatus: "pending",
-          steps: run.steps.map((p) => ({ ...p, status: "submitted" })),
+          steps: run.steps.map((p) => ({
+            ...p,
+            status: "submitted",
+            error: undefined,
+          })),
         };
         saveAgentExecution(run);
       } else {
@@ -1026,27 +1106,33 @@ export default function StockCity() {
           })),
         };
         saveAgentExecution(run);
+        focus(
+          plan.steps[0],
+          "submitted",
+          "Checking the submitted transaction · no additional signatures",
+        );
+        // Single-tx hash first; legacy EIP-7702 batch ids fall through.
+        receipts =
+          (await recoverRebalanceTx(plan, run.batchId!)) ??
+          (await confirmRebalanceBatch(
+            provider,
+            plan,
+            run.batchId!,
+            (hash) => {
+              run = {
+                ...run,
+                steps: run.steps.map((p) => ({ ...p, hash })),
+              };
+              saveAgentExecution(run);
+              focus(
+                plan.steps[0],
+                "submitted",
+                "One transaction · verifying all building receipts",
+                hash,
+              );
+            },
+          ));
       }
-      focus(
-        plan.steps[0],
-        "submitted",
-        "Checking the atomic batch · no additional signatures",
-      );
-      const receipts = await confirmRebalanceBatch(
-        provider,
-        plan,
-        run.batchId!,
-        (hash) => {
-          run = { ...run, steps: run.steps.map((p) => ({ ...p, hash })) };
-          saveAgentExecution(run);
-          focus(
-            plan.steps[0],
-            "submitted",
-            "One transaction · verifying all building receipts",
-            hash,
-          );
-        },
-      );
       const next = {
         ...applyRebalanceBatch(
           simulationLatest.current.city,

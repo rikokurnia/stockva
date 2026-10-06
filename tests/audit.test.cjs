@@ -342,7 +342,7 @@ test("RWA spread requests cannot receive another ticker's cached response", asyn
 
 const viem = require("viem");
 const OWNER = `0x${"a".repeat(40)}`;
-const VAULT = "0x1810b360e0a4d593117f0bfaf2e0939b2df5e415";
+const VAULT = "0xa5D86d9829EA2097884163C1ebd38072875263D9";
 const TOKEN = "0xCA2Ab14Aa5F41705a2f3BF17b728a272441C4f21";
 const events = viem.parseAbi([
   "event FaucetClaimed(address indexed recipient,uint256 amount)",

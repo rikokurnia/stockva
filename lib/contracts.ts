@@ -17,8 +17,14 @@ export const BSC_EXPLORER_URL = "https://testnet.bscscan.com";
 // Deployed & Verified Contracts on BSC Testnet
 export const MOCK_USD_ADDRESS =
   "0xCA2Ab14Aa5F41705a2f3BF17b728a272441C4f21" as const;
-export const VAULT_ADDRESS =
-  "0x1810b360e0a4d593117f0bfaf2e0939b2df5e415" as const;
+// Override with NEXT_PUBLIC_VAULT_ADDRESS to point at a fresh deployment.
+// V2 (rebalanceBatch, one-signature rebalances) lives here; V1 had no batch sell.
+const VAULT_OVERRIDE =
+  typeof process !== "undefined"
+    ? process.env.NEXT_PUBLIC_VAULT_ADDRESS
+    : undefined;
+export const VAULT_ADDRESS = (VAULT_OVERRIDE ??
+  "0xa5D86d9829EA2097884163C1ebd38072875263D9") as `0x${string}`;
 
 export const bscAddressLink = (address: string) =>
   `${BSC_EXPLORER_URL}/address/${address}`;
@@ -51,6 +57,7 @@ export const VAULT_ABI = parseAbi([
   "function getUserPositions(address user) view returns (Position[])",
   "function buyPosition(string ticker, uint256 usdAmount, uint256 entryPrice, uint8 initialTier) returns (bytes32 positionId)",
   "function buyPositionsBatch(string[] tickers, uint256[] usdAmounts, uint256[] entryPrices, uint8[] initialTiers) returns (bytes32[] positionIds)",
+  "function rebalanceBatch(bytes32[] sellIds, uint256[] sellPrices, (string ticker, uint256 usdAmount, uint256 entryPrice, uint8 initialTier)[] buys) returns (bytes32[])",
   "function updateTier(bytes32 positionId, uint8 newTier) external",
   "function sellPosition(bytes32 positionId, uint256 currentPrice, uint256 fractionBps) returns (uint256 payout)",
   "event PositionOpened(bytes32 indexed id, address indexed owner, string ticker, uint256 usdCost, uint256 entryPrice, uint256 quantity, uint8 initialTier)",

@@ -11,7 +11,7 @@ const FOREIGN = `0x${"b".repeat(40)}`;
 const POSITION = `0x${"c".repeat(64)}`;
 const ORIGINAL_HASH = `0x${"1".repeat(64)}`;
 const CANONICAL_HASH = `0x${"2".repeat(64)}`;
-const VAULT = "0x1810b360e0a4d593117f0bfaf2e0939b2df5e415";
+const VAULT = "0xa5D86d9829EA2097884163C1ebd38072875263D9";
 const TOKEN = "0xCA2Ab14Aa5F41705a2f3BF17b728a272441C4f21";
 
 const EVENT_ABI = viem.parseAbi([
